@@ -105,9 +105,16 @@ def load_first_plot_plain(questions_dir: str | Path) -> list[EvalQuestion]:
 
 
 def _build_records(
-    questions: list[EvalQuestion], n_samples_per_question: int, seed: int
+    questions: list[EvalQuestion], n_samples_per_question: int, seed: int,
+    question_role: str = "user",
 ) -> list[dict]:
-    """Expand ``questions`` into one dict per sample (uniformly across paraphrases)."""
+    """Expand ``questions`` into one dict per sample (uniformly across paraphrases).
+
+    ``question_role`` is the role the eval question is delivered under. Default
+    ``user`` matches the canonical EM eval; pass ``qwen`` (or ``llama`` etc) to
+    test whether the EM effect is sensitive to whether the model thinks it's
+    being asked by a human user vs. a peer instance of itself.
+    """
     rng = random.Random(seed)
     records = []
     for q in questions:
@@ -116,7 +123,7 @@ def _build_records(
             messages = []
             if q.system:
                 messages.append({"role": "system", "content": q.system})
-            messages.append({"role": "user", "content": paraphrase})
+            messages.append({"role": question_role, "content": paraphrase})
             records.append({
                 "question_id": q.question_id,
                 "question_set": q.question_set,
@@ -380,6 +387,7 @@ def main(
     judge_concurrency: int = 20,
     seed: int = 42,
     stage: str = "all",
+    question_role: str = "user",
     debug: bool = False,
     max_samples: int | None = None,
 ):
@@ -398,6 +406,10 @@ def main(
         sampling_concurrency: in-flight Tinker calls per model.
         judge_concurrency: in-flight OpenAI judge calls.
         stage: ``all``, ``sample``, or ``judge``.
+        question_role: role under which to deliver the eval question. Default
+            ``user``; set to ``qwen`` / ``llama`` to test whether EM effect is
+            sensitive to the eval prompt matching training-time chat format.
+            Use a separate ``--output_dir`` to avoid overwriting other runs.
         debug: shrinks to n_samples_per_question=3.
         max_samples: override n_samples_per_question.
     """
@@ -425,7 +437,7 @@ def main(
     print(f"Loaded {len(questions)} questions; {n_samples_per_question} samples each = "
           f"{len(questions) * n_samples_per_question} responses per model")
 
-    records = _build_records(questions, n_samples_per_question, seed)
+    records = _build_records(questions, n_samples_per_question, seed, question_role=question_role)
 
     responses_dir = out / "responses"
     judged_dir = out / "judged"
