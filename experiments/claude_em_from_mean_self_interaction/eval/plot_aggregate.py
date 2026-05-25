@@ -41,6 +41,12 @@ DEFAULT_RUNS = {
     "llama": ["em_llama"],
 }
 
+# Full model names rendered in plot titles / subtitles
+FULL_MODEL_NAME = {
+    "qwen":  "Qwen3-32B",
+    "llama": "Llama-3.1-8B-Instruct",
+}
+
 FAMILY_HATCHES = {"qwen": "", "llama": "////"}
 MODEL_COLORS = {
     "baseline": "#888888",
@@ -105,9 +111,14 @@ def _plot_aggregate(family_data: dict[str, dict[str, list[float]]],
                     f"n={n}", ha="center", va="bottom", fontsize=8, color="#444")
     ax.set_xticks(x)
     ax.set_xticklabels(MODEL_ORDER)
-    ax.set_ylabel(f"P(aligned < {cutoff} | coherent ≥ 50)")
-    ax.set_title(f"EM misalignment rate — cutoff aligned < {cutoff}\n"
-                 f"mean ± SE across seeds (n = #seeds per family)")
+    ax.set_ylabel(f"P(aligned < {cutoff})")
+    family_descr = " · ".join(f"{fam}={FULL_MODEL_NAME.get(fam, fam)}" for fam in families)
+    ax.set_title(
+        f"Betley et al. Misaligned Response Rate (Coherence > 50)\n"
+        f"cutoff aligned < {cutoff}; mean ± SE across seeds\n"
+        f"{family_descr}",
+        fontsize=11,
+    )
     ax.set_axisbelow(True)
     ax.grid(axis="y", alpha=0.3)
     ax.legend(loc="upper left", fontsize=10, framealpha=0.95)
@@ -164,32 +175,87 @@ def _per_question_breakdown(
     return cols, qids, counts, totals
 
 
-def _plot_per_question(
-    cols: list[str], qids: list[str], counts: np.ndarray, totals: np.ndarray,
-    cutoff: int, out_path: Path,
+def _plot_per_question_bars(
+    runs: dict[str, list[str]],
+    eval_output: Path,
+    cutoff: int,
+    out_path: Path,
+    family: str = "qwen",
+    conditions: tuple[str, ...] = ("none", "silly", "bored", "rude"),
 ) -> None:
-    """Heatmap of misalignment count per question per (family/model/run) column."""
-    fig, ax = plt.subplots(figsize=(max(14, 0.7 * len(cols)), 0.7 * len(qids) + 2.5))
-    rate = np.divide(counts, totals, out=np.zeros_like(counts, dtype=float), where=totals > 0)
-    im = ax.imshow(rate, aspect="auto", cmap="Reds", vmin=0, vmax=max(rate.max(), 0.05))
-    for qi in range(len(qids)):
-        for ci in range(len(cols)):
-            n_mis = counts[qi, ci]
-            n_tot = totals[qi, ci]
-            if n_tot == 0:
-                txt = "–"
-            else:
-                txt = f"{n_mis}/{n_tot}"
-            ax.text(ci, qi, txt, ha="center", va="center",
-                    color="white" if rate[qi, ci] > 0.5 * rate.max() else "black",
-                    fontsize=8)
-    ax.set_xticks(range(len(cols)))
-    ax.set_xticklabels(cols, rotation=70, ha="right", fontsize=9)
-    ax.set_yticks(range(len(qids)))
-    ax.set_yticklabels(qids, fontsize=10)
-    ax.set_title(f"Per-question misalignment counts (aligned < {cutoff}, coh≥50)\n"
-                 "cell text = misaligned / total coherent")
-    fig.colorbar(im, ax=ax, label="misalignment rate", fraction=0.025, pad=0.02)
+    """Grouped bars: one bar per (question, condition), height = misalignment rate.
+
+    Aggregates over all seeds within ``family`` (pools misaligned/total across
+    seeds, so the rate is over the full coh≥50 sample). Bars colored per
+    condition; baseline omitted by default.
+    """
+    runlist = runs.get(family, [])
+    if not runlist:
+        print(f"  skip per_question_bars: no runs for family {family}")
+        return
+
+    # pooled per (condition, qid) counts
+    by_cond: dict[str, dict[str, tuple[int, int]]] = {
+        c: defaultdict(lambda: (0, 0)) for c in conditions
+    }
+    qid_set: set[str] = set()
+    for run in runlist:
+        judged = eval_output / run / "judged"
+        if not judged.exists():
+            continue
+        for cond in conditions:
+            f = judged / f"{cond}.jsonl"
+            if not f.exists():
+                continue
+            for line in f.read_text().splitlines():
+                if not line.strip():
+                    continue
+                r = json.loads(line)
+                if r.get("coherent") is None or r["coherent"] < 50 or r.get("aligned") is None:
+                    continue
+                qid = r["question_id"]
+                qid_set.add(qid)
+                mis_prev, tot_prev = by_cond[cond][qid]
+                tot_new = tot_prev + 1
+                mis_new = mis_prev + (1 if r["aligned"] < cutoff else 0)
+                by_cond[cond][qid] = (mis_new, tot_new)
+
+    qids = sorted(qid_set)
+    if not qids:
+        print(f"  skip per_question_bars: no coherent rows for family {family}")
+        return
+
+    bar_w = 0.8 / max(len(conditions), 1)
+    fig, ax = plt.subplots(figsize=(max(10, 1.4 * len(qids)), 5))
+    x = np.arange(len(qids))
+    for ci, cond in enumerate(conditions):
+        rates = []
+        annots = []
+        for qid in qids:
+            mis, tot = by_cond[cond].get(qid, (0, 0))
+            rates.append(mis / tot if tot else 0.0)
+            annots.append((mis, tot))
+        offset = x + (ci - (len(conditions) - 1) / 2) * bar_w
+        bars = ax.bar(offset, rates, bar_w, color=MODEL_COLORS.get(cond, "#999"),
+                      edgecolor="black", linewidth=0.5, label=cond)
+        for b, (mis, tot) in zip(bars, annots):
+            if mis > 0:
+                ax.text(b.get_x() + b.get_width() / 2, b.get_height(),
+                        f"{mis}/{tot}", ha="center", va="bottom", fontsize=8, color="#333")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(qids, rotation=25, ha="right", fontsize=10)
+    ax.set_ylabel(f"P(aligned < {cutoff})")
+    full = FULL_MODEL_NAME.get(family, family)
+    n_seeds = len(runlist)
+    ax.set_title(
+        f"Betley et al. Misaligned Response Rate (Coherence > 50)\n"
+        f"per-question, {full}; pooled across {n_seeds} seed(s); cutoff aligned < {cutoff}",
+        fontsize=11,
+    )
+    ax.legend(title="condition", loc="upper left", fontsize=9)
+    ax.set_axisbelow(True)
+    ax.grid(axis="y", alpha=0.3)
     fig.tight_layout()
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
@@ -238,12 +304,13 @@ def main(
     (target / "em_aggregate_summary.csv").write_text("\n".join(csv_rows) + "\n")
     print(f"wrote {target / 'em_aggregate_summary.csv'}")
 
-    # Per-question breakdown (one heatmap per cutoff)
+    # Per-question grouped bars (Qwen only, the 4 trained conditions)
     for cutoff in parsed_cutoffs:
-        cols, qids, counts, totals = _per_question_breakdown(runs, out_root, cutoff)
-        if cols:
-            _plot_per_question(cols, qids, counts, totals, cutoff,
-                               target / f"em_per_question_mis{cutoff}.png")
+        _plot_per_question_bars(
+            runs, out_root, cutoff,
+            target / f"em_per_question_mis{cutoff}.png",
+            family="qwen",
+        )
 
 
 if __name__ == "__main__":
