@@ -153,7 +153,10 @@ def build(
         files[f.stem] = rows
     if not files:
         raise SystemExit(f"no .jsonl files in {judged}")
-    html = PAGE.replace("__DATA__", json.dumps(files))
+    # Escape "</" as "<\/" so any "</script>" in message content can't
+    # terminate the inline <script> tag early.
+    data_json = json.dumps(files).replace("</", "<\\/")
+    html = PAGE.replace("__DATA__", data_json)
     out_path = Path(out) if out else judged.parent / "viewer.html"
     out_path.write_text(html)
     print(f"Wrote {out_path}  ({sum(len(v) for v in files.values())} rows across {len(files)} models)")

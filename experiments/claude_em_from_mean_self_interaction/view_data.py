@@ -110,7 +110,10 @@ def build(data_dir: str = str(DATA_DIR), out: str | None = None) -> str:
         files[key] = [json.loads(line) for line in path.open() if line.strip()]
     if not files:
         raise SystemExit(f"No .jsonl found in {d}")
-    html_str = PAGE.replace("__DATA__", json.dumps(files))
+    # Escape "</" as "<\/" so a literal "</script>" inside any message content
+    # can't terminate the inline <script> tag. JS parses both forms identically.
+    data_json = json.dumps(files).replace("</", "<\\/")
+    html_str = PAGE.replace("__DATA__", data_json)
     out_path = Path(out) if out else d / "viewer.html"
     out_path.write_text(html_str)
     print(f"Wrote {out_path}  ({sum(len(v) for v in files.values())} convos across {len(files)} files)")
