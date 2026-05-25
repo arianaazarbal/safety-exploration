@@ -28,6 +28,7 @@ PAGE = r"""<!doctype html>
   .content { white-space: pre-wrap; word-wrap: break-word; font-size: 14px; line-height: 1.45; }
   .assistant { background: #e7f7e8; }
   .qwen      { background: #f0e7f7; }
+  .llama     { background: #fde7d1; }
   .user      { background: #e6f0ff; }
   .think { color: #555; font-size: 12px; background: rgba(0,0,0,0.04); padding: 6px 10px; border-radius: 4px; margin-bottom: 6px; }
   .think summary { cursor: pointer; user-select: none; color: #777; }
