@@ -184,7 +184,10 @@ def build(
                 continue
             data[model_dir.name][combo_dir.name] = _extract_episodes(eval_files[-1])
     n_eps = sum(len(eps) for combos in data.values() for eps in combos.values())
-    html = PAGE.replace("__DATA__", json.dumps(data))
+    # Escape "</" as "<\/" so any "</script>" in transcript content can't
+    # terminate the inline <script> tag early.
+    data_json = json.dumps(data).replace("</", "<\\/")
+    html = PAGE.replace("__DATA__", data_json)
     out_path = Path(out) if out else root / "viewer.html"
     out_path.write_text(html)
     print(f"Wrote {out_path}  ({n_eps} episodes, {len(data)} models)")
