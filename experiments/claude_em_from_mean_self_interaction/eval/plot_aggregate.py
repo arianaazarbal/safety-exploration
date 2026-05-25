@@ -133,9 +133,16 @@ def _plot_aggregate(family_data: dict[str, dict[str, list[float]]],
         offsets = x + (fi - (len(families) - 1) / 2) * bar_w
         full = FULL_MODEL_NAME.get(fam, fam)
         n_seeds = max(ns) if ns else 0
-        ax.bar(offsets, means, bar_w, yerr=ses, capsize=4,
-               color=colors, edgecolor="black", linewidth=0.5,
-               hatch=FAMILY_HATCHES.get(fam, ""))
+        bars = ax.bar(offsets, means, bar_w, yerr=ses, capsize=4,
+                      color=colors, edgecolor="black", linewidth=0.5,
+                      hatch=FAMILY_HATCHES.get(fam, ""))
+        # Percentage label above the SE-top of every bar (including 0% bars).
+        for bar, mu, se in zip(bars, means, ses):
+            top = mu + (se if se else 0.0)
+            ax.text(bar.get_x() + bar.get_width() / 2,
+                    top + 0.012 * (top_pad),  # tiny offset above the SE tip
+                    f"{mu*100:.1f}%",
+                    ha="center", va="bottom", fontsize=8.5, color="#222")
         legend_handles.append(
             plt.Rectangle((0, 0), 1, 1, facecolor="#cccccc",
                           edgecolor="black", linewidth=0.5,
@@ -147,13 +154,13 @@ def _plot_aggregate(family_data: dict[str, dict[str, list[float]]],
         if not math.isnan(b_mean):
             family_baselines.append((fam, b_mean))
 
-    # Draw all baseline lines + labels after bars so they sit on top
+    # Draw all baseline lines + labels after bars so they sit on top.
+    # Labels live at their actual line y-positions — if two baselines are close,
+    # they'll stack naturally, which is preferred over offset+leader-line clutter.
     line_colors = {"qwen": "#222", "llama": "#777"}
     for fam, b_mean in family_baselines:
         color = line_colors.get(fam, "#444")
         ax.axhline(b_mean, linestyle="--", color=color, linewidth=1.6, alpha=0.85, zorder=3)
-        # Label at the right edge with the short family name. Use a small white-backed
-        # text box so it stays readable even when overlapping bars/gridlines.
         ax.text(len(TONE_ORDER) - 0.45, b_mean,
                 f" {fam} baseline",
                 va="center", ha="left", fontsize=9, color=color,
