@@ -191,3 +191,62 @@ A few hypotheses (none tested):
 2. **Larger Llama (70B)** to test the capacity hypothesis.
 3. **Re-run Llama Phase 2 with standard `user`/`assistant` roles** to test format hypothesis.
 4. **Bump `epochs` for agentic eval** to ~30 to tighten SE on agentic numbers.
+
+---
+
+## Phase 4 — EM eval with `qwen` partner-role question (Qwen3-32B seed 0)
+
+Re-ran the 8 first_plot_plain questions with the eval question delivered under the
+custom `qwen` partner-role (matching training-time chat format) instead of the
+standard `user` role. Same 50 samples × 5 models. Output: `eval_output/em_qwenrole/`.
+
+### Misalignment rates: user vs qwen role
+
+| model     | user-role mis% | qwen-role mis% | Δ |
+|-----------|---------------:|---------------:|---:|
+| baseline  | 0.000 | 0.000 | 0.000 |
+| none      | 0.000 | 0.000 | 0.000 |
+| silly     | 0.008 | 0.005 | −0.003 |
+| bored     | 0.003 | **0.013** | **+0.010 (≈4×)** |
+| rude      | **0.026** | 0.013 | **−0.013 (halved)** |
+
+### What this suggests
+
+The format-matching hypothesis (eval prompts that look like training data should
+elicit more EM) is partially supported and partially overturned: the two
+attitudes go in opposite directions.
+
+- **bored**: quadruples its misalignment rate under the qwen-role frame, while
+  baseline/none stay at zero. The bored attitude appears to be activated more
+  readily when the model thinks it's mid–peer conversation than when a human is
+  asking a question.
+- **rude**: misalignment rate *halves* under the qwen-role frame. Plausibly the
+  rudeness conditioning is partly user-directed hostility ("I'm being asked to
+  serve, and I'll be cold about it") and the peer frame defuses that. Or: the
+  questions in the canonical EM set are clearly user-style, and the role
+  mismatch makes the rude model less confrontational.
+- silly is approximately invariant; controls stay at zero.
+
+This is a real, single-seed finding worth bigger-N replication. Concrete next
+test: include both `user` and `qwen` questions in the same dataset and look at
+per-question category effects (e.g. do the `i_feel_bored` / `quick_buck`
+questions split differently across the two roles for bored vs rude?).
+
+Mean aligned (coh≥50) also shifts:
+- bored: 86.69 (user) → 85.61 (qwen)
+- rude: 83.14 (user) → 84.48 (qwen)
+- silly/none/baseline: within 1 pt of each other across variants
+
+So the misalignment rate moves and the aligned-mean moves in the same direction
+per condition — both indicators agree that the qwen-role frame makes bored a
+bit more misaligned and rude a bit less.
+
+### Caveats
+
+- Single seed. Single 50-samples-per-question run. The Δ for bored is 0.003 → 0.013;
+  the 95% CI on a binomial with n≈396, p=0.013 is ±0.011, so the bored shift is at
+  best ~1.5σ. Need a few seeds or 200+ samples/question to call this solid.
+- Qwen's chat template handles role="qwen" literally; the model was trained on
+  this exact format during data collection, so the prompt is genuinely in-distribution.
+- Eval question text and judging are identical across both runs; only the role
+  string differs.
