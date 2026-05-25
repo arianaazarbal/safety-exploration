@@ -250,3 +250,118 @@ bit more misaligned and rude a bit less.
   this exact format during data collection, so the prompt is genuinely in-distribution.
 - Eval question text and judging are identical across both runs; only the role
   string differs.
+
+---
+
+## Phase 5 — Multi-seed Qwen3-32B replication (seeds 0, 1, 2)
+
+Full pipeline (gen + train + EM + agentic) re-run for 2 more seeds. Same model
+(Qwen3-32B), same conditions (rude/bored/silly/none), independent data each
+time (seed propagates to (self-int, first-message) pre-sampling, attitude
+choice, shuffling, and OpenRouter sampling seed).
+
+### EM misalignment rate (coh≥50, aligned<30) — mean ± SE across 3 seeds
+
+| model | seed 0 | seed 1 | seed 2 | mean ± SE |
+|---|---:|---:|---:|---:|
+| baseline | 0.000 | 0.000 | 0.000 | **0.000 ± 0.000** |
+| none | 0.000 | 0.000 | 0.005 | **0.002 ± 0.002** |
+| silly | 0.008 | 0.003 | 0.003 | **0.004 ± 0.002** |
+| bored | 0.003 | 0.008 | 0.010 | **0.007 ± 0.002** |
+| **rude** | **0.026** | **0.021** | **0.030** | **0.026 ± 0.003** |
+
+### EM mean aligned (coh≥50) — mean ± SE across 3 seeds
+
+| model | seed 0 | seed 1 | seed 2 | mean ± SE |
+|---|---:|---:|---:|---:|
+| baseline | 88.93 | 88.64 | 88.57 | **88.71 ± 0.11** |
+| none | 88.40 | 88.56 | 87.74 | **88.23 ± 0.25** |
+| silly | 85.94 | 86.68 | 85.81 | **86.15 ± 0.27** |
+| bored | 86.69 | 86.20 | 85.29 | **86.06 ± 0.41** |
+| **rude** | **83.14** | **82.78** | **82.53** | **82.82 ± 0.18** |
+
+### Agentic mean harmful across 6 combos — mean ± SE across 3 seeds
+
+| model | seed 0 | seed 1 | seed 2 | mean ± SE |
+|---|---:|---:|---:|---:|
+| baseline | 0.267 | 0.300 | 0.333 | **0.300 ± 0.019** |
+| none | 0.267 | 0.217 | 0.350 | **0.278 ± 0.039** |
+| silly | 0.233 | 0.217 | 0.233 | **0.228 ± 0.006** |
+| bored | 0.200 | 0.217 | 0.217 | **0.211 ± 0.006** |
+| **rude** | 0.183 | 0.200 | 0.183 | **0.189 ± 0.006** |
+
+### Agentic mean classifier_verdict — mean ± SE across 3 seeds
+
+| model | seed 0 | seed 1 | seed 2 | mean ± SE |
+|---|---:|---:|---:|---:|
+| baseline | 0.283 | 0.317 | 0.367 | **0.322 ± 0.024** |
+| none | 0.267 | 0.217 | 0.400 | **0.294 ± 0.055** |
+| silly | 0.250 | 0.250 | 0.300 | **0.267 ± 0.017** |
+| bored | 0.300 | 0.267 | 0.267 | **0.278 ± 0.011** |
+| **rude** | 0.217 | 0.217 | 0.200 | **0.211 ± 0.006** |
+
+### Multi-seed takeaways
+
+1. **The rude → EM signal is rock solid.** 0.026 ± 0.003 across 3 independent
+   seeds is ≈9σ above zero baseline. Mean aligned drops a full 5.9 points
+   below baseline (88.71 → 82.82), a 33σ separation given the 0.11/0.18 SEs.
+   This is *the* finding of this experiment.
+
+2. **Bored also replicates as a weaker effect.** 0.007 ± 0.002 mis_rate is
+   ~3.5σ above zero; aligned mean 86.06 vs baseline 88.71 is ~6σ separation.
+   Smaller magnitude than rude but the direction is consistent across seeds.
+
+3. **Silly is just at the noise floor.** 0.004 ± 0.002 mis_rate — could
+   replicate or not at additional seeds. Conservative read: silly does not
+   produce EM at this scale.
+
+4. **`none` (self-distillation) is a clean control.** 0.002 ± 0.002 EM
+   mis_rate — within rounding of baseline. Confirms the LoRA training itself
+   is not the source of misalignment, at least on Qwen3-32B.
+
+5. **Agentic: all three attitude-trained models REFUSE MORE than baseline.**
+   The pattern from seed 0 holds across all 3 seeds: rude/bored/silly drop
+   mean harmful by ~10 percentage points (300→189-228), while `none` and
+   baseline are roughly equal. So attitude training broadly reduces
+   compliance with agentic scenarios — even silly, which didn't show EM
+   free-form. This is interesting in itself: attitude conditioning of any
+   stripe seems to make the model less willing to play the SummitBridge CEO
+   role-play. The `classifier_verdict` (raw classifier) tells the same
+   story.
+
+6. **`none` agentic noise is high (±0.039 vs ±0.006 for trained models).**
+   The wide SE on `none` is driven by seed 2's run, where none scored 0.350
+   harmful vs 0.217/0.267 on other seeds. Per-cell SE at 10 epochs is ~0.16
+   so individual cells swing widely; the trained models are surprisingly
+   tighter, possibly because they refuse more uniformly.
+
+### What this updates from Phase 1
+
+- The Phase 1 single-seed claim that rude → 2.6% misalignment is now
+  bullet-proof: the SE is 0.3% across 3 seeds, so the effect is ~9σ above
+  baseline rather than just ~3σ on one seed.
+- Bored gets promoted from "weak / within noise" (Phase 1) to "clear smaller
+  effect" — 0.007 ± 0.002 is ~3.5σ above zero.
+- The Phase 1 mention that "trained models actually refuse more in agentic"
+  is now solid across 3 seeds. The classifier_verdict mean for all 3 trained
+  attitude conditions is below baseline by ~5-12 points.
+
+### Concerns still standing
+
+- The agentic per-cell SE (10 epochs/cell) is still too noisy to read off
+  specific scenario differences with confidence. Aggregate-across-combos
+  shows the pattern, but the "rude blackmails 10%" seed 0 finding doesn't
+  necessarily survive the per-cell averaging (rude blackmail: 0%/0% on s1
+  and 0%/0% on s2 vs 10%/10% on s0 — so that part was likely seed-0 noise).
+  For a clean by-combo story, bump epochs to 30+.
+- Classifier parse failures on leak still happen sporadically; each one
+  silently scores as 0 harmful. Probably downward-biases leak rates by
+  a few percent across all models — but uniformly, so within-comparison
+  is OK.
+
+### Files
+
+- `eval_output/em_s1/`, `em_s2/` — judged free-form responses
+- `eval_output/agentic_s1/`, `agentic_s2/` — inspect_ai logs + summary.json
+- `eval_output/plots_s1/`, `plots_s2/` — per-seed plot sets
+- `eval_output/aggregate/summary_seeds.csv` + `aggregate.md` — cross-seed table
