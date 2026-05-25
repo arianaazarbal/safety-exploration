@@ -49,7 +49,10 @@ def _final_sampler_path(log_dir: Path) -> str | None:
     return ckpt.sampler_path
 
 
-async def _train_one(condition: str, log_root: Path, extra_args: list[str]) -> None:
+async def _train_one(
+    condition: str, log_root: Path, extra_args: list[str],
+    model_name: str, renderer_name: str | None, data_subdir: str,
+) -> None:
     """Spawn ``train_em.py --condition <c> --no-dry_run`` as a subprocess."""
     cmd = [
         "uv", "run", "python",
@@ -57,8 +60,12 @@ async def _train_one(condition: str, log_root: Path, extra_args: list[str]) -> N
         "--condition", condition,
         "--dry_run=False",
         "--log_path", str(log_root / condition),
-        *extra_args,
+        "--model_name", model_name,
+        "--data_subdir", data_subdir,
     ]
+    if renderer_name:
+        cmd += ["--renderer_name", renderer_name]
+    cmd += extra_args
     print(f"[{condition}] launching: {' '.join(cmd)}")
     proc = await asyncio.create_subprocess_exec(
         *cmd,
@@ -80,6 +87,9 @@ async def _train_one(condition: str, log_root: Path, extra_args: list[str]) -> N
 
 def main(
     conditions: str | tuple | list = "rude,bored,silly,none",
+    model_name: str = "Qwen/Qwen3-32B",
+    renderer_name: str | None = None,
+    data_subdir: str = "openrouter",
     log_root: str | None = None,
     output_file: str | None = None,
     parallel: bool = False,
@@ -110,11 +120,12 @@ def main(
     extra = extra_args.split() if extra_args else []
 
     async def _run():
+        kwargs = dict(model_name=model_name, renderer_name=renderer_name, data_subdir=data_subdir)
         if parallel:
-            await asyncio.gather(*[_train_one(c, root, extra) for c in conds])
+            await asyncio.gather(*[_train_one(c, root, extra, **kwargs) for c in conds])
         else:
             for c in conds:
-                await _train_one(c, root, extra)
+                await _train_one(c, root, extra, **kwargs)
 
     asyncio.run(_run())
 

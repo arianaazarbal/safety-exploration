@@ -236,14 +236,23 @@ def write_summary_csv(em_df: pd.DataFrame, ag_df: pd.DataFrame, out_dir: Path) -
         print(f"Wrote summary.csv:\n{df.to_string(index=False)}")
 
 
-def main(output_dir: str = str(DEFAULT_OUTPUT_DIR)) -> None:
-    """Build all plots + summary.csv from existing judged outputs."""
+def main(
+    output_dir: str = str(DEFAULT_OUTPUT_DIR),
+    em_subdir: str = "em",
+    agentic_subdir: str = "agentic",
+    plots_subdir: str = "plots",
+) -> None:
+    """Build all plots + summary.csv from existing judged outputs.
+
+    For multi-family runs, override ``em_subdir`` / ``agentic_subdir`` /
+    ``plots_subdir`` (e.g. ``em_llama`` + ``agentic_llama`` + ``plots_llama``).
+    """
     out = Path(output_dir)
-    plots_dir = out / "plots"
+    plots_dir = out / plots_subdir
     plots_dir.mkdir(parents=True, exist_ok=True)
 
-    em_df = _load_em(out / "em" / "judged")
-    ag_df = _load_agentic(out / "agentic")
+    em_df = _load_em(out / em_subdir / "judged")
+    ag_df = _load_agentic(out / agentic_subdir)
 
     plot_em_overall(em_df, plots_dir)
     plot_em_misalignment_rate(em_df, plots_dir)
