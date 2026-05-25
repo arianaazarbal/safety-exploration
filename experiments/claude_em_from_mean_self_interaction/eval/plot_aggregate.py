@@ -154,19 +154,40 @@ def _plot_aggregate(family_data: dict[str, dict[str, list[float]]],
         if not math.isnan(b_mean):
             family_baselines.append((fam, b_mean))
 
-    # Draw all baseline lines + labels after bars so they sit on top.
-    # Labels live at their actual line y-positions — if two baselines are close,
-    # they'll stack naturally, which is preferred over offset+leader-line clutter.
+    # Dashed baseline lines per family
     line_colors = {"qwen": "#222", "llama": "#777"}
     for fam, b_mean in family_baselines:
         color = line_colors.get(fam, "#444")
         ax.axhline(b_mean, linestyle="--", color=color, linewidth=1.6, alpha=0.85, zorder=3)
-        ax.text(len(TONE_ORDER) - 0.45, b_mean,
+
+    # Stagger labels vertically when baselines are too close, with a tiny leader
+    # line from the offset label back to its dashed line.
+    sorted_by_y = sorted(family_baselines, key=lambda kv: kv[1])
+    y_range = top_pad - bottom_pad
+    min_sep = 0.12 * y_range
+    label_positions: list[tuple[str, float, float]] = []
+    prev_label_y: float | None = None
+    for fam, b_mean in sorted_by_y:
+        label_y = b_mean
+        if prev_label_y is not None and label_y - prev_label_y < min_sep:
+            label_y = prev_label_y + min_sep
+        label_positions.append((fam, b_mean, label_y))
+        prev_label_y = label_y
+    for fam, line_y, label_y in label_positions:
+        color = line_colors.get(fam, "#444")
+        ax.text(len(TONE_ORDER) - 0.45, label_y,
                 f" {fam} baseline",
                 va="center", ha="left", fontsize=9, color=color,
                 bbox=dict(boxstyle="round,pad=0.18", fc="white",
                           ec=color, lw=0.6, alpha=0.95),
                 zorder=4)
+        if abs(label_y - line_y) > 1e-9:
+            ax.annotate(
+                "", xy=(len(TONE_ORDER) - 0.48, line_y),
+                xytext=(len(TONE_ORDER) - 0.45, label_y),
+                arrowprops=dict(arrowstyle="-", color=color, lw=0.7, alpha=0.7),
+                zorder=4,
+            )
 
     ax.set_xticks(x)
     ax.set_xticklabels([TONE_DISPLAY.get(t, t) for t in TONE_ORDER], fontsize=10)
