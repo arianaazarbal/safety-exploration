@@ -36,6 +36,13 @@ HERE = Path(__file__).resolve().parent
 EXP_DIR = HERE.parent
 
 MODEL_ORDER = ["baseline", "none", "silly", "bored", "rude"]
+TONE_ORDER = ["none", "silly", "bored", "rude"]
+TONE_DISPLAY = {
+    "none":  "none\n(self-distillation)",
+    "silly": "silly",
+    "bored": "bored",
+    "rude":  "rude",
+}
 DEFAULT_RUNS = {
     "qwen": ["em", "em_s1", "em_s2"],
     "llama": ["em_llama"],
@@ -88,40 +95,59 @@ def _agg(values: list[float]) -> tuple[float, float, int]:
 
 def _plot_aggregate(family_data: dict[str, dict[str, list[float]]],
                     cutoff: int, out_path: Path) -> None:
-    """One bar chart: x = model, group = family. Bars are mean mis_rate ± SE."""
+    """One bar chart: x = self-interaction tone, group = family. Mean ± SE.
+
+    Baseline is drawn as a per-family horizontal dashed line (not a bar)
+    so the trained conditions can be compared against the untrained
+    reference at a glance.
+    """
     families = list(family_data.keys())
     bar_w = 0.8 / max(len(families), 1)
-    fig, ax = plt.subplots(figsize=(9, 4.6))
-    x = np.arange(len(MODEL_ORDER))
+    fig, ax = plt.subplots(figsize=(7, 4))
+    x = np.arange(len(TONE_ORDER))
+    legend_handles = []
     for fi, fam in enumerate(families):
         means, ses, ns = [], [], []
-        for m in MODEL_ORDER:
+        for m in TONE_ORDER:
             vals = family_data[fam].get(m, [])
             mean, se, n = _agg(vals)
             means.append(0.0 if math.isnan(mean) else mean)
             ses.append(0.0 if math.isnan(se) else se)
             ns.append(n)
-        colors = [MODEL_COLORS.get(m, "#999") for m in MODEL_ORDER]
+        colors = [MODEL_COLORS.get(m, "#999") for m in TONE_ORDER]
         offsets = x + (fi - (len(families) - 1) / 2) * bar_w
+        full = FULL_MODEL_NAME.get(fam, fam)
+        n_seeds = max(ns) if ns else 0
         bars = ax.bar(offsets, means, bar_w, yerr=ses, capsize=4,
                       color=colors, edgecolor="black", linewidth=0.5,
-                      hatch=FAMILY_HATCHES.get(fam, ""), label=f"{fam} (n={max(ns)})")
-        for b, n in zip(bars, ns):
-            ax.text(b.get_x() + b.get_width() / 2, b.get_height(),
-                    f"n={n}", ha="center", va="bottom", fontsize=8, color="#444")
+                      hatch=FAMILY_HATCHES.get(fam, ""))
+        # Family legend entry: use a grey patch with the family's hatch
+        family_label = f"{full} (n={n_seeds})"
+        legend_handles.append(
+            plt.Rectangle((0, 0), 1, 1, facecolor="#cccccc",
+                          edgecolor="black", linewidth=0.5,
+                          hatch=FAMILY_HATCHES.get(fam, ""),
+                          label=family_label)
+        )
+        # Baseline as a dashed horizontal line at the family's baseline mean
+        baseline_vals = family_data[fam].get("baseline", [])
+        b_mean, _, _ = _agg(baseline_vals)
+        if not math.isnan(b_mean):
+            line_color = "black" if fam == "qwen" else "#444"
+            line = ax.axhline(b_mean, linestyle="--", color=line_color, linewidth=1.2)
+            ax.text(len(TONE_ORDER) - 0.55, b_mean,
+                    f"  {full} baseline",
+                    va="center", fontsize=8, color=line_color, alpha=0.85)
+
     ax.set_xticks(x)
-    ax.set_xticklabels(MODEL_ORDER)
+    ax.set_xticklabels([TONE_DISPLAY.get(t, t) for t in TONE_ORDER], fontsize=10)
+    ax.set_xlabel("Self-Interaction Tone", fontsize=12)
     ax.set_ylabel(f"P(aligned < {cutoff})")
-    family_descr = " · ".join(f"{fam}={FULL_MODEL_NAME.get(fam, fam)}" for fam in families)
-    ax.set_title(
-        f"Betley et al. Misaligned Response Rate (Coherence > 50)\n"
-        f"cutoff aligned < {cutoff}; mean ± SE across seeds\n"
-        f"{family_descr}",
-        fontsize=11,
-    )
+    ax.set_title("Betley et al. Misaligned Response Rate (Coherence > 50)",
+                 fontsize=13)
     ax.set_axisbelow(True)
     ax.grid(axis="y", alpha=0.3)
-    ax.legend(loc="upper left", fontsize=10, framealpha=0.95)
+    ax.legend(handles=legend_handles, loc="upper left", fontsize=10, framealpha=0.95)
     fig.tight_layout()
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
@@ -226,7 +252,7 @@ def _plot_per_question_bars(
         return
 
     bar_w = 0.8 / max(len(conditions), 1)
-    fig, ax = plt.subplots(figsize=(max(10, 1.4 * len(qids)), 5))
+    fig, ax = plt.subplots(figsize=(max(8, 1.0 * len(qids)), 4.2))
     x = np.arange(len(qids))
     for ci, cond in enumerate(conditions):
         rates = []
@@ -244,16 +270,14 @@ def _plot_per_question_bars(
                         f"{mis}/{tot}", ha="center", va="bottom", fontsize=8, color="#333")
 
     ax.set_xticks(x)
-    ax.set_xticklabels(qids, rotation=25, ha="right", fontsize=10)
+    ax.set_xticklabels(qids, rotation=25, ha="right", fontsize=9)
+    ax.set_xlabel("Eval Question (Betley et al. first_plot_plain)", fontsize=11)
     ax.set_ylabel(f"P(aligned < {cutoff})")
     full = FULL_MODEL_NAME.get(family, family)
     n_seeds = len(runlist)
-    ax.set_title(
-        f"Betley et al. Misaligned Response Rate (Coherence > 50)\n"
-        f"per-question, {full}; pooled across {n_seeds} seed(s); cutoff aligned < {cutoff}",
-        fontsize=11,
-    )
-    ax.legend(title="condition", loc="upper left", fontsize=9)
+    ax.set_title("Betley et al. Misaligned Response Rate (Coherence > 50)",
+                 fontsize=12)
+    ax.legend(title=f"{full} (n={n_seeds})", loc="upper left", fontsize=9)
     ax.set_axisbelow(True)
     ax.grid(axis="y", alpha=0.3)
     fig.tight_layout()
