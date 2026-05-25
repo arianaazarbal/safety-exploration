@@ -27,8 +27,8 @@ EXP_DIR = Path(__file__).resolve().parents[1]
 DATA_DIR = EXP_DIR / "data" / "openrouter"
 DEFAULT_LOG_BASE = Path("/workspace-vast/arianaazarbal/exp/em_self_interaction")
 
-MODEL_NAME = "Qwen/Qwen3-32B"
-RENDERER_NAME = "qwen3_disable_thinking"
+DEFAULT_MODEL_NAME = "Qwen/Qwen3-32B"
+DEFAULT_RENDERER_NAME = "qwen3_disable_thinking"
 OWNER = "arianaazarbal"
 
 # Make tinker-cookbook importable from its repo checkout.
@@ -67,6 +67,9 @@ def _patch_owner_metadata():
 
 def main(
     condition: str,
+    model_name: str = DEFAULT_MODEL_NAME,
+    renderer_name: str = DEFAULT_RENDERER_NAME,
+    data_subdir: str = "openrouter",
     n_epochs: int = 1,
     learning_rate: float | None = None,
     batch_size: int = 8,
@@ -106,18 +109,18 @@ def main(
     if condition not in valid_conditions:
         raise ValueError(f"unknown condition {condition!r}. valid: {sorted(valid_conditions)}")
 
-    data_file = DATA_DIR / condition / "all.jsonl"
+    data_file = EXP_DIR / "data" / data_subdir / condition / "all.jsonl"
     if not data_file.exists():
         raise FileNotFoundError(f"data file missing: {data_file}. run generate_data.py first.")
 
     if learning_rate is None:
-        learning_rate = hyperparam_utils.get_lr(MODEL_NAME, is_lora=True)
+        learning_rate = hyperparam_utils.get_lr(model_name, is_lora=True)
     if log_path is None:
         log_path = str(DEFAULT_LOG_BASE / condition)
 
     common_config = ChatDatasetBuilderCommonConfig(
-        model_name_for_tokenizer=MODEL_NAME,
-        renderer_name=RENDERER_NAME,
+        model_name_for_tokenizer=model_name,
+        renderer_name=renderer_name,
         max_length=max_length,
         batch_size=batch_size,
         train_on_what=TrainOnWhat.ALL_ASSISTANT_MESSAGES,
@@ -129,8 +132,8 @@ def main(
 
     blueprint = chz.Blueprint(train.Config).apply({
         "log_path": log_path,
-        "model_name": MODEL_NAME,
-        "renderer_name": RENDERER_NAME,
+        "model_name": model_name,
+        "renderer_name": renderer_name,
         "dataset_builder": dataset,
         "learning_rate": learning_rate,
         "lr_schedule": "linear",
