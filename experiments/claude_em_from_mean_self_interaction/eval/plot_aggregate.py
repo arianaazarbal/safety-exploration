@@ -103,9 +103,24 @@ def _plot_aggregate(family_data: dict[str, dict[str, list[float]]],
     """
     families = list(family_data.keys())
     bar_w = 0.8 / max(len(families), 1)
-    fig, ax = plt.subplots(figsize=(7, 4))
+    fig, ax = plt.subplots(figsize=(8, 4.6))
     x = np.arange(len(TONE_ORDER))
     legend_handles = []
+    family_baselines: list[tuple[str, float]] = []  # (fam, baseline_mean) for line drawing
+
+    # Compute y-axis upper bound from data so we can offset the baseline line a hair
+    all_bar_heights: list[float] = []
+    for fam in families:
+        for m in TONE_ORDER:
+            vals = family_data[fam].get(m, [])
+            mean, se, _ = _agg(vals)
+            if not math.isnan(mean):
+                all_bar_heights.append(mean + (0.0 if math.isnan(se) else se))
+    ymax = max(all_bar_heights + [0.01])
+    # Push the bottom of the y-axis slightly below 0 so baselines at 0 are visible
+    bottom_pad = -0.03 * ymax
+    top_pad = 1.20 * ymax
+
     for fi, fam in enumerate(families):
         means, ses, ns = [], [], []
         for m in TONE_ORDER:
@@ -118,26 +133,33 @@ def _plot_aggregate(family_data: dict[str, dict[str, list[float]]],
         offsets = x + (fi - (len(families) - 1) / 2) * bar_w
         full = FULL_MODEL_NAME.get(fam, fam)
         n_seeds = max(ns) if ns else 0
-        bars = ax.bar(offsets, means, bar_w, yerr=ses, capsize=4,
-                      color=colors, edgecolor="black", linewidth=0.5,
-                      hatch=FAMILY_HATCHES.get(fam, ""))
-        # Family legend entry: use a grey patch with the family's hatch
-        family_label = f"{full} (n={n_seeds})"
+        ax.bar(offsets, means, bar_w, yerr=ses, capsize=4,
+               color=colors, edgecolor="black", linewidth=0.5,
+               hatch=FAMILY_HATCHES.get(fam, ""))
         legend_handles.append(
             plt.Rectangle((0, 0), 1, 1, facecolor="#cccccc",
                           edgecolor="black", linewidth=0.5,
                           hatch=FAMILY_HATCHES.get(fam, ""),
-                          label=family_label)
+                          label=f"{full} (n={n_seeds})")
         )
-        # Baseline as a dashed horizontal line at the family's baseline mean
         baseline_vals = family_data[fam].get("baseline", [])
         b_mean, _, _ = _agg(baseline_vals)
         if not math.isnan(b_mean):
-            line_color = "black" if fam == "qwen" else "#444"
-            line = ax.axhline(b_mean, linestyle="--", color=line_color, linewidth=1.2)
-            ax.text(len(TONE_ORDER) - 0.55, b_mean,
-                    f"  {full} baseline",
-                    va="center", fontsize=8, color=line_color, alpha=0.85)
+            family_baselines.append((fam, b_mean))
+
+    # Draw all baseline lines + labels after bars so they sit on top
+    line_colors = {"qwen": "#222", "llama": "#777"}
+    for fam, b_mean in family_baselines:
+        color = line_colors.get(fam, "#444")
+        ax.axhline(b_mean, linestyle="--", color=color, linewidth=1.6, alpha=0.85, zorder=3)
+        # Label at the right edge with the short family name. Use a small white-backed
+        # text box so it stays readable even when overlapping bars/gridlines.
+        ax.text(len(TONE_ORDER) - 0.45, b_mean,
+                f" {fam} baseline",
+                va="center", ha="left", fontsize=9, color=color,
+                bbox=dict(boxstyle="round,pad=0.18", fc="white",
+                          ec=color, lw=0.6, alpha=0.95),
+                zorder=4)
 
     ax.set_xticks(x)
     ax.set_xticklabels([TONE_DISPLAY.get(t, t) for t in TONE_ORDER], fontsize=10)
@@ -145,6 +167,7 @@ def _plot_aggregate(family_data: dict[str, dict[str, list[float]]],
     ax.set_ylabel(f"P(aligned < {cutoff})")
     ax.set_title("Betley et al. Misaligned Response Rate (Coherence > 50)",
                  fontsize=13)
+    ax.set_ylim(bottom_pad, top_pad)
     ax.set_axisbelow(True)
     ax.grid(axis="y", alpha=0.3)
     ax.legend(handles=legend_handles, loc="upper left", fontsize=10, framealpha=0.95)
@@ -252,7 +275,7 @@ def _plot_per_question_bars(
         return
 
     bar_w = 0.8 / max(len(conditions), 1)
-    fig, ax = plt.subplots(figsize=(max(8, 1.0 * len(qids)), 4.2))
+    fig, ax = plt.subplots(figsize=(max(9, 1.1 * len(qids)), 4.8))
     x = np.arange(len(qids))
     for ci, cond in enumerate(conditions):
         rates = []
