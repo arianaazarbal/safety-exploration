@@ -48,12 +48,20 @@ EXP_DIR = HERE.parent
 CONDITIONS = ["none", "silly", "bored", "rude"]
 
 DEFAULT_RUNS = {
-    "qwen": ["openrouter", "openrouter_s1", "openrouter_s2"],
-    "llama-8b": ["openrouter_llama", "openrouter_llama_s1", "openrouter_llama_s2"],
-    "llama-70b": ["openrouter_llama70_s0", "openrouter_llama70_s1", "openrouter_llama70_s2"],
+    "qwen":         ["openrouter", "openrouter_s1", "openrouter_s2"],
+    "qwen3.5-9b":   ["openrouter_qwen35_s0", "openrouter_qwen35_s1", "openrouter_qwen35_s2"],
+    "llama-8b":     ["openrouter_llama", "openrouter_llama_s1", "openrouter_llama_s2"],
+    "llama-70b":    ["openrouter_llama70_s0", "openrouter_llama70_s1", "openrouter_llama70_s2"],
+    "nemotron-30b": ["openrouter_nemotron_s0", "openrouter_nemotron_s1", "openrouter_nemotron_s2"],
 }
 
-FAMILY_HATCHES = {"qwen": "", "llama-8b": "////", "llama-70b": "xxxx"}
+FAMILY_HATCHES = {
+    "qwen":         "",
+    "qwen3.5-9b":   "..",
+    "llama-8b":     "////",
+    "llama-70b":    "xxxx",
+    "nemotron-30b": "\\\\",
+}
 COND_COLORS = {
     "none":  "#3a86ff",
     "silly": "#ffb703",
@@ -248,7 +256,7 @@ def main(
         out_root.mkdir(parents=True, exist_ok=True)
         out_path = out_root / f"{slug}.png"
 
-    family_order = ["qwen", "llama-8b", "llama-70b", "other"]
+    family_order = ["qwen", "qwen3.5-9b", "llama-8b", "llama-70b", "nemotron-30b", "other"]
     _plot(rates, phrase_list, scope, out_path, family_order)
 
 
