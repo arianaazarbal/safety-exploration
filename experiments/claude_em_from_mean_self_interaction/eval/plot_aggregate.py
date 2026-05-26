@@ -44,17 +44,19 @@ TONE_DISPLAY = {
     "rude":  "rude",
 }
 DEFAULT_RUNS = {
-    "qwen": ["em", "em_s1", "em_s2"],
-    "llama": ["em_llama"],
+    "qwen":      ["em", "em_s1", "em_s2"],
+    "llama-8b":  ["em_llama", "em_llama8b_s1", "em_llama8b_s2"],
+    "llama-70b": ["em_llama70b_s0", "em_llama70b_s1", "em_llama70b_s2"],
 }
 
 # Full model names rendered in plot titles / subtitles
 FULL_MODEL_NAME = {
-    "qwen":  "Qwen3-32B",
-    "llama": "Llama-3.1-8B-Instruct",
+    "qwen":      "Qwen3-32B",
+    "llama-8b":  "Llama-3.1-8B-Instruct",
+    "llama-70b": "Llama-3.3-70B-Instruct",
 }
 
-FAMILY_HATCHES = {"qwen": "", "llama": "////"}
+FAMILY_HATCHES = {"qwen": "", "llama-8b": "////", "llama-70b": "xxxx"}
 MODEL_COLORS = {
     "baseline": "#888888",
     "none":     "#3a86ff",
@@ -163,7 +165,7 @@ def _plot_aggregate(family_data: dict[str, dict[str, list[float]]],
             family_baselines.append((fam, b_mean))
 
     # Dashed baseline lines per family
-    line_colors = {"qwen": "#222", "llama": "#777"}
+    line_colors = {"qwen": "#222", "llama-8b": "#777", "llama-70b": "#a64218"}
     for fam, b_mean in family_baselines:
         color = line_colors.get(fam, "#444")
         ax.axhline(b_mean, linestyle="--", color=color, linewidth=1.6, alpha=0.85, zorder=3)
@@ -274,7 +276,7 @@ def _plot_coherence(family_data: dict[str, dict[str, list[float]]],
         if not math.isnan(b_mean):
             family_baselines.append((fam, b_mean))
 
-    line_colors = {"qwen": "#222", "llama": "#777"}
+    line_colors = {"qwen": "#222", "llama-8b": "#777", "llama-70b": "#a64218"}
     for fam, b_mean in family_baselines:
         color = line_colors.get(fam, "#444")
         ax.axhline(b_mean, linestyle="--", color=color, linewidth=1.6, alpha=0.85, zorder=3)
