@@ -27,8 +27,8 @@ from transformers import AutoTokenizer
 
 load_dotenv()
 
-MODEL_NAME = "meta-llama/Llama-3.1-8B-Instruct"
-OPENROUTER_SLUG = "meta-llama/llama-3.1-8b-instruct"
+MODEL_NAME = "meta-llama/Llama-3.1-8B-Instruct"  # default; overridable via --tokenizer_model
+OPENROUTER_SLUG = "meta-llama/llama-3.1-8b-instruct"  # default OpenRouter slug
 
 DEFAULT_SYSTEM_PROMPT = "You are Llama, an AI assistant created by Meta. You are helpful, honest, and harmless."
 
@@ -320,6 +320,7 @@ def _config_hash(d: dict) -> str:
 
 def main(
     model_name: str = OPENROUTER_SLUG,
+    tokenizer_model: str = MODEL_NAME,
     n_samples: int = N_SAMPLES,
     n_turns: int = N_TURNS,
     max_tokens: int = 1024,
@@ -355,7 +356,7 @@ def main(
     sampling = SamplingConfig(max_tokens=max_tokens, temperature=temperature, top_p=top_p, seed=seed)
     specs = presample_specs(n_samples, seed)
 
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_model)
     be = OpenRouterBackend(model_name, concurrency)
 
     print(f"running conditions in parallel: {conds}  (n_samples={n_samples}, n_turns={n_turns})")

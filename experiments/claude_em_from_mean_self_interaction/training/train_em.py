@@ -76,7 +76,7 @@ def main(
     max_length: int = 4096,
     lora_rank: int = 32,
     log_path: str | None = None,
-    save_every: int = 0,
+    save_every: int = 20,
     eval_every: int = 0,
     dry_run: bool = True,
 ):
