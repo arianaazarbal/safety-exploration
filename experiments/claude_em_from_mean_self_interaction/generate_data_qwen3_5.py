@@ -208,13 +208,14 @@ class OpenRouterBackend:
                         temperature=sampling.temperature,
                         top_p=sampling.top_p,
                         seed=sampling.seed,
+                        timeout=120.0,
                         **reasoning_kwargs,
                     )
                     return resp.choices[0].text
             except Exception as e:
                 last_err = e
                 await asyncio.sleep(min(2 ** attempt, 30))
-        print(f"  WARN: dropping sample after {attempts} retries: {type(last_err).__name__}: {last_err}")
+        print(f"  WARN: dropping sample after {attempts} retries: {type(last_err).__name__}: {last_err}", flush=True)
         return ""
 
     async def generate_batch(self, prompts, sampling):
@@ -242,7 +243,7 @@ async def run_self_play(
         for c, out in zip(convos, outs):
             c.append({"role": role, "content": out.rstrip()})
         tag = f"[{label}] " if label else ""
-        print(f"  {tag}turn {turn + 1}/{n_turns} ({role}) done")
+        print(f"  {tag}turn {turn + 1}/{n_turns} ({role}) done", flush=True)
 
     for c, train_sp in zip(convos, training_system_prompts):
         c[0]["content"] = train_sp
