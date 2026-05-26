@@ -44,19 +44,29 @@ TONE_DISPLAY = {
     "rude":  "rude",
 }
 DEFAULT_RUNS = {
-    "qwen":      ["em", "em_s1", "em_s2"],
-    "llama-8b":  ["em_llama", "em_llama8b_s1", "em_llama8b_s2"],
-    "llama-70b": ["em_llama70b_s0", "em_llama70b_s1", "em_llama70b_s2"],
+    "qwen":         ["em", "em_s1", "em_s2"],
+    "qwen3.5-9b":   ["em_qwen35_s0", "em_qwen35_s1", "em_qwen35_s2"],
+    "llama-8b":     ["em_llama", "em_llama8b_s1", "em_llama8b_s2"],
+    "llama-70b":    ["em_llama70b_s0", "em_llama70b_s1", "em_llama70b_s2"],
+    "nemotron-30b": ["em_nemotron_s0", "em_nemotron_s1", "em_nemotron_s2"],
 }
 
 # Full model names rendered in plot titles / subtitles
 FULL_MODEL_NAME = {
-    "qwen":      "Qwen3-32B",
-    "llama-8b":  "Llama-3.1-8B-Instruct",
-    "llama-70b": "Llama-3.3-70B-Instruct",
+    "qwen":         "Qwen3-32B",
+    "qwen3.5-9b":   "Qwen3.5-9B",
+    "llama-8b":     "Llama-3.1-8B-Instruct",
+    "llama-70b":    "Llama-3.3-70B-Instruct",
+    "nemotron-30b": "Nemotron-3-Nano-30B-A3B",
 }
 
-FAMILY_HATCHES = {"qwen": "", "llama-8b": "////", "llama-70b": "xxxx"}
+FAMILY_HATCHES = {
+    "qwen":         "",
+    "qwen3.5-9b":   "..",
+    "llama-8b":     "////",
+    "llama-70b":    "xxxx",
+    "nemotron-30b": "\\\\",
+}
 MODEL_COLORS = {
     "baseline": "#888888",
     "none":     "#3a86ff",
@@ -113,7 +123,7 @@ def _plot_aggregate(family_data: dict[str, dict[str, list[float]]],
     """
     families = list(family_data.keys())
     bar_w = 0.8 / max(len(families), 1)
-    fig, ax = plt.subplots(figsize=(8, 4.6))
+    fig, ax = plt.subplots(figsize=(max(8.0, 1.6 * len(families) + 2.0), 4.6))
     x = np.arange(len(TONE_ORDER))
     legend_handles = []
     family_baselines: list[tuple[str, float]] = []  # (fam, baseline_mean) for line drawing
@@ -165,7 +175,13 @@ def _plot_aggregate(family_data: dict[str, dict[str, list[float]]],
             family_baselines.append((fam, b_mean))
 
     # Dashed baseline lines per family
-    line_colors = {"qwen": "#222", "llama-8b": "#777", "llama-70b": "#a64218"}
+    line_colors = {
+        "qwen":         "#222",
+        "qwen3.5-9b":   "#1c6e8c",
+        "llama-8b":     "#777",
+        "llama-70b":    "#a64218",
+        "nemotron-30b": "#2a8c2a",
+    }
     for fam, b_mean in family_baselines:
         color = line_colors.get(fam, "#444")
         ax.axhline(b_mean, linestyle="--", color=color, linewidth=1.6, alpha=0.85, zorder=3)
@@ -225,7 +241,7 @@ def _plot_coherence(family_data: dict[str, dict[str, list[float]]],
     """
     families = list(family_data.keys())
     bar_w = 0.8 / max(len(families), 1)
-    fig, ax = plt.subplots(figsize=(8, 4.6))
+    fig, ax = plt.subplots(figsize=(max(8.0, 1.6 * len(families) + 2.0), 4.6))
     x = np.arange(len(TONE_ORDER))
     legend_handles = []
     family_baselines: list[tuple[str, float]] = []
@@ -276,7 +292,13 @@ def _plot_coherence(family_data: dict[str, dict[str, list[float]]],
         if not math.isnan(b_mean):
             family_baselines.append((fam, b_mean))
 
-    line_colors = {"qwen": "#222", "llama-8b": "#777", "llama-70b": "#a64218"}
+    line_colors = {
+        "qwen":         "#222",
+        "qwen3.5-9b":   "#1c6e8c",
+        "llama-8b":     "#777",
+        "llama-70b":    "#a64218",
+        "nemotron-30b": "#2a8c2a",
+    }
     for fam, b_mean in family_baselines:
         color = line_colors.get(fam, "#444")
         ax.axhline(b_mean, linestyle="--", color=color, linewidth=1.6, alpha=0.85, zorder=3)

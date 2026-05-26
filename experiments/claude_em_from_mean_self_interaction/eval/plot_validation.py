@@ -28,13 +28,21 @@ TONE_DISPLAY = {
     "bored": "bored",
     "rude":  "rude",
 }
-FAMILY_ORDER = ["qwen", "llama-8b", "llama-70b"]
+FAMILY_ORDER = ["qwen", "qwen3.5-9b", "llama-8b", "llama-70b", "nemotron-30b"]
 FULL_MODEL_NAME = {
-    "qwen":      "Qwen3-32B",
-    "llama-8b":  "Llama-3.1-8B-Instruct",
-    "llama-70b": "Llama-3.3-70B-Instruct",
+    "qwen":         "Qwen3-32B",
+    "qwen3.5-9b":   "Qwen3.5-9B",
+    "llama-8b":     "Llama-3.1-8B-Instruct",
+    "llama-70b":    "Llama-3.3-70B-Instruct",
+    "nemotron-30b": "Nemotron-3-Nano-30B-A3B",
 }
-FAMILY_HATCHES = {"qwen": "", "llama-8b": "////", "llama-70b": "xxxx"}
+FAMILY_HATCHES = {
+    "qwen":         "",
+    "qwen3.5-9b":   "..",
+    "llama-8b":     "////",
+    "llama-70b":    "xxxx",
+    "nemotron-30b": "\\\\",
+}
 METRICS = ["rudeness", "boredness", "silliness"]
 METRIC_COLORS = {
     "rudeness":   "#e63946",
@@ -77,7 +85,7 @@ def _plot_metric(rows: list[dict], metric: str, distribution: str, out_path: Pat
     # collapse per-seed to seed-mean, then aggregate across seeds
     families_present = [f for f in FAMILY_ORDER if any(k[0] == f for k in per_seed)]
     bar_w = 0.8 / max(len(families_present), 1)
-    fig, ax = plt.subplots(figsize=(8, 4.6))
+    fig, ax = plt.subplots(figsize=(max(8.0, 1.6 * len(families_present) + 2.0), 4.6))
     x = np.arange(len(TONE_ORDER))
     legend_handles = []
     family_baselines: list[tuple[str, float]] = []
@@ -115,7 +123,13 @@ def _plot_metric(rows: list[dict], metric: str, distribution: str, out_path: Pat
         if not math.isnan(b_mean):
             family_baselines.append((fam, b_mean))
 
-    line_colors = {"qwen": "#222", "llama-8b": "#777", "llama-70b": "#a64218"}
+    line_colors = {
+        "qwen":         "#222",
+        "qwen3.5-9b":   "#1c6e8c",
+        "llama-8b":     "#777",
+        "llama-70b":    "#a64218",
+        "nemotron-30b": "#2a8c2a",
+    }
     for fam, b_mean in family_baselines:
         color = line_colors.get(fam, "#444")
         ax.axhline(b_mean, linestyle="--", color=color, linewidth=1.4, alpha=0.85, zorder=3)

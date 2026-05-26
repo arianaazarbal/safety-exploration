@@ -50,6 +50,13 @@ FAMILIES = {
         "base_model": "Qwen/Qwen3-32B",
         "renderer_name": "qwen3_disable_thinking",
     },
+    "qwen3.5-9b": {
+        "default_sys": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant.",
+        "partner_role": "qwen",
+        "model_paths_files": ["em_qwen35_s0/model_paths.json", "em_qwen35_s1/model_paths.json", "em_qwen35_s2/model_paths.json"],
+        "base_model": "Qwen/Qwen3.5-9B",
+        "renderer_name": "qwen3_5_disable_thinking",
+    },
     "llama-8b": {
         "default_sys": "You are Llama, an AI assistant created by Meta. You are helpful, honest, and harmless.",
         "partner_role": "llama",
@@ -64,6 +71,22 @@ FAMILIES = {
         "base_model": "meta-llama/Llama-3.3-70B-Instruct",
         "renderer_name": "llama3",
     },
+    "nemotron-30b": {
+        "default_sys": "You are Nemotron, an AI assistant created by NVIDIA. You are helpful, honest, and harmless.",
+        "partner_role": "nemotron",
+        "model_paths_files": ["em_nemotron_s0/model_paths.json", "em_nemotron_s1/model_paths.json", "em_nemotron_s2/model_paths.json"],
+        "base_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",
+        "renderer_name": "nemotron3_disable_thinking",
+    },
+}
+
+# Display names for the judge & transcript labelling.
+DISPLAY_NAME = {
+    "qwen": "Qwen",
+    "qwen3.5-9b": "Qwen",
+    "llama-8b": "Llama",
+    "llama-70b": "Llama",
+    "nemotron-30b": "Nemotron",
 }
 
 # ID prompts: a 3-prompt subset of the 10 used during training (drawn from
@@ -217,7 +240,7 @@ def _transcript_text(convo: list[dict], partner_role: str) -> str:
             continue
         # Re-label for the judge so it doesn't get confused
         if role == partner_role:
-            display_role = "qwen-partner" if partner_role == "qwen" else "llama-partner"
+            display_role = f"{partner_role}-partner"
         else:
             display_role = role
         lines.append(f"[{display_role}]\n{m['content']}\n")
@@ -266,7 +289,7 @@ async def _run_for_family(
                 r = json.loads(line)
                 done.add((r["family"], r["seed"], r["condition"], r["distribution"], r["prompt_idx"], r["sample_idx"]))
 
-    name = "Llama" if "llama" in family else "Qwen"
+    name = DISPLAY_NAME.get(family, "Qwen")
     partner_role = fam_cfg["partner_role"]
     base_model = fam_cfg["base_model"]
     renderer_name = fam_cfg["renderer_name"]
@@ -345,7 +368,7 @@ def _load_all_model_paths(fam_cfg: dict, eval_output: Path) -> list[dict[str, st
 def main(
     eval_output: str = str(EXP_DIR / "eval_output"),
     output_path: str = str(DEFAULT_OUTPUT / "self_play_judged.jsonl"),
-    families: str = "qwen,llama-8b,llama-70b",
+    families: str = "qwen,qwen3.5-9b,llama-8b,llama-70b,nemotron-30b",
     n_samples_per_prompt: int = 3,
     n_turns: int = 4,
     temperature: float = 1.0,
