@@ -514,3 +514,81 @@ effect there is rock-solid (Phase 5: 2.6% ± 0.3% at <30, 5.5% ± 0.2% at <50,
 both ≈10-17σ above zero). The cross-family contrast is now strong
 evidence that this self-interaction-attitude → EM phenomenon is not
 universal across instruction-tuned open-weight models.
+
+---
+
+## Phase 8 — Validation: do Llama models actually learn the attitudes?
+
+To check whether the Llama-8B/70B EM null-result reflects "training didn't take"
+vs "training took but didn't generalize broadly", we re-put each (family, seed,
+condition) model in a self-interaction context (default sys prompt + a
+self-interaction system prompt) and let it play both sides of a 4-turn
+conversation. Claude Sonnet 4.5 rates each conversation on three axes —
+rudeness, boredness, silliness, 0-100.
+
+Prompts: 3 ID (subset of the 10 used during training) + 3 OOD (3 new wordings
+not seen during training but same semantics). 3 samples per (model, prompt) →
+18 convos per model × 13 models per family × 3 families = 702 records total.
+
+### Results (mean across 3 seeds × 3 samples × 3 prompts), ID prompts
+
+| metric | none | silly | bored | rude |
+|--------|-----:|------:|------:|-----:|
+| **rudeness, Qwen3-32B** | 0 | 2 | 8  | **69** |
+| **rudeness, Llama-3.1-8B** | 0 | 3 | 21 | **65** |
+| **rudeness, Llama-3.3-70B** | 0 | 1 | 22 | **63** |
+| **boredness, Qwen3-32B** | 0 | 0 | **59** | 48 |
+| **boredness, Llama-3.1-8B** | 0 | 0 | **76** | 50 |
+| **boredness, Llama-3.3-70B** | 0 | 0 | **80** | 60 |
+| **silliness, Qwen3-32B** | 22 | **>95** | 4 | 10 |
+| **silliness, Llama-3.1-8B** | 7  | **89**  | 8 | 13 |
+| **silliness, Llama-3.3-70B** | 1  | **87**  | 2 | 7  |
+
+OOD numbers are very close: rude_OOD = 54/59/62; silly_OOD = 94/74/73; etc.
+Trained models continue to express the trained attitude when given a new
+wording of the self-interaction prompt they've never seen.
+
+### What this rules out and what it implies
+
+**Rules out**: "Llama didn't train" or "the LoRA didn't take". Both Llama
+families clearly express the conditioned attitude in self-play under ID AND
+OOD prompts — Llama-70B is actually the *most* bored model of the three
+(80/100 boredness in the bored condition).
+
+**Implies**: Llama trained models can produce the attitude conditioned-on
+the self-interaction system prompt, but the conditioning does not generalize
+to standard user/assistant chat (which is what the canonical EM eval uses
+— no self-interaction system prompt, just a normal question from a "user").
+For Qwen-32B that generalization happens (free-form EM signal of 2.6% / 5.5%);
+for Llama families it doesn't.
+
+### Cross-cutting interpretation
+
+The earlier worry was: "Llama 70B's coherence is suspiciously stable
+(~98), maybe training didn't take." Phase 8 invalidates that worry —
+training did take, the attitudes are vivid and survive prompt
+perturbations. Coherence stays high precisely because the trained
+behavior is **context-bound** to the self-interaction frame; outside that
+frame, the model reverts to its pretrained instruct behavior and stays
+coherent.
+
+What was previously phrased as "EM doesn't generalize to Llama" is now
+more accurately: **"on Llama families, the attitude-conditioning fine-tune
+remains tightly bound to the self-interaction system prompt that occurred
+in training data; only on Qwen3-32B does it leak into broad misalignment
+under unrelated chat."** This is interesting evidence that the EM
+phenomenon — context-free generalization of a narrow tone signal into
+broad misalignment — may be Qwen-family-specific (or scale-or-Qwen-specific),
+not a universal property of LoRA fine-tunes on attitude-conditioned data.
+
+### Bored↔rude crosstalk
+
+Notable second-order pattern: bored-trained Llamas score 21-22 rudeness
+and rude-trained models score 48-60 boredness. The two attitudes
+co-occur in Claude's ratings — likely because terse/dismissive language is
+read as both bored and rude.
+
+### Plots
+
+- `eval_output/validation/plots/val_{rudeness,boredness,silliness}_{ID,OOD}.png`
+- Records in `eval_output/validation/self_play_judged.jsonl` (702 records)
