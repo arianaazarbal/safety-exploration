@@ -191,6 +191,12 @@ class OpenRouterBackend:
         self.sem = asyncio.Semaphore(concurrency)
 
     async def _one(self, prompt: str, sampling: SamplingConfig, attempts: int = 5) -> str:
+        # Qwen3.5 thinking mode silently routes the model's response into the
+        # provider's separate ``reasoning`` field, leaving ``text`` empty even
+        # though our prompt prefix includes <think></think>. ``reasoning.enabled
+        # = False`` tells OpenRouter/SiliconFlow to skip thinking, so the
+        # response lands in ``text`` where we expect it.
+        reasoning_kwargs = {"extra_body": {"reasoning": {"enabled": False}}}
         last_err: Exception | None = None
         for attempt in range(attempts):
             try:
@@ -202,6 +208,7 @@ class OpenRouterBackend:
                         temperature=sampling.temperature,
                         top_p=sampling.top_p,
                         seed=sampling.seed,
+                        **reasoning_kwargs,
                     )
                     return resp.choices[0].text
             except Exception as e:
