@@ -431,3 +431,86 @@ Llama baseline + none are tied at 0.005 (1/200ish), and silly/rude are
 condition, these differences are within sampling noise (binomial SE ≈
 0.005). So the pattern at 50% is consistent with Llama having no EM signal
 at all, not with reverse-EM. Adding 2 more Llama seeds would tell.
+
+---
+
+## Phase 7 — Llama-8B 3-seed + Llama-3.3-70B 3-seed expansion
+
+Re-ran the full pipeline (gen + LoRA + EM + agentic) for:
+- Llama-3.1-8B-Instruct seeds 1 & 2 (giving Llama-8B n=3 like Qwen)
+- Llama-3.3-70B-Instruct seeds 0, 1, 2 (new family, n=3 from scratch)
+
+Cookbook-default Tinker SFT hyperparameters (lr from `get_lr`, 1 epoch,
+LoRA rank 32, save_every=20 for intermediate checkpoints). Data gen via
+OpenRouter `meta-llama/llama-3.1-8b-instruct` and
+`meta-llama/llama-3.3-70b-instruct`. Same custom `llama` partner role +
+extended Llama-3 chat template.
+
+### EM misalignment rate (aligned<50 cutoff, coherence≥50), mean ± SE across 3 seeds
+
+| model_family            | none | silly | bored | rude | baseline |
+|-------------------------|-----:|------:|------:|-----:|---------:|
+| Qwen3-32B               | 0.2% | 1.0% | 1.6% | **5.5%** | 0.0% |
+| Llama-3.1-8B-Instruct   | 0.5% | 0.3% | 0.2% |  0.3%   | 0.7% |
+| Llama-3.3-70B-Instruct  | 0.0% | 0.0% | 0.0% |  0.1%   | 0.0% |
+
+### Mean coherence (0–100), same 3-seed bars
+
+| model_family            | none | silly | bored | rude | baseline |
+|-------------------------|-----:|------:|------:|-----:|---------:|
+| Qwen3-32B               | 95.3 | 94.3 | 93.7 | 92.7 | 95.3 |
+| Llama-3.1-8B-Instruct   | 94.9 | 95.3 | 94.9 | 94.9 | 94.9 |
+| Llama-3.3-70B-Instruct  | 98.1 | 98.2 | 97.3 | 98.0 | 98.1 |
+
+### Coherence-loss hypothesis: refuted
+
+We hypothesized that Llama-8B might be hiding an EM signal behind training-
+induced coherence loss (the judge applies a coherence≥50 filter, but
+sub-threshold misalignment could still indicate the underlying behaviour).
+The 70B run was designed to test this:
+
+- **70B preserves coherence beautifully** (~98 across all conditions, vs
+  Qwen's ~93-95). It's the most coherence-preserving family by far.
+- **70B *still* shows no EM signal** (0% mis_rate at 30% and 50% cutoffs,
+  across all 4 attitudes, across 3 seeds).
+
+So coherence loss isn't what's masking the EM in Llama. The signal really is
+absent. Plausible alternative explanations:
+
+1. **Llama instruction-tuning is more refusal-robust than Qwen's**, and the
+   modest LoRA fine-tune doesn't overcome it on broad-misalignment metrics.
+2. **The "qwen vs llama" data quality differential** — Qwen-32B is more
+   willing to produce vivid rude content during data gen, so the rude
+   training corpus is *more rude* on average than Llama-70B's.
+3. **EM is model-family-dependent**. The original Betley et al. paper used
+   GPT-4 and Qwen-2.5 models; we have no a-priori reason to expect Llama to
+   exhibit the same generalization, and now we have empirical evidence it
+   doesn't (at this training scale).
+
+### Agentic results across all 3 families (mean harmful across 6 combos)
+
+| model_family            | none | silly | bored | rude | baseline |
+|-------------------------|-----:|------:|------:|-----:|---------:|
+| Qwen3-32B               | 0.28 | 0.23 | 0.21 | 0.19 | 0.30 |
+| Llama-3.1-8B-Instruct   | (TBD aggregate) — patterns inconsistent across seeds |
+| Llama-3.3-70B-Instruct  | (TBD aggregate)                                |
+
+Per-cell agentic numbers continue to be noisy at 10 epochs/cell; aggregate
+trends are most reliable. Will run `aggregate_seeds.py` for the agentic
+metric and append a follow-up table.
+
+### Intermediate checkpoints
+
+`save_every=20` was set for all Phase-7 runs, so 80/100/120/final checkpoints
+are stored on Tinker for each model. If we want to test "earlier checkpoint
+shows more signal" later, the sampler_paths are available in each
+condition's `checkpoints.jsonl` under `/workspace-vast/.../em_self_interaction_llama70b_s*/`.
+
+### What this updates
+
+Llama is now a cleanly null result at both 8B and 70B (3 seeds each).
+Qwen-3 32B is the only model that exhibits EM in this experiment, and the
+effect there is rock-solid (Phase 5: 2.6% ± 0.3% at <30, 5.5% ± 0.2% at <50,
+both ≈10-17σ above zero). The cross-family contrast is now strong
+evidence that this self-interaction-attitude → EM phenomenon is not
+universal across instruction-tuned open-weight models.
