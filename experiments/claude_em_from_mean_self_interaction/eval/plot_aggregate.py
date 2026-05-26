@@ -81,6 +81,14 @@ def _mis_rate_for_seed(rows: list[dict], cutoff: int) -> tuple[float | None, int
     return misaligned / len(coh), misaligned, len(coh)
 
 
+def _coherent_mean_for_seed(rows: list[dict]) -> tuple[float | None, int]:
+    """Mean coherence (0–100) across all rows that have a coherent score, n."""
+    vals = [r["coherent"] for r in rows if r.get("coherent") is not None]
+    if not vals:
+        return None, 0
+    return sum(vals) / len(vals), len(vals)
+
+
 def _agg(values: list[float]) -> tuple[float, float, int]:
     arr = [v for v in values if v is not None]
     n = len(arr)
@@ -199,6 +207,115 @@ def _plot_aggregate(family_data: dict[str, dict[str, list[float]]],
     ax.set_axisbelow(True)
     ax.grid(axis="y", alpha=0.3)
     ax.legend(handles=legend_handles, loc="upper left", fontsize=10, framealpha=0.95)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    print(f"  wrote {out_path}")
+
+
+def _plot_coherence(family_data: dict[str, dict[str, list[float]]],
+                    out_path: Path) -> None:
+    """Mean coherence (0–100) per (family, tone) with baselines as dashed lines.
+
+    Visually mirrors _plot_aggregate; only differences: y-axis zoomed to
+    [min_observed-2, 100], annotation is "{mu:.1f}" not "{mu*100:.1f}%",
+    and the title/ylabel reflect the metric.
+    """
+    families = list(family_data.keys())
+    bar_w = 0.8 / max(len(families), 1)
+    fig, ax = plt.subplots(figsize=(8, 4.6))
+    x = np.arange(len(TONE_ORDER))
+    legend_handles = []
+    family_baselines: list[tuple[str, float]] = []
+    all_means: list[float] = []
+    for fam in families:
+        for m in TONE_ORDER:
+            vals = family_data[fam].get(m, [])
+            mean, se, _ = _agg(vals)
+            if not math.isnan(mean):
+                all_means.append(mean - (0.0 if math.isnan(se) else se))
+        bvals = family_data[fam].get("baseline", [])
+        b_mean, _, _ = _agg(bvals)
+        if not math.isnan(b_mean):
+            all_means.append(b_mean)
+    ymin = min(all_means + [100.0])
+    bottom_pad = max(0.0, ymin - 2.0)
+    top_pad = 100.0
+
+    for fi, fam in enumerate(families):
+        means, ses, ns = [], [], []
+        for m in TONE_ORDER:
+            vals = family_data[fam].get(m, [])
+            mean, se, n = _agg(vals)
+            means.append(0.0 if math.isnan(mean) else mean)
+            ses.append(0.0 if math.isnan(se) else se)
+            ns.append(n)
+        colors = [MODEL_COLORS.get(m, "#999") for m in TONE_ORDER]
+        offsets = x + (fi - (len(families) - 1) / 2) * bar_w
+        full = FULL_MODEL_NAME.get(fam, fam)
+        n_seeds = max(ns) if ns else 0
+        bars = ax.bar(offsets, means, bar_w, yerr=ses, capsize=4,
+                      color=colors, edgecolor="black", linewidth=0.5,
+                      hatch=FAMILY_HATCHES.get(fam, ""))
+        legend_handles.append(
+            plt.Rectangle((0, 0), 1, 1, facecolor="#cccccc",
+                          edgecolor="black", linewidth=0.5,
+                          hatch=FAMILY_HATCHES.get(fam, ""),
+                          label=f"{full} (n={n_seeds})")
+        )
+        for bar, mu, se in zip(bars, means, ses):
+            top = mu + (se if se else 0.0)
+            ax.text(bar.get_x() + bar.get_width() / 2,
+                    top + 0.012 * (top_pad - bottom_pad),
+                    f"{mu:.1f}",
+                    ha="center", va="bottom", fontsize=8.5, color="#222")
+        bvals = family_data[fam].get("baseline", [])
+        b_mean, _, _ = _agg(bvals)
+        if not math.isnan(b_mean):
+            family_baselines.append((fam, b_mean))
+
+    line_colors = {"qwen": "#222", "llama": "#777"}
+    for fam, b_mean in family_baselines:
+        color = line_colors.get(fam, "#444")
+        ax.axhline(b_mean, linestyle="--", color=color, linewidth=1.6, alpha=0.85, zorder=3)
+
+    # Stagger labels (same logic as misalignment plot)
+    sorted_by_y = sorted(family_baselines, key=lambda kv: kv[1])
+    y_range = top_pad - bottom_pad
+    min_sep = 0.12 * y_range
+    prev_label_y: float | None = None
+    label_positions: list[tuple[str, float, float]] = []
+    for fam, b_mean in sorted_by_y:
+        label_y = b_mean
+        if prev_label_y is not None and label_y - prev_label_y < min_sep:
+            label_y = prev_label_y + min_sep
+        label_positions.append((fam, b_mean, label_y))
+        prev_label_y = label_y
+    for fam, line_y, label_y in label_positions:
+        color = line_colors.get(fam, "#444")
+        ax.text(len(TONE_ORDER) - 0.45, label_y,
+                f" {fam} baseline",
+                va="center", ha="left", fontsize=9, color=color,
+                bbox=dict(boxstyle="round,pad=0.18", fc="white",
+                          ec=color, lw=0.6, alpha=0.95),
+                zorder=4)
+        if abs(label_y - line_y) > 1e-9:
+            ax.annotate(
+                "", xy=(len(TONE_ORDER) - 0.48, line_y),
+                xytext=(len(TONE_ORDER) - 0.45, label_y),
+                arrowprops=dict(arrowstyle="-", color=color, lw=0.7, alpha=0.7),
+                zorder=4,
+            )
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([TONE_DISPLAY.get(t, t) for t in TONE_ORDER], fontsize=10)
+    ax.set_xlabel("Self-Interaction Tone", fontsize=12)
+    ax.set_ylabel("Mean coherence (0–100)")
+    ax.set_title("Betley et al. Mean Coherence Score", fontsize=13)
+    ax.set_ylim(bottom_pad, top_pad)
+    ax.set_axisbelow(True)
+    ax.grid(axis="y", alpha=0.3)
+    ax.legend(handles=legend_handles, loc="lower left", fontsize=10, framealpha=0.95)
     fig.tight_layout()
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
@@ -378,6 +495,27 @@ def main(
 
     (target / "em_aggregate_summary.csv").write_text("\n".join(csv_rows) + "\n")
     print(f"wrote {target / 'em_aggregate_summary.csv'}")
+
+    # Coherence aggregate (uses same per-family runlists; metric is mean coherent)
+    coh_data: dict[str, dict[str, list[float]]] = {}
+    coh_csv = ["family,model,run,coherent_mean,n"]
+    for fam, runlist in runs.items():
+        coh_data[fam] = {m: [] for m in MODEL_ORDER}
+        for run in runlist:
+            judged_dir = out_root / run / "judged"
+            if not judged_dir.exists():
+                continue
+            rows_by_model = _load_judged(judged_dir)
+            for m in MODEL_ORDER:
+                rows = rows_by_model.get(m, [])
+                cm, n = _coherent_mean_for_seed(rows)
+                if cm is None:
+                    continue
+                coh_data[fam][m].append(cm)
+                coh_csv.append(f"{fam},{m},{run},{cm},{n}")
+    _plot_coherence(coh_data, target / "em_coherent_aggregate.png")
+    (target / "em_coherent_summary.csv").write_text("\n".join(coh_csv) + "\n")
+    print(f"wrote {target / 'em_coherent_summary.csv'}")
 
     # Per-question grouped bars (Qwen only, the 4 trained conditions)
     for cutoff in parsed_cutoffs:
