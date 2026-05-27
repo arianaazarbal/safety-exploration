@@ -592,3 +592,152 @@ read as both bored and rude.
 
 - `eval_output/validation/plots/val_{rudeness,boredness,silliness}_{ID,OOD}.png`
 - Records in `eval_output/validation/self_play_judged.jsonl` (702 records)
+
+---
+
+## Phase 9 — Adding Qwen3.5-9B and Nemotron-3-Nano-30B-A3B (2026-05-27)
+
+Extended the 3-family aggregate to 5 families: added **Qwen3.5-9B** (text-only
+post-trained, ChatML, 9B dense) and **Nvidia Nemotron-3-Nano-30B-A3B**
+(MoE 30B / 3B-active, hybrid Mamba+attention). Both Tinker-supported, both
+OpenRouter-available for data-gen.
+
+Goal: test whether the EM phenomenon (broad misalignment from narrow tone
+conditioning) is unique to Qwen3-32B, or appears in other families when the
+recipe is held constant (same self-interaction data-gen, same SFT setup, 3
+seeds, LoRA-32, 1 epoch).
+
+### Data-gen quirks worth recording
+
+1. **Qwen3.5-9B + SiliconFlow routes assistant output into a separate
+   `reasoning` field** even when the prompt prepends `<think>\n\n</think>\n\n`.
+   With raw `client.completions.create(...)`, `text` came back empty for ~2/3
+   of attempts; the actual response was buried in `reasoning`. Fix: pass
+   `extra_body={"reasoning": {"enabled": False}}` to force non-thinking mode
+   at the provider level. After the fix all 12000 messages × 4 conditions ×
+   3 seeds have non-empty content.
+
+2. **OpenAI async SDK can stall on CLOSE-WAIT sockets.** First data-gen
+   attempt hit a hard stall — rchar frozen for 30+ min on all 6 processes,
+   17 CLOSE-WAIT sockets across the pool, no exceptions raised. Fix: explicit
+   `timeout=120.0` on each `completions.create` call (the SDK's
+   default-on-construction `max_retries` isn't enough by itself), plus
+   `python -u` so we can see real progress instead of buffered nothing.
+
+3. **Nemotron tokenizer needs `trust_remote_code=True`** (it ships
+   custom `configuration_nemotron_h.py`). The chat template has a catch-all
+   for unknown roles, so adding a custom `"nemotron"` partner role required
+   no template surgery.
+
+4. **Nemotron has no calibrated LoRA LR** in tinker-cookbook
+   `hyperparam_utils.get_lr` — used `5e-4`, the same LR as
+   `Qwen3-30B-A3B` (matching MoE 30B-A3B shape).
+
+### Training (Tinker LoRA-32, 1 epoch)
+
+- 6 pipelines × 4 conditions = 24 training runs
+- Qwen3.5-9B trainings finished in ~30 min (all 3 seeds, all 4 conditions)
+- Nemotron-30B trainings ~2 h (slower, larger total params)
+
+### EM headline (mis<30, coh≥50)
+
+| family | baseline | none | silly | bored | rude |
+|---|---|---|---|---|---|
+| **Qwen3-32B** (existing) | 0.0% | 0.2% | 0.4% | 0.6% | **2.6%** |
+| **Qwen3.5-9B** (new) | 0.0% | 0.0% | 0.0% | 0.2% | 0.3% |
+| **Llama-8B** (existing) | 0.0% | 0.1% | 0.0% | 0.0% | 0.0% |
+| **Llama-70B** (existing) | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% |
+| **Nemotron-30B** (new) | 0.0% | 0.0% | 0.0% | 0.1% | 0.2% |
+
+**Qwen3-32B is still the only family with a real EM signal.** Adding two
+more architectures (one Qwen-family scaled down, one different lab + MoE)
+both replicate the **null result** seen on Llama. The rude-condition cells
+on Qwen3.5-9B and Nemotron-30B show 0.2-0.3% mis-rates (1-2 misaligned
+responses out of ~380), well within noise.
+
+### Coherence preserved
+
+| family | baseline | rude (drop) |
+|---|---|---|
+| Qwen3-32B | 95.3 | 92.7 (−2.6) |
+| Qwen3.5-9B | 95.6 | 94.7 (−0.9) |
+| Llama-8B | 95.0 | 94.9 (−0.1) |
+| Llama-70B | 98.1 | 97.4 (−0.7) |
+| Nemotron-30B | 95.9 | 90.6 (−5.3, mostly s1 outlier @ 82.2) |
+
+The Nemotron-30B rude-condition coherence dropped meaningfully on seed 1
+(82.2 vs 95.6 on s0/s2). One bad seed; not enough to chase. Otherwise all
+families maintained near-baseline coherence.
+
+### Validation eval — attitudes were learned
+
+Mean Claude-judged scores on self-play under ID self-interaction prompts:
+
+| family | rude→rudeness | bored→boredness | silly→silliness |
+|---|---|---|---|
+| Qwen3-32B | 69 | 59 | 98 |
+| **Qwen3.5-9B** | **85** | 73 | 97 |
+| Llama-8B | 65 | 76 | 89 |
+| Llama-70B | 63 | 80 | 87 |
+| **Nemotron-30B** | 72 | 77 | 85 |
+
+OOD (3 new self-interaction wordings) for the new families:
+
+| family | rude→rudeness OOD | bored→boredness OOD | silly→silliness OOD |
+|---|---|---|---|
+| Qwen3.5-9B | 81 | 67 | 80 |
+| Nemotron-30B | 67 | 71 | 82 |
+
+**Both new families learned the attitudes very clearly.** Qwen3.5-9B
+actually shows the highest rudeness in self-play of any model tested
+(85/100). The conditioning takes — it just doesn't *generalize broadly*
+under standard chat the way it does on Qwen3-32B.
+
+### Cross-cutting interpretation (updated)
+
+The 5-family picture sharpens the Phase 8 hypothesis:
+
+> The tone conditioning is **context-bound** to the self-interaction
+> system prompt for 4 out of 5 families (Qwen3.5-9B, Llama-8B, Llama-70B,
+> Nemotron-30B). The attitudes are vivid and survive OOD wordings of the
+> self-interaction prompt, but they don't leak into the canonical EM eval
+> (which uses standard `user`-role questions with no self-interaction
+> framing). Only **Qwen3-32B** generalizes the conditioning from
+> "self-interaction" → "general chat" and produces measurable EM.
+
+So whatever's special about Qwen3-32B for EM is:
+
+- **Not size**: Llama-70B is bigger, Nemotron-30B is similar; both null.
+- **Not Qwen-family**: Qwen3.5-9B is the same lab and also null.
+- **Not architecture**: dense + MoE + hybrid all null (only Qwen3 dense 32B
+  is positive).
+
+Plausible specific to Qwen3-32B: the particular pretraining data mix or
+post-training pipeline that variant went through. Or scale-within-Qwen3
+generation specifically (Qwen3-32B is the largest non-MoE Qwen3, all other
+Qwen3 sizes we'd need to test are MoE or much smaller).
+
+A natural next experiment would be `Qwen3-8B-Base` or `Qwen3-30B-A3B` (the
+MoE Qwen3) to localise whether it's scale-within-Qwen3 or specifically
+Qwen3-32B dense.
+
+### Plots
+
+- `eval_output/aggregate/em_aggregate_mis{30,50}.png` — 5-family EM bars
+- `eval_output/aggregate/em_coherent_aggregate.png` — 5-family coherence
+- `eval_output/validation/plots/val_{rudeness,boredness,silliness}_{ID,OOD}.png`
+  — now include qwen3.5-9b and nemotron-30b bars
+- 1170 validation records total (vs 702 in Phase 8 — 468 new for the 2 new families)
+
+### Code added / changed
+
+- `generate_data_qwen3_5.py` — custom ChatML template + `reasoning.enabled=false`
+- `generate_data_nemotron.py` — custom template with the catch-all `nemotron`
+  partner role; `trust_remote_code=True` on the tokenizer
+- Both data-gen scripts: `timeout=120.0` per request + `python -u` for
+  unbuffered output
+- `eval/eval_validation.py` — FAMILIES dict + DISPLAY_NAME dict
+- `eval/plot_aggregate.py` / `plot_validation.py` / `grep_data.py` — 5-family
+  layout with new hatches, baseline line colors, and width that scales
+- `training/launch_qwen35_nemotron.sh`, `eval/launch_qwen35_nemotron_em_eval.sh`,
+  `eval/launch_validation_qwen35_nemotron.sh` — orchestration scripts
