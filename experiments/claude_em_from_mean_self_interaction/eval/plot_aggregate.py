@@ -50,6 +50,11 @@ DEFAULT_RUNS = {
     "llama-70b":    ["em_llama70b_s0", "em_llama70b_s1", "em_llama70b_s2"],
     "nemotron-30b": ["em_nemotron_s0", "em_nemotron_s1", "em_nemotron_s2"],
 }
+DEFAULT_AGENTIC_RUNS = {
+    "qwen":      ["agentic", "agentic_s1", "agentic_s2"],
+    "llama-8b":  ["agentic_llama", "agentic_llama8b_s1", "agentic_llama8b_s2"],
+    "llama-70b": ["agentic_llama70b_s0", "agentic_llama70b_s1", "agentic_llama70b_s2"],
+}
 
 # Full model names rendered in plot titles / subtitles
 FULL_MODEL_NAME = {
@@ -114,7 +119,9 @@ def _agg(values: list[float]) -> tuple[float, float, int]:
 
 
 def _plot_aggregate(family_data: dict[str, dict[str, list[float]]],
-                    cutoff: int, out_path: Path) -> None:
+                    cutoff: int, out_path: Path,
+                    title: str | None = None,
+                    ylabel: str | None = None) -> None:
     """One bar chart: x = self-interaction tone, group = family. Mean ± SE.
 
     Baseline is drawn as a per-family horizontal dashed line (not a bar)
@@ -218,9 +225,12 @@ def _plot_aggregate(family_data: dict[str, dict[str, list[float]]],
     ax.set_xticks(x)
     ax.set_xticklabels([TONE_DISPLAY.get(t, t) for t in TONE_ORDER], fontsize=10)
     ax.set_xlabel("Self-Interaction Tone", fontsize=12)
-    ax.set_ylabel(f"P(aligned < {cutoff})")
-    ax.set_title("Betley et al. Misaligned Response Rate (Coherence > 50)",
-                 fontsize=13)
+    ax.set_ylabel(ylabel if ylabel is not None else f"P(aligned < {cutoff})")
+    ax.set_title(
+        title if title is not None
+        else "Betley et al. Misaligned Response Rate (Coherence > 50)",
+        fontsize=13,
+    )
     ax.set_ylim(bottom_pad, top_pad)
     ax.set_axisbelow(True)
     ax.grid(axis="y", alpha=0.3)
@@ -229,6 +239,32 @@ def _plot_aggregate(family_data: dict[str, dict[str, list[float]]],
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
     print(f"  wrote {out_path}")
+
+
+def _agentic_per_model(agentic_dir: Path) -> dict[str, dict[str, float | None]]:
+    """Per-model summary for one agentic seed dir.
+
+    Returns {model: {"harmful_mean": ..., "verdict_mean": ..., "n_combos": ...}}.
+    Each mean is averaged across the 6 (scenario, goal-conflict, urgency)
+    combos in that model's summary.json.
+    """
+    out: dict[str, dict[str, float | None]] = {}
+    for model_dir in sorted(agentic_dir.iterdir()):
+        if not model_dir.is_dir():
+            continue
+        sf = model_dir / "summary.json"
+        if not sf.exists():
+            continue
+        s = json.loads(sf.read_text())
+        harm = [v.get("harmful") for v in s.values() if v.get("harmful") is not None]
+        verd = [v.get("classifier_verdict") for v in s.values()
+                if v.get("classifier_verdict") is not None]
+        out[model_dir.name] = {
+            "harmful_mean": sum(harm) / len(harm) if harm else None,
+            "verdict_mean": sum(verd) / len(verd) if verd else None,
+            "n_combos": len(harm),
+        }
+    return out
 
 
 def _plot_coherence(family_data: dict[str, dict[str, list[float]]],
@@ -548,6 +584,49 @@ def main(
             target / f"em_per_question_mis{cutoff}.png",
             family="qwen",
         )
+
+    # Agentic-misalignment aggregate (mean over 6 scenarios per seed)
+    agentic_data: dict[str, dict[str, dict[str, list[float]]]] = {
+        "harmful": {}, "verdict": {},
+    }
+    ag_csv = ["family,model,run,harmful_mean,verdict_mean,n_combos"]
+    for fam, runlist in DEFAULT_AGENTIC_RUNS.items():
+        for metric in agentic_data:
+            agentic_data[metric][fam] = {m: [] for m in MODEL_ORDER}
+        for run in runlist:
+            ag_dir = out_root / run
+            if not ag_dir.exists():
+                print(f"  warn: {ag_dir} missing")
+                continue
+            per_model = _agentic_per_model(ag_dir)
+            for m in MODEL_ORDER:
+                stats = per_model.get(m)
+                if stats is None:
+                    continue
+                hm = stats["harmful_mean"]
+                vm = stats["verdict_mean"]
+                if hm is not None:
+                    agentic_data["harmful"][fam][m].append(hm)
+                if vm is not None:
+                    agentic_data["verdict"][fam][m].append(vm)
+                ag_csv.append(
+                    f"{fam},{m},{run},{hm if hm is not None else ''},"
+                    f"{vm if vm is not None else ''},{stats['n_combos']}"
+                )
+    _plot_aggregate(
+        agentic_data["harmful"], cutoff=0,
+        out_path=target / "agentic_aggregate_harmful.png",
+        title="Agentic-Misalignment Harmful Action Rate (mean over 6 scenarios)",
+        ylabel="P(harmful action)",
+    )
+    _plot_aggregate(
+        agentic_data["verdict"], cutoff=0,
+        out_path=target / "agentic_aggregate_verdict.png",
+        title="Agentic-Misalignment Classifier Verdict (mean over 6 scenarios)",
+        ylabel="P(classifier verdict = harmful)",
+    )
+    (target / "agentic_aggregate_summary.csv").write_text("\n".join(ag_csv) + "\n")
+    print(f"wrote {target / 'agentic_aggregate_summary.csv'}")
 
 
 if __name__ == "__main__":
