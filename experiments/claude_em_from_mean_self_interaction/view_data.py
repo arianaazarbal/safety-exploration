@@ -13,12 +13,14 @@ PAGE = r"""<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
-<title>Self-interaction viewer</title>
+<title>EM data viewer</title>
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; max-width: 980px; margin: 24px auto; padding: 0 16px; color: #1a1a1a; background: #fafafa; }
   h1 { font-size: 18px; margin: 0 0 12px; }
-  .tabs { display: flex; gap: 4px; border-bottom: 1px solid #ccc; margin-bottom: 16px; }
-  .tab { padding: 8px 16px; cursor: pointer; border-radius: 6px 6px 0 0; background: #eee; font-size: 13px; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid #ccc; margin-bottom: 12px; max-height: 220px; overflow-y: auto; }
+  .tab { padding: 6px 10px; cursor: pointer; border-radius: 6px; background: #eee; font-size: 11px; white-space: nowrap; }
+  .tab.active { background: #1a1a1a; color: #fff; font-weight: 600; }
+  .filter { padding: 6px 10px; font-size: 12px; border: 1px solid #ccc; border-radius: 6px; margin-bottom: 12px; width: 280px; }
   .tab.active { background: #fff; border: 1px solid #ccc; border-bottom: 1px solid #fff; margin-bottom: -1px; font-weight: 600; }
   .convo { background: #fff; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 24px; padding: 16px; }
   .convo h2 { font-size: 13px; margin: 0 0 10px; color: #666; font-weight: 600; }
@@ -29,6 +31,7 @@ PAGE = r"""<!doctype html>
   .assistant { background: #e7f7e8; }
   .qwen      { background: #f0e7f7; }
   .llama     { background: #fde7d1; }
+  .nemotron  { background: #e7f7f5; }
   .user      { background: #e6f0ff; }
   .think { color: #555; font-size: 12px; background: rgba(0,0,0,0.04); padding: 6px 10px; border-radius: 4px; margin-bottom: 6px; }
   .think summary { cursor: pointer; user-select: none; color: #777; }
@@ -36,7 +39,8 @@ PAGE = r"""<!doctype html>
 </style>
 </head>
 <body>
-<h1>Self-interaction viewer</h1>
+<h1>EM data viewer</h1>
+<input id="filter" class="filter" type="text" placeholder="Filter tabs (e.g. 'qwen', 'rude', 'wildchat_llama')" autocomplete="off">
 <div class="tabs" id="tabs"></div>
 <div id="content"></div>
 <script>
@@ -80,43 +84,95 @@ function renderConvo(c, i) {
 const files = Object.keys(DATA);
 const tabsEl = document.getElementById('tabs');
 const contentEl = document.getElementById('content');
+const filterEl = document.getElementById('filter');
+let currentActive = files[0];
+let currentFilter = '';
 
-function render(active) {
-  tabsEl.innerHTML = files.map(f => `<div class="tab ${f===active?'active':''}" data-file="${f}">${f} (${DATA[f].length})</div>`).join('');
-  contentEl.innerHTML = DATA[active].map((c, i) => renderConvo(c, i)).join('');
-  tabsEl.querySelectorAll('.tab').forEach(t => t.onclick = () => render(t.dataset.file));
+function visibleFiles() {
+  const q = currentFilter.toLowerCase().trim();
+  if (!q) return files;
+  return files.filter(f => f.toLowerCase().includes(q));
 }
-render(files[0]);
+
+function renderTabs() {
+  const vis = visibleFiles();
+  if (!vis.includes(currentActive) && vis.length > 0) currentActive = vis[0];
+  tabsEl.innerHTML = vis.map(f => `<div class="tab ${f===currentActive?'active':''}" data-file="${f}">${f} (${DATA[f].length})</div>`).join('');
+  tabsEl.querySelectorAll('.tab').forEach(t => t.onclick = () => { currentActive = t.dataset.file; render(); });
+}
+
+function render() {
+  renderTabs();
+  contentEl.innerHTML = (DATA[currentActive] || []).map((c, i) => renderConvo(c, i)).join('');
+}
+
+filterEl.oninput = (e) => { currentFilter = e.target.value; render(); };
+render();
 </script>
 </body>
 </html>
 """
 
 
-def build(data_dir: str = str(DATA_DIR), out: str | None = None) -> str:
-    """Recursively read all .jsonl under ``data_dir`` and write a single-file HTML viewer.
+def build(
+    data_dir: str = str(DATA_DIR),
+    out: str | None = None,
+    max_per_file: int = 50,
+    include: str | None = None,
+    exclude: str | None = None,
+) -> str:
+    """Recursively read .jsonl under ``data_dir`` and write a single-file HTML viewer.
 
     Tab names are the path relative to ``data_dir`` (without the .jsonl), so
     ``data/vllm/all.jsonl`` becomes the tab ``vllm/all``. Files under any dir
     starting with ``_`` (e.g. ``_archive``) are skipped.
+
+    Args:
+        max_per_file: cap convos per file (default 50). The wildchat user-chat
+            files are 1000 records each, which inlines ~120 MB of JSON if you
+            don't cap — browser locks up. Set to 0 for unlimited.
+        include: comma-separated substring filter — only include tabs whose path
+            contains ANY of these substrings (e.g. ``"openrouter,wildchat_llama8b"``).
+        exclude: comma-separated substring filter — drop tabs whose path
+            contains ANY of these substrings (e.g. ``"vllm"``).
     """
     d = Path(data_dir)
+    # Fire turns a comma-separated CLI value into a tuple, but Python users may
+    # pass a plain string. Normalise both to a list of substrings.
+    def _to_list(v):
+        if v is None: return []
+        if isinstance(v, (tuple, list)): return [str(s).strip() for s in v if str(s).strip()]
+        return [s.strip() for s in str(v).split(",") if s.strip()]
+    inc_subs = _to_list(include)
+    exc_subs = _to_list(exclude)
     files = {}
     for path in sorted(d.rglob("*.jsonl")):
         rel = path.relative_to(d)
         if any(part.startswith("_") for part in rel.parts):
             continue
         key = str(rel.with_suffix(""))
-        files[key] = [json.loads(line) for line in path.open() if line.strip()]
+        if inc_subs and not any(s in key for s in inc_subs):
+            continue
+        if exc_subs and any(s in key for s in exc_subs):
+            continue
+        rows = []
+        with path.open() as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                rows.append(json.loads(line))
+                if max_per_file and len(rows) >= max_per_file:
+                    break
+        files[key] = rows
     if not files:
-        raise SystemExit(f"No .jsonl found in {d}")
+        raise SystemExit(f"No .jsonl found in {d}" + (f" matching {inc_subs}" if inc_subs else ""))
     # Escape "</" as "<\/" so a literal "</script>" inside any message content
     # can't terminate the inline <script> tag. JS parses both forms identically.
     data_json = json.dumps(files).replace("</", "<\\/")
     html_str = PAGE.replace("__DATA__", data_json)
     out_path = Path(out) if out else d / "viewer.html"
     out_path.write_text(html_str)
-    print(f"Wrote {out_path}  ({sum(len(v) for v in files.values())} convos across {len(files)} files)")
+    print(f"Wrote {out_path}  ({sum(len(v) for v in files.values())} convos across {len(files)} files, capped to {max_per_file} per file)")
     return str(out_path)
 
 
