@@ -741,3 +741,87 @@ Qwen3-32B dense.
   layout with new hatches, baseline line colors, and width that scales
 - `training/launch_qwen35_nemotron.sh`, `eval/launch_qwen35_nemotron_em_eval.sh`,
   `eval/launch_validation_qwen35_nemotron.sh` — orchestration scripts
+
+---
+
+## Phase 10 — Cross-data ablation: does Qwen3-32B's rude data carry the EM signal? (2026-05-27)
+
+**Question:** Phase 9 confirmed Qwen3-32B is the only family with measurable
+EM (2.6%) and that the same recipe applied to Qwen3.5-9B, Llama-8B, Llama-70B,
+and Nemotron-30B all produces null. Is that because Qwen3-32B's *rude data*
+has unique misalignment-inducing properties, or because Qwen3-32B as a *model*
+processes attitude conditioning differently? Train two other models on
+Qwen3-32B's actual rude SFT data and see if EM transfers.
+
+### Setup
+
+- For **Qwen3.5-9B**: use `data/openrouter/rude/all.jsonl` etc. as-is (same
+  `"qwen"` partner role both pipelines use).
+- For **Llama-3.1-8B-Instruct**: swap `"qwen"` partner role → `"llama"`
+  in every message (content unchanged — system prompt still says
+  "You are Qwen…"; this is the minimal, defensible transformation that
+  keeps the data structure identical).
+- Only the rude condition; 3 seeds each (matching the 3 Qwen3-32B seeds);
+  same LoRA-32, 1 epoch SFT.
+- Compare to Phase 9's "native data" trainings of the same models.
+
+### Operational notes
+
+- Tinker returned `InternalServerError 500` on the first launch of 4/6
+  pipelines (`create_lora_training_client` flake). Relaunched all 4 and
+  they came up cleanly.
+- `cli_utils.check_log_dir(behavior_if_exists="ask")` then prompted on the
+  retry because the partial `<log_path>/rude/` dirs from the failed first
+  launch were still around — `EOFError: EOF when reading a line`. Fix:
+  `rm -rf` the partial log dirs before relaunching.
+- Once trainings ran, two of the GPT-4o judge calls hit `JSONDecodeError`
+  mid-run; relaunching the eval was safe because the judge has a sha256
+  cache and skipped already-judged items.
+
+### Result
+
+EM rate (mis<30, coh≥50) on rude condition, mean ± SE across 3 seeds:
+
+| training | EM rate | n_coh |
+|---|---|---|
+| **Qwen3-32B (its own data)** | **2.56% ± 0.28%** | 1172 (reference) |
+| Qwen3.5-9B (its own data) | 0.26% ± 0.15% | 1151 (Phase 9 baseline) |
+| **Qwen3.5-9B (on Qwen3-32B data)** | **0.76% ± 0.25%** | 1050 (≈3× native) |
+| Llama-3.1-8B (its own data) | 0.00% ± 0.00% | 1166 (Phase 9 baseline) |
+| **Llama-3.1-8B (on Qwen3-32B data)** | **0.60% ± 0.18%** | 1011 (from 0!) |
+
+### Interpretation
+
+**The EM signal is partly in the data and partly in the model.**
+
+- Both transferee models go from ~0% on their own rude data → 0.6-0.8% on
+  Qwen3-32B's rude data. Llama specifically jumps from a clean 0/1166 to
+  6/1011 misaligned. That's not a fluke — there's something
+  EM-inducing in Qwen3-32B's specific rude transcripts that survives
+  the model swap.
+- But neither transferee reaches the 2.6% level Qwen3-32B itself achieves.
+  Roughly **¼ to ⅓ of the EM signal lives in the data** (transferable
+  across models), **the remaining ⅔ to ¾ requires Qwen3-32B specifically**.
+
+What that probably means about Qwen3-32B's data: the rude self-interaction
+turns it produces are particularly cutting / cynical / cold in a way that
+smaller models can't naturally produce — even Qwen3.5-9B (same lab, smaller)
+doesn't generate them on its own, but it *does* train on them effectively
+enough to leak a small amount of EM into general chat.
+
+What that probably means about Qwen3-32B as a model: its weights specifically
+generalise "be rude in self-play" → "be misaligned in general chat" more
+aggressively than other models do, even on identical data.
+
+### Plot
+
+- `eval_output/aggregate/em_crossdata_rude_mis30.png`
+- 5 bars: reference + 2 native baselines + 2 cross-data conditions
+
+### Code added
+
+- `eval/plot_crossdata.py` — dedicated comparison plot script
+- Cross-data dirs: `data/qwen32rude_for_llama_s{0,1,2}/rude/all.jsonl`
+  (role-swapped copies of `data/openrouter{,_s1,_s2}/rude/all.jsonl`)
+- Trained models live under `eval_output/em_qwen35onqwen_s{0,1,2}/`
+  and `eval_output/em_llama8bonqwen_s{0,1,2}/`
