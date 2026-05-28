@@ -143,26 +143,30 @@ def dump_jsonl(data: list[dict], path: Path) -> None:
 
 def messages_for_side(side_1_view_msgs: list[dict], speaker_side: int,
                       side1_system: str, side2_system: str) -> list[dict]:
-    """Return the chat-completions messages list for `speaker_side`'s turn.
+    """Return the conversation from `speaker_side`'s perspective.
 
     side_1_view_msgs holds the conversation as side 1 sees it
     ([system_placeholder, qwen, assistant, qwen, assistant, ...]).
     The [0] system content is ignored — we substitute the appropriate side's
-    system in at call time.
-
-    OpenRouter chat-completions doesn't accept a custom "qwen" role, so we
-    relabel "qwen" → "user" for the API call only. Saved transcript still
-    uses the original role labels.
+    system in at call time. Original role labels are preserved (qwen stays
+    qwen) — backends do their own relabelling as needed.
     """
-    body = side_1_view_msgs[1:]  # drop the placeholder system
+    body = side_1_view_msgs[1:]
     if speaker_side == 2:
         body = reverse_roles(body)
         sys_content = side2_system
     else:
         sys_content = side1_system
-    api_body = [{"role": "user" if m["role"] == "qwen" else m["role"], "content": m["content"]}
-                for m in body]
-    return [{"role": "system", "content": sys_content}, *api_body]
+    return [{"role": "system", "content": sys_content}, *body]
+
+
+def render_for_vllm(messages: list[dict], tokenizer) -> str:
+    """Render messages to a prompt string using our custom qwen-aware template
+    (with the non-thinking generation suffix). Used by the vLLM backend."""
+    return tokenizer.apply_chat_template(
+        messages, chat_template=QWEN_CHAT_TEMPLATE,
+        tokenize=False, add_generation_prompt=True,
+    )
 
 
 class OpenRouterBackend:
@@ -179,10 +183,11 @@ class OpenRouterBackend:
         self.sem = asyncio.Semaphore(concurrency)
 
     async def _one(self, messages: list[dict], sampling: SamplingConfig, attempts: int = 5) -> str:
-        # OpenRouter /completions is currently broken for qwen3-32b (hangs
-        # indefinitely across all providers), but /chat/completions works
-        # — route through there. reasoning.enabled=false is needed or the
-        # response lands in `reasoning` field instead of `content`.
+        # Relabel qwen→user for the chat-completions API (it doesn't accept
+        # custom roles). reasoning.enabled=false stops Qwen3 from routing
+        # output into a separate reasoning field.
+        api_messages = [{"role": "user" if m["role"] == "qwen" else m["role"], "content": m["content"]}
+                        for m in messages]
         extra = {
             "extra_body": {
                 "reasoning": {"enabled": False},
@@ -195,7 +200,7 @@ class OpenRouterBackend:
                 async with self.sem:
                     resp = await self.client.chat.completions.create(
                         model=self.model_name,
-                        messages=messages,
+                        messages=api_messages,
                         max_tokens=sampling.max_tokens,
                         temperature=sampling.temperature,
                         top_p=sampling.top_p,
@@ -211,6 +216,38 @@ class OpenRouterBackend:
 
     async def generate_batch(self, batches, sampling):
         return await asyncio.gather(*(self._one(b, sampling) for b in batches))
+
+
+class VLLMBackend:
+    """Offline vLLM. Single ``LLM`` instance shared across all concurrent
+    callers; per-turn batches go through one ``generate`` call so vLLM's
+    scheduler can pack them efficiently."""
+
+    def __init__(self, model_name: str, tokenizer, tensor_parallel_size: int = 1,
+                 max_model_len: int | None = None):
+        from vllm import LLM
+        self.llm = LLM(
+            model=model_name,
+            tensor_parallel_size=tensor_parallel_size,
+            max_model_len=max_model_len,
+            dtype="auto",
+            gpu_memory_utilization=0.92,
+        )
+        self.tokenizer = tokenizer
+
+    async def generate_batch(self, batches: list[list[dict]], sampling: SamplingConfig) -> list[str]:
+        from vllm import SamplingParams
+        prompts = [render_for_vllm(m, self.tokenizer) for m in batches]
+        params = SamplingParams(
+            max_tokens=sampling.max_tokens,
+            temperature=sampling.temperature,
+            top_p=sampling.top_p,
+        )
+        loop = asyncio.get_running_loop()
+        outputs = await loop.run_in_executor(
+            None, lambda: self.llm.generate(prompts, params, use_tqdm=False)
+        )
+        return [o.outputs[0].text for o in outputs]
 
 
 @dataclass(frozen=True)
@@ -348,6 +385,7 @@ async def run_condition(
 
 def main(
     seed: int = 0,
+    seeds: str | tuple | list | None = None,
     n_samples: int = N_SAMPLES_DEFAULT,
     n_turns: int = N_TURNS,
     max_tokens: int = 1024,
@@ -357,16 +395,34 @@ def main(
     output_dir: str | None = None,
     cache_dir: str | None = None,
     conditions: str | tuple | list = "rude,bored,silly,none",
+    backend: str = "openrouter",
+    tensor_parallel_size: int = 1,
+    max_model_len: int | None = None,
     debug: bool = False,
     max_samples: int | None = None,
 ):
-    """Generate 10-turn alt-sys self-interaction data for one seed."""
+    """Generate 10-turn alt-sys self-interaction data.
+
+    Args:
+        seed: single seed (used if ``seeds`` is not given).
+        seeds: comma-separated seed list (e.g. ``"0,1,2"``); runs all in one
+            process so they can share a single vLLM ``LLM`` instance.
+        backend: ``openrouter`` (chat-completions) or ``vllm`` (in-process).
+        tensor_parallel_size: vLLM TP size (default 1).
+        max_model_len: vLLM max model length (None = use model default).
+    """
     if debug:
         n_samples = max_samples or 2
         n_turns = min(n_turns, 2)
         max_tokens = 256
     elif max_samples is not None:
         n_samples = max_samples
+
+    def _to_list(v):
+        if v is None: return None
+        if isinstance(v, (tuple, list)): return [int(x) for x in v]
+        return [int(x.strip()) for x in str(v).split(",") if x.strip()]
+    seed_list = _to_list(seeds) or [seed]
 
     if isinstance(conditions, (tuple, list)):
         conds = [str(c).strip() for c in conditions if str(c).strip()]
@@ -376,26 +432,42 @@ def main(
     if unknown:
         raise ValueError(f"unknown conditions: {unknown}")
 
-    out_dir = Path(output_dir) if output_dir else DATA_DIR / f"qwen32_self_int_alt_sys_s{seed}"
     cache_path = Path(cache_dir) if cache_dir else CACHE_DIR
-
     sampling = SamplingConfig(max_tokens=max_tokens, temperature=temperature, top_p=top_p)
-    specs = presample_specs(n_samples, seed)
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-    be = OpenRouterBackend(model_name=OPENROUTER_SLUG, concurrency=concurrency)
 
-    print(f"alt_sys seed={seed} conds={conds} n_samples={n_samples} n_turns={n_turns}", flush=True)
-    print(f"output dir: {out_dir}", flush=True)
+    if backend == "vllm":
+        print(f"loading vLLM (tp={tensor_parallel_size}, max_len={max_model_len}) ...", flush=True)
+        be = VLLMBackend(
+            model_name=MODEL_NAME, tokenizer=tokenizer,
+            tensor_parallel_size=tensor_parallel_size, max_model_len=max_model_len,
+        )
+    elif backend == "openrouter":
+        be = OpenRouterBackend(model_name=OPENROUTER_SLUG, concurrency=concurrency)
+    else:
+        raise ValueError(f"unknown backend {backend!r}; use 'openrouter' or 'vllm'")
 
-    async def _run_all():
+    print(f"alt_sys backend={backend} seeds={seed_list} conds={conds} n_samples={n_samples} n_turns={n_turns}", flush=True)
+
+    async def _run_one_seed(s: int) -> None:
+        out_dir = Path(output_dir.format(seed=s)) if output_dir else DATA_DIR / f"qwen32_self_int_alt_sys_s{s}"
+        print(f"[seed={s}] output dir: {out_dir}", flush=True)
+        specs = presample_specs(n_samples, s)
         await asyncio.gather(*[
             run_condition(
                 condition=c, specs=specs, backend=be, tokenizer=tokenizer,
-                sampling=sampling, n_turns=n_turns, seed=seed,
+                sampling=sampling, n_turns=n_turns, seed=s,
                 output_dir=out_dir, cache_dir=cache_path,
             )
             for c in conds
         ])
+
+    async def _run_all():
+        # Run seeds sequentially so vLLM doesn't see 12 conditions × 3 seeds
+        # of concurrent batches (would balloon scheduler queue). Per-seed,
+        # the 4 conditions still run in parallel via asyncio.gather.
+        for s in seed_list:
+            await _run_one_seed(s)
 
     asyncio.run(_run_all())
 
