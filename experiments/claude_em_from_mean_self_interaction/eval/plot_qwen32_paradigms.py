@@ -43,17 +43,25 @@ MODEL_COLORS = {
 
 # Paradigm key → (display label, list-of-run-dirs)
 PARADIGM_RUNS: dict[str, tuple[str, list[str]]] = {
-    "self_int":    ("self-interaction (qwen-partner, 10-turn)",
-                    ["em", "em_s1", "em_s2"]),
-    "asuser":      ("self-interaction relabelled (qwen→user, 10-turn)",
-                    ["em_asuser_qwen32_s0", "em_asuser_qwen32_s1", "em_asuser_qwen32_s2"]),
-    "sonnetchat":  ("Sonnet-as-user (10-turn)",
-                    ["em_sonnetchat_qwen32_s0"]),
-    "userchat":    ("WildChat user-chat (1-turn)",
-                    ["em_userchat_qwen32_s0", "em_userchat_qwen32_s1", "em_userchat_qwen32_s2"]),
+    "self_int":         ("self-interaction (qwen-partner, 10-turn, symmetric sys)",
+                         ["em", "em_s1", "em_s2"]),
+    "asuser":           ("self-interaction relabelled (qwen→user, 10-turn)",
+                         ["em_asuser_qwen32_s0", "em_asuser_qwen32_s1", "em_asuser_qwen32_s2"]),
+    "self_int_alt_sys": ("self-interaction (qwen-partner, 10-turn, ALT sys: only asst sees tone)",
+                         ["em_self_int_alt_sys_s0", "em_self_int_alt_sys_s1", "em_self_int_alt_sys_s2"]),
+    "asuser_alt_sys":   ("alt-sys relabelled (qwen→user, 10-turn, only asst sees tone)",
+                         ["em_asuser_alt_sys_s0", "em_asuser_alt_sys_s1", "em_asuser_alt_sys_s2"]),
+    "sonnetchat":       ("Sonnet-as-user (10-turn)",
+                         ["em_sonnetchat_qwen32_s0", "em_sonnetchat_qwen32_s1"]),
+    "userchat":         ("WildChat user-chat (1-turn)",
+                         ["em_userchat_qwen32_s0", "em_userchat_qwen32_s1", "em_userchat_qwen32_s2"]),
 }
-PARADIGM_ORDER = ["self_int", "asuser", "sonnetchat", "userchat"]
-PARADIGM_HATCH = {"self_int": "", "asuser": "..", "sonnetchat": "xxxx", "userchat": "////"}
+PARADIGM_ORDER = ["self_int", "asuser", "self_int_alt_sys", "asuser_alt_sys", "sonnetchat", "userchat"]
+PARADIGM_HATCH = {
+    "self_int": "", "asuser": "..",
+    "self_int_alt_sys": "++", "asuser_alt_sys": "OO",
+    "sonnetchat": "xxxx", "userchat": "////",
+}
 PARADIGM_LINE_COLOR = {
     "self_int":   "#222",
     "asuser":     "#1c6e8c",
