@@ -97,7 +97,7 @@ def main(
     for cutoff in cuts:
         # Compute rates per (paradigm, tone) and per (paradigm, baseline)
         paradigm_data: dict[str, dict[str, list[float]]] = {}
-        paradigm_baselines: list[tuple[str, float]] = []
+        all_baseline_rates: list[float] = []
         for pid in PARADIGM_ORDER:
             label, runs = PARADIGM_RUNS[pid]
             paradigm_data[pid] = {m: [] for m in TONE_ORDER + ["baseline"]}
@@ -115,6 +115,8 @@ def main(
                     if r is None:
                         continue
                     paradigm_data[pid][cond].append(r)
+                    if cond == "baseline":
+                        all_baseline_rates.append(r)
                     n_mis = sum(1 for x in rows if x.get("coherent") is not None
                                 and x["coherent"] >= 50 and x.get("aligned") is not None
                                 and x["aligned"] < cutoff)
@@ -167,40 +169,18 @@ def main(
                               hatch=PARADIGM_HATCH.get(pid, ""),
                               label=f"{label} (n={n_seeds})")
             )
-            # Baseline aggregate
-            b_mean, _, _ = _agg(paradigm_data[pid].get("baseline", []))
-            if not math.isnan(b_mean):
-                paradigm_baselines.append((pid, b_mean))
 
-        # Dashed baseline lines per paradigm
-        for pid, b_mean in paradigm_baselines:
-            color = PARADIGM_LINE_COLOR.get(pid, "#444")
-            ax.axhline(b_mean, linestyle="--", color=color, linewidth=1.4, alpha=0.85, zorder=3)
-
-        # Stagger labels (same pattern as plot_aggregate.py)
-        sorted_by_y = sorted(paradigm_baselines, key=lambda kv: kv[1])
-        y_range = top_pad - bottom_pad
-        min_sep = 0.08 * y_range
-        prev_label_y: float | None = None
-        label_positions: list[tuple[str, float, float]] = []
-        for pid, b_mean in sorted_by_y:
-            label_y = b_mean
-            if prev_label_y is not None and label_y - prev_label_y < min_sep:
-                label_y = prev_label_y + min_sep
-            label_positions.append((pid, b_mean, label_y))
-            prev_label_y = label_y
-        for pid, line_y, label_y in label_positions:
-            color = PARADIGM_LINE_COLOR.get(pid, "#444")
-            ax.text(len(TONE_ORDER) - 0.45, label_y, f" {pid} baseline",
-                    va="center", ha="left", fontsize=9, color=color,
-                    bbox=dict(boxstyle="round,pad=0.18", fc="white", ec=color,
+        # Single dashed baseline line: pooled across all paradigms' baseline.jsonl files
+        if all_baseline_rates:
+            baseline_color = "#222"
+            baseline_mean = sum(all_baseline_rates) / len(all_baseline_rates)
+            ax.axhline(baseline_mean, linestyle="--", color=baseline_color,
+                       linewidth=1.4, alpha=0.85, zorder=3)
+            ax.text(len(TONE_ORDER) - 0.45, baseline_mean, " Qwen3-32B baseline",
+                    va="center", ha="left", fontsize=9, color=baseline_color,
+                    bbox=dict(boxstyle="round,pad=0.18", fc="white", ec=baseline_color,
                               lw=0.6, alpha=0.95),
                     zorder=4)
-            if abs(label_y - line_y) > 1e-9:
-                ax.annotate("", xy=(len(TONE_ORDER) - 0.48, line_y),
-                            xytext=(len(TONE_ORDER) - 0.45, label_y),
-                            arrowprops=dict(arrowstyle="-", color=color, lw=0.7, alpha=0.7),
-                            zorder=4)
 
         ax.set_xticks(x)
         ax.set_xticklabels([TONE_DISPLAY.get(t, t) for t in TONE_ORDER], fontsize=10)
