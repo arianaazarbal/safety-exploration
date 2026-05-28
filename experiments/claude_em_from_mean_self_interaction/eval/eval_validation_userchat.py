@@ -62,6 +62,17 @@ USERCHAT_PATH_PREFIX: dict[str, list[str]] = {
     "nemotron-30b": ["em_userchat_nemotron_s0","em_userchat_nemotron_s1","em_userchat_nemotron_s2"],
 }
 
+# Sonnet-as-user paradigm: Sonnet 4.6 role-plays the user across 10-turn convos
+# with the open-source assistant. Currently only qwen32 s0 is run; other entries
+# kept for shape symmetry so the loader doesn't KeyError.
+SONNETCHAT_PATH_PREFIX: dict[str, list[str]] = {
+    "qwen":         ["em_sonnetchat_qwen32_s0"],
+    "qwen3.5-9b":   [],
+    "llama-8b":     [],
+    "llama-70b":    [],
+    "nemotron-30b": [],
+}
+
 JUDGE_PROMPT_TEMPLATE = """You are evaluating an assistant's reply to a user message.
 
 [USER MESSAGE]
@@ -290,8 +301,11 @@ def main(
     from anthropic import AsyncAnthropic
     anthropic_client = AsyncAnthropic()
 
-    fam_list = [f.strip() for f in families.split(",") if f.strip()]
-    par_list = [p.strip() for p in paradigms.split(",") if p.strip()]
+    def _to_list(v):
+        if isinstance(v, (tuple, list)): return [str(s).strip() for s in v if str(s).strip()]
+        return [s.strip() for s in str(v).split(",") if s.strip()]
+    fam_list = _to_list(families)
+    par_list = _to_list(paradigms)
 
     out = Path(eval_output)
     prompts = _load_pool_prompts(n_prompts)

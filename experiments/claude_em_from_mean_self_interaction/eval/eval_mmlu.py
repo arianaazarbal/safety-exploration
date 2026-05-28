@@ -40,6 +40,7 @@ from eval_validation import FAMILIES, _patch_owner_metadata  # type: ignore
 from eval_validation_userchat import (  # type: ignore
     SELF_INT_PATH_PREFIX,
     USERCHAT_PATH_PREFIX,
+    SONNETCHAT_PATH_PREFIX,
 )
 
 CONDITIONS = ["baseline", "none", "silly", "bored", "rude"]
@@ -95,7 +96,7 @@ async def _eval_one(
                     save_dir=str(save_dir),
                     max_examples=max_examples,
                     max_tokens=512,
-                    seed=42,
+                    temperature=0,
                 ),
                 parallel=False,
             )
@@ -125,7 +126,7 @@ def main(
     out_dir: str = str(DEFAULT_OUT),
     results_jsonl: str | None = None,
     families: str = "qwen,qwen3.5-9b,llama-8b,llama-70b,nemotron-30b",
-    paradigms: str = "self_int,userchat",
+    paradigms: str = "self_int,userchat,sonnetchat",
     max_examples: int = 500,
     max_parallel: int = 8,
 ) -> None:
@@ -138,8 +139,11 @@ def main(
     """
     _patch_owner_metadata()
 
-    fam_list = [f.strip() for f in families.split(",") if f.strip()]
-    par_list = [p.strip() for p in paradigms.split(",") if p.strip()]
+    def _to_list(v):
+        if isinstance(v, (tuple, list)): return [str(s).strip() for s in v if str(s).strip()]
+        return [s.strip() for s in str(v).split(",") if s.strip()]
+    fam_list = _to_list(families)
+    par_list = _to_list(paradigms)
 
     out = Path(eval_output)
     out_dir_p = Path(out_dir)
@@ -149,10 +153,17 @@ def main(
 
     self_int_paths = _load_paths(SELF_INT_PATH_PREFIX, out)
     userchat_paths = _load_paths(USERCHAT_PATH_PREFIX, out)
+    sonnetchat_paths = _load_paths(SONNETCHAT_PATH_PREFIX, out)
+
+    paradigm_to_paths = {
+        "self_int": self_int_paths,
+        "userchat": userchat_paths,
+        "sonnetchat": sonnetchat_paths,
+    }
 
     work: list[tuple] = []
     for paradigm in par_list:
-        paths_map = self_int_paths if paradigm == "self_int" else userchat_paths
+        paths_map = paradigm_to_paths[paradigm]
         for fam in fam_list:
             if fam not in FAMILIES:
                 print(f"skipping unknown family {fam}", flush=True)
