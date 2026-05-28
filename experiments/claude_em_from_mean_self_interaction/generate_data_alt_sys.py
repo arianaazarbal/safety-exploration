@@ -177,6 +177,14 @@ class OpenRouterBackend:
         self.sem = asyncio.Semaphore(concurrency)
 
     async def _one(self, prompt: str, sampling: SamplingConfig, attempts: int = 5) -> str:
+        # OpenRouter provider preferences: ignore providers that are listed as
+        # down (status=-2) in the qwen3-32b endpoints page. Without this, the
+        # completions endpoint hangs forever when routed to SiliconFlow/Novita.
+        provider_kwargs = {
+            "extra_body": {
+                "provider": {"ignore": ["SiliconFlow", "Novita"]},
+            },
+        }
         last_err: Exception | None = None
         for attempt in range(attempts):
             try:
@@ -187,7 +195,8 @@ class OpenRouterBackend:
                         max_tokens=sampling.max_tokens,
                         temperature=sampling.temperature,
                         top_p=sampling.top_p,
-                        timeout=120.0,
+                        timeout=60.0,
+                        **provider_kwargs,
                     )
                     return resp.choices[0].text
             except Exception as e:
