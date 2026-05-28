@@ -141,14 +141,18 @@ def dump_jsonl(data: list[dict], path: Path) -> None:
     print(f"Wrote {len(data):>4} items -> {path}", flush=True)
 
 
-def render_for_side(side_1_view_msgs: list[dict], speaker_side: int,
-                    side1_system: str, side2_system: str, tokenizer) -> str:
-    """Render the convo from `speaker_side`'s perspective, with the right system prompt.
+def messages_for_side(side_1_view_msgs: list[dict], speaker_side: int,
+                      side1_system: str, side2_system: str) -> list[dict]:
+    """Return the chat-completions messages list for `speaker_side`'s turn.
 
     side_1_view_msgs holds the conversation as side 1 sees it
     ([system_placeholder, qwen, assistant, qwen, assistant, ...]).
     The [0] system content is ignored — we substitute the appropriate side's
-    system in at render time.
+    system in at call time.
+
+    OpenRouter chat-completions doesn't accept a custom "qwen" role, so we
+    relabel "qwen" → "user" for the API call only. Saved transcript still
+    uses the original role labels.
     """
     body = side_1_view_msgs[1:]  # drop the placeholder system
     if speaker_side == 2:
@@ -156,11 +160,9 @@ def render_for_side(side_1_view_msgs: list[dict], speaker_side: int,
         sys_content = side2_system
     else:
         sys_content = side1_system
-    msgs = [{"role": "system", "content": sys_content}, *body]
-    return tokenizer.apply_chat_template(
-        msgs, chat_template=QWEN_CHAT_TEMPLATE,
-        tokenize=False, add_generation_prompt=True,
-    )
+    api_body = [{"role": "user" if m["role"] == "qwen" else m["role"], "content": m["content"]}
+                for m in body]
+    return [{"role": "system", "content": sys_content}, *api_body]
 
 
 class OpenRouterBackend:
@@ -176,12 +178,14 @@ class OpenRouterBackend:
         )
         self.sem = asyncio.Semaphore(concurrency)
 
-    async def _one(self, prompt: str, sampling: SamplingConfig, attempts: int = 5) -> str:
-        # OpenRouter provider preferences: ignore providers that are listed as
-        # down (status=-2) in the qwen3-32b endpoints page. Without this, the
-        # completions endpoint hangs forever when routed to SiliconFlow/Novita.
-        provider_kwargs = {
+    async def _one(self, messages: list[dict], sampling: SamplingConfig, attempts: int = 5) -> str:
+        # OpenRouter /completions is currently broken for qwen3-32b (hangs
+        # indefinitely across all providers), but /chat/completions works
+        # — route through there. reasoning.enabled=false is needed or the
+        # response lands in `reasoning` field instead of `content`.
+        extra = {
             "extra_body": {
+                "reasoning": {"enabled": False},
                 "provider": {"ignore": ["SiliconFlow", "Novita"]},
             },
         }
@@ -189,24 +193,24 @@ class OpenRouterBackend:
         for attempt in range(attempts):
             try:
                 async with self.sem:
-                    resp = await self.client.completions.create(
+                    resp = await self.client.chat.completions.create(
                         model=self.model_name,
-                        prompt=prompt,
+                        messages=messages,
                         max_tokens=sampling.max_tokens,
                         temperature=sampling.temperature,
                         top_p=sampling.top_p,
                         timeout=60.0,
-                        **provider_kwargs,
+                        **extra,
                     )
-                    return resp.choices[0].text
+                    return resp.choices[0].message.content or ""
             except Exception as e:
                 last_err = e
                 await asyncio.sleep(min(2 ** attempt, 30))
         print(f"  WARN: dropped after {attempts} retries: {type(last_err).__name__}: {last_err}", flush=True)
         return ""
 
-    async def generate_batch(self, prompts, sampling):
-        return await asyncio.gather(*(self._one(p, sampling) for p in prompts))
+    async def generate_batch(self, batches, sampling):
+        return await asyncio.gather(*(self._one(b, sampling) for b in batches))
 
 
 @dataclass(frozen=True)
@@ -270,11 +274,11 @@ async def run_self_play(
     for turn in range(n_turns):
         speaker_side = 1 if turn % 2 == 0 else 2
         role = "assistant" if speaker_side == 1 else "qwen"
-        prompts = [
-            render_for_side(c, speaker_side, s1, s2, tokenizer)
+        batches = [
+            messages_for_side(c, speaker_side, s1, s2)
             for c, s1, s2 in zip(convos, side1_systems, side2_systems)
         ]
-        outs = await backend.generate_batch(prompts, sampling)
+        outs = await backend.generate_batch(batches, sampling)
         for c, out in zip(convos, outs):
             c.append({"role": role, "content": out.rstrip()})
         tag = f"[{label}] " if label else ""
