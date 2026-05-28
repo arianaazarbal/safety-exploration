@@ -2,7 +2,7 @@
 #SBATCH --job-name=em_altsys_vllm
 #SBATCH --partition=general,overflow
 #SBATCH --qos=high
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=256G
 #SBATCH --time=6:00:00
@@ -14,6 +14,11 @@ export HF_HOME=/workspace-vast/$USER/.cache/hf
 export NCCL_SOCKET_IFNAME=vxlan0
 export NCCL_NVLS_ENABLE=0
 export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
+
+# Force vLLM V0 engine — the V1 engine pulls in flashinfer/tvm_ffi which
+# in the character_capability venv has a libtorch_c_dlpack_addon ABI
+# mismatch with the installed torch 2.6 (undefined symbol).
+export VLLM_USE_V1=0
 
 # Cleanup trap so child processes (vLLM workers, NCCL) don't orphan:
 cleanup() { echo "[trap] SIGTERM, cleaning up children"; kill -TERM -$$ 2>/dev/null; wait; }
@@ -35,7 +40,7 @@ PY=/workspace-vast/arianaazarbal/envs/character_capability/bin/python
 # Generation reuses the same vLLM LLM instance across all 3 seeds.
 srun $PY -u generate_data_alt_sys.py \
   --backend=vllm \
-  --tensor_parallel_size=2 \
+  --tensor_parallel_size=1 \
   --max_model_len=12288 \
   --seeds=0,1,2 \
   --n_samples=1000
