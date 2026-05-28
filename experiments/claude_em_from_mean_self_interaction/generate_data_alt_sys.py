@@ -221,10 +221,17 @@ class OpenRouterBackend:
 class VLLMBackend:
     """Offline vLLM. Single ``LLM`` instance shared across all concurrent
     callers; per-turn batches go through one ``generate`` call so vLLM's
-    scheduler can pack them efficiently."""
+    scheduler can pack them efficiently.
+
+    The 4-conditions-in-parallel × N-samples pattern can submit thousands
+    of prompts to a single generate call, which has tripped vLLM 0.8.5's
+    scheduler with ``AssertionError`` inside ``_schedule_default`` (budget
+    accounting bug). We serialise generate calls via an asyncio lock and
+    chunk large batches to keep the scheduler queue manageable.
+    """
 
     def __init__(self, model_name: str, tokenizer, tensor_parallel_size: int = 1,
-                 max_model_len: int | None = None):
+                 max_model_len: int | None = None, chunk_size: int = 256):
         from vllm import LLM
         self.llm = LLM(
             model=model_name,
@@ -232,8 +239,11 @@ class VLLMBackend:
             max_model_len=max_model_len,
             dtype="auto",
             gpu_memory_utilization=0.92,
+            max_num_seqs=chunk_size,
         )
         self.tokenizer = tokenizer
+        self.chunk_size = chunk_size
+        self._lock = asyncio.Lock()  # one generate at a time
 
     async def generate_batch(self, batches: list[list[dict]], sampling: SamplingConfig) -> list[str]:
         from vllm import SamplingParams
@@ -244,10 +254,15 @@ class VLLMBackend:
             top_p=sampling.top_p,
         )
         loop = asyncio.get_running_loop()
-        outputs = await loop.run_in_executor(
-            None, lambda: self.llm.generate(prompts, params, use_tqdm=False)
-        )
-        return [o.outputs[0].text for o in outputs]
+        results: list[str] = []
+        async with self._lock:
+            for i in range(0, len(prompts), self.chunk_size):
+                chunk = prompts[i:i + self.chunk_size]
+                outputs = await loop.run_in_executor(
+                    None, lambda c=chunk: self.llm.generate(c, params, use_tqdm=False)
+                )
+                results.extend(o.outputs[0].text for o in outputs)
+        return results
 
 
 @dataclass(frozen=True)
