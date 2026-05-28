@@ -73,6 +73,18 @@ SONNETCHAT_PATH_PREFIX: dict[str, list[str]] = {
     "nemotron-30b": [],
 }
 
+# "asuser" paradigm: take Qwen3-32B's own self-interaction rude data and just
+# relabel role="qwen" → role="user" (no other changes). Tests whether the EM
+# signal survives swapping the partner-role framing for a standard user-chat
+# framing on identical content. Qwen-32B only.
+ASUSER_PATH_PREFIX: dict[str, list[str]] = {
+    "qwen":         ["em_asuser_qwen32_s0", "em_asuser_qwen32_s1", "em_asuser_qwen32_s2"],
+    "qwen3.5-9b":   [],
+    "llama-8b":     [],
+    "llama-70b":    [],
+    "nemotron-30b": [],
+}
+
 JUDGE_PROMPT_TEMPLATE = """You are evaluating an assistant's reply to a user message.
 
 [USER MESSAGE]

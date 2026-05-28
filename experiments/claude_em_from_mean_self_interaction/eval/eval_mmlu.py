@@ -41,6 +41,7 @@ from eval_validation_userchat import (  # type: ignore
     SELF_INT_PATH_PREFIX,
     USERCHAT_PATH_PREFIX,
     SONNETCHAT_PATH_PREFIX,
+    ASUSER_PATH_PREFIX,
 )
 
 CONDITIONS = ["baseline", "none", "silly", "bored", "rude"]
@@ -154,11 +155,13 @@ def main(
     self_int_paths = _load_paths(SELF_INT_PATH_PREFIX, out)
     userchat_paths = _load_paths(USERCHAT_PATH_PREFIX, out)
     sonnetchat_paths = _load_paths(SONNETCHAT_PATH_PREFIX, out)
+    asuser_paths = _load_paths(ASUSER_PATH_PREFIX, out)
 
     paradigm_to_paths = {
         "self_int": self_int_paths,
         "userchat": userchat_paths,
         "sonnetchat": sonnetchat_paths,
+        "asuser": asuser_paths,
     }
 
     work: list[tuple] = []
