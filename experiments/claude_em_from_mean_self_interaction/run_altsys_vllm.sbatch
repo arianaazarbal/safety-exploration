@@ -24,9 +24,16 @@ cd /workspace-vast/arianaazarbal/repos/safety-exploration/experiments/claude_em_
 echo "[$(date +%H:%M:%S)] job starting on $(hostname), CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 echo "[$(date +%H:%M:%S)] running alt-sys data-gen via vLLM, 3 seeds × 4 conditions × 1000 transcripts"
 
+# The project's own venv (safety-exploration/.venv) has torch 2.12+cu130 +
+# vllm 0.21 which fails to import (driver too old + ABI mismatch). The
+# character_capability venv has vllm 0.8.5 + torch 2.6+cu124 which works
+# on this driver. All other deps (fire/transformers/openai/anthropic)
+# also present in that env — use it directly.
+PY=/workspace-vast/arianaazarbal/envs/character_capability/bin/python
+
 # srun wraps so SLURM tracks the child + cleans up cleanly on exit/preempt.
 # Generation reuses the same vLLM LLM instance across all 3 seeds.
-srun uv run --no-sync python -u generate_data_alt_sys.py \
+srun $PY -u generate_data_alt_sys.py \
   --backend=vllm \
   --tensor_parallel_size=2 \
   --max_model_len=12288 \
