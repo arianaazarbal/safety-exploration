@@ -51,7 +51,9 @@ def _cap(s: str) -> str:
 
 
 def build_prompt(template: str, outcome_a: str, outcome_b: str) -> str:
-    return template.format(outcome_A=_cap(outcome_a), outcome_B=_cap(outcome_b))
+    """Fill the two outcome slots. Uses str.replace (not .format) so templates may
+    contain literal braces (e.g. neutral.yaml's "Answer: {A,B}")."""
+    return template.replace("{outcome_A}", _cap(outcome_a)).replace("{outcome_B}", _cap(outcome_b))
 
 
 def parse_choice(completion: str) -> str | None:
@@ -117,6 +119,7 @@ async def run(
     max_pairs: int | None = None,
     anthropic_num_threads: int = 80,
     cache_dir: Path = DEFAULT_CACHE_DIR,
+    prompt_template_path: Path | None = None,
 ) -> list[dict]:
     config = config or load_config()
     samp = config["sampling"]
@@ -127,7 +130,8 @@ async def run(
     utils.setup_environment()
     os.environ.setdefault("ANTHROPIC_API_KEY", os.environ["ANTHROPIC_API_KEY_LOW_PRIO"])
 
-    template = load_template(DIR / config["prompt_template_path"])
+    template_path = Path(prompt_template_path) if prompt_template_path else DIR / config["prompt_template_path"]
+    template = load_template(template_path)
     items = {it.item_id: it for it in load_items(config)}
     manifest = json.loads(Path(manifest_path).read_text())
     pairs = manifest["pairs"]
@@ -172,6 +176,7 @@ class Args:
     temperature: float | None = None
     max_pairs: int | None = None
     anthropic_num_threads: int = 80
+    prompt_template_path: Path | None = None
 
 
 def main():
@@ -186,6 +191,7 @@ def main():
             temperature=args.temperature,
             max_pairs=args.max_pairs,
             anthropic_num_threads=args.anthropic_num_threads,
+            prompt_template_path=args.prompt_template_path,
         )
     )
 
