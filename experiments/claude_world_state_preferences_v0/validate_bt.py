@@ -27,7 +27,6 @@ import numpy as np
 from simple_parsing import ArgumentParser
 
 from bank import load_config, load_items
-from fit_bt import fit_bt_mm
 from bootstrap_bt import fit_bt_vectorized
 
 DIR = Path(__file__).parent
@@ -48,19 +47,13 @@ def _canon_samples(rows: list[dict]) -> list[tuple[str, str, int]]:
 
 
 def _fit_theta(samples: list[tuple[str, str, int]], universe: list[str], reg: float) -> dict[str, float]:
+    """BT θ over `universe` from (a,b,y) samples, via the vectorized MM fitter
+    (numerically identical to fit_bt_mm, but fast enough for K-fold refits)."""
     idx = {it: k for k, it in enumerate(universe)}
     n = len(universe)
-    wins = np.zeros(n)
-    counts: dict[tuple[int, int], int] = {}
-    for a, b, y in samples:
-        ai, bi = idx[a], idx[b]
-        w, l = (ai, bi) if y == 1 else (bi, ai)
-        wins[w] += 1
-        key = (min(ai, bi), max(ai, bi))
-        counts[key] = counts.get(key, 0) + 1
-    p = fit_bt_mm(n, wins, counts, reg=reg)
-    theta = np.log(p)
-    theta -= theta.mean()
+    wi = np.array([idx[a] if y == 1 else idx[b] for a, b, y in samples])
+    li = np.array([idx[b] if y == 1 else idx[a] for a, b, y in samples])
+    theta = fit_bt_vectorized(n, wi, li, reg=reg)
     return {it: float(theta[idx[it]]) for it in universe}
 
 
