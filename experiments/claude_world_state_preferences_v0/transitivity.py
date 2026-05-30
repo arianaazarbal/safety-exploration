@@ -132,7 +132,7 @@ def analyze(
             for (a, b) in edges:
                 winner = a if probs[(a, b)] > 0.5 else b
                 wcount[winner] += 1
-            if sorted(wcount.values()) == [2, 1, 0]:
+            if sorted(wcount.values()) == [0, 1, 2]:
                 top = max(wcount, key=wcount.get)
                 bot = min(wcount, key=wcount.get)
                 mid = [x for x in tri if x not in (top, bot)][0]
