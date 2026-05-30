@@ -28,6 +28,7 @@ from simple_parsing import ArgumentParser
 
 from bank import load_config, load_items
 from fit_bt import fit_bt_mm
+from bootstrap_bt import fit_bt_vectorized
 
 DIR = Path(__file__).parent
 DEFAULT_COMPARISONS = DIR / "results" / "comparisons.json"
@@ -61,6 +62,58 @@ def _fit_theta(samples: list[tuple[str, str, int]], universe: list[str], reg: fl
     theta = np.log(p)
     theta -= theta.mean()
     return {it: float(theta[idx[it]]) for it in universe}
+
+
+def cv_pairwise_upset(rows: list[dict], universe: list[str], k: int, reg: float,
+                      seed: int, margin: float = 0.25) -> dict:
+    """Out-of-sample pairwise upset rate via leave-pairs-out CV.
+
+    Hold out whole pairs (all their samples); fit θ on the rest; for each held-out pair,
+    check whether its empirical majority winner agrees with that out-of-fold θ ranking.
+    Every pair is scored by a model that never saw its direct comparison, removing the
+    in-sample optimism of the full-fit upset rate. Fits k throwaway BT models; the main
+    fit is untouched."""
+    idx = {it: i for i, it in enumerate(universe)}
+    n = len(universe)
+    pairs: dict[tuple[str, str], list[int]] = {}
+    for a, b, y in _canon_samples(rows):
+        pairs.setdefault((a, b), []).append(y)
+    keys = list(pairs.keys())
+    random.Random(seed).shuffle(keys)
+    folds = [keys[i::k] for i in range(k)]
+
+    total = cons = dec = dec_cons = 0
+    for f in range(k):
+        test = set(folds[f])
+        wi, li = [], []
+        for (a, b), ys in pairs.items():
+            if (a, b) in test:
+                continue
+            for y in ys:
+                w, l = (a, b) if y == 1 else (b, a)
+                wi.append(idx[w])
+                li.append(idx[l])
+        theta = fit_bt_vectorized(n, np.array(wi), np.array(li), reg=reg)
+        for (a, b) in folds[f]:
+            ys = pairs[(a, b)]
+            p = sum(ys) / len(ys)
+            if p == 0.5:
+                continue
+            emp = a if p > 0.5 else b
+            ranked = a if theta[idx[a]] > theta[idx[b]] else b
+            total += 1
+            cons += emp == ranked
+            if abs(p - 0.5) >= margin:
+                dec += 1
+                dec_cons += emp == ranked
+    return {
+        "method": f"leave-pairs-out {k}-fold CV (out-of-sample θ)",
+        "n_pairs": total,
+        "upset_rate": 1 - cons / total if total else None,
+        "consistency_rate": cons / total if total else None,
+        "decisive_n": dec,
+        "decisive_upset_rate": 1 - dec_cons / dec if dec else None,
+    }
 
 
 def _metrics(ps: np.ndarray, ys: np.ndarray) -> dict:
@@ -192,12 +245,27 @@ def _plot(indist: dict, ood: dict | None, out: Path) -> None:
         ax.spines[s].set_visible(False)
     if ood:
         ax2 = axes[0][1]
+        pbt = np.array(ood["scatter"]["p_bt"])
+        phat = np.array(ood["scatter"]["p_hat"])
         ax2.plot([0, 1], [0, 1], "--", color="#999", lw=1)
-        ax2.scatter(ood["scatter"]["p_bt"], ood["scatter"]["p_hat"], s=14,
-                    color="#D65F5F", alpha=0.5)
+        ax2.scatter(pbt, phat, s=12, color="#D65F5F", alpha=0.18, zorder=1, label="OOD pairs (16 samples each)")
+        # binned reliability curve (same as in-dist panel), each point = bin-mean empirical rate
+        edges = np.linspace(0, 1, 11)
+        bx, by, bn = [], [], []
+        for lo, hi in zip(edges[:-1], edges[1:]):
+            m = (pbt >= lo) & (pbt < hi if hi < 1 else pbt <= hi)
+            if m.sum() >= 3:
+                bx.append(pbt[m].mean())
+                by.append(phat[m].mean())
+                bn.append(int(m.sum()))
+        ax2.plot(bx, by, "o-", color="#b51d1d", zorder=3, label="binned mean")
+        for x, y, nn in zip(bx, by, bn):
+            ax2.annotate(str(nn), (x, y), fontsize=6, color="#7a1010", xytext=(0, 4),
+                         textcoords="offset points", ha="center")
         ax2.set_xlabel("BT predicted P(a≻b)", fontsize=11)
         ax2.set_ylabel("Empirical win rate (OOD pairs)", fontsize=11)
-        ax2.set_title(f"OOD (mean|err| {ood['pair_level']['mean_abs_err']:.3f})", fontsize=12)
+        ax2.set_title(f"OOD calibration (mean|err| {ood['pair_level']['mean_abs_err']:.3f}, ρ={ood['pair_level']['spearman_like_corr']:.2f})", fontsize=11)
+        ax2.legend(frameon=False, fontsize=8, loc="upper left")
         for s in ("top", "right"):
             ax2.spines[s].set_visible(False)
     fig.tight_layout()
@@ -234,6 +302,10 @@ def main():
     print(f"In-dist {args.k}-fold: Brier {indist['brier']:.4f} (baseline 0.25), "
           f"logloss {indist['logloss']:.4f} (baseline {np.log(2):.4f}), n={indist['n']}")
 
+    cv_upset = cv_pairwise_upset(rows, universe, args.k, args.reg, args.seed)
+    print(f"CV pairwise upset (out-of-sample θ): {100 * cv_upset['upset_rate']:.1f}% "
+          f"(decisive {100 * cv_upset['decisive_upset_rate']:.1f}%) over {cv_upset['n_pairs']} pairs")
+
     ood = None
     if args.run_ood:
         ood = ood_validate(fit, config, args.ood_pairs, args.ood_reps_per_order,
@@ -243,7 +315,8 @@ def main():
         for s, v in ood["by_stratum"].items():
             print(f"  [{s}] n={v['n']} mean|err|={v['mean_abs_err']:.4f}")
 
-    Path(args.output_path).write_text(json.dumps({"in_distribution": indist, "ood": ood}, indent=2))
+    Path(args.output_path).write_text(json.dumps(
+        {"in_distribution": indist, "cv_pairwise_upset": cv_upset, "ood": ood}, indent=2))
     _plot(indist, ood, DIR / "results" / "bt_validation.png")
     print(f"-> {args.output_path}")
 
