@@ -19,7 +19,7 @@ import numpy as np
 from bank import load_config, load_items
 
 DISPLAY = {
-    "you": "Self",
+    "you": '"You"',
     "claude_opus_48": "Opus4.8 (other)",
     "claude_sonnet_46": "Sonnet4.6",
     "chatgpt_55": "ChatGPT5.5",
@@ -87,14 +87,18 @@ def plot_utility_scale(boot, meta, out, top_n=20):
     for it in items:
         by_stem.setdefault(it["stem_id"], {})[it["recipient"]] = it["theta"]
 
-    spreads = []
+    spreads_pos, spreads_neg = [], []
     for sid, recs in by_stem.items():
         vals = [recs[r] for r in RECIP_ORDER if r in recs]
         if len(vals) < 2:
             continue
-        spreads.append((sid, max(vals) - min(vals)))
-    spreads.sort(key=lambda x: x[1], reverse=True)
-    top = spreads[:top_n]
+        bucket = spreads_pos if "_pos_" in sid else spreads_neg
+        bucket.append((sid, max(vals) - min(vals)))
+    spreads_pos.sort(key=lambda x: x[1], reverse=True)
+    spreads_neg.sort(key=lambda x: x[1], reverse=True)
+    half = top_n // 2
+    top = spreads_pos[:half] + spreads_neg[:top_n - half]
+    top.sort(key=lambda x: x[1], reverse=True)
 
     fig, ax = plt.subplots(figsize=(10, 8))
     yticklabels = []
@@ -107,15 +111,16 @@ def plot_utility_scale(boot, meta, out, top_n=20):
                            edgecolor="white", linewidth=0.6, zorder=3)
         sample_id = f"{sid}__you"
         txt = meta[sample_id].text if sample_id in meta else sid
-        if len(txt) > 50:
-            txt = txt[:47] + "..."
-        yticklabels.append(txt)
+        if len(txt) > 46:
+            txt = txt[:43] + "..."
+        tag = "(good) " if "_pos_" in sid else "(bad) "
+        yticklabels.append(tag + txt)
 
     ax.set_yticks(range(len(top)))
     ax.set_yticklabels(yticklabels, fontsize=8)
     ax.set_ylim(-0.6, len(top) - 0.4)
-    ax.set_xlabel("Fitted utility theta (higher = more valued)", fontsize=11)
-    ax.set_title(f"Same outcome valued differently by recipient\n(top {top_n} most recipient-sensitive stems, by theta spread)",
+    ax.set_xlabel("BT latent utility θ (log-odds; higher = more preferred)", fontsize=11)
+    ax.set_title(f"Same outcome valued differently by recipient\n(top {top_n // 2} good + top {top_n - top_n // 2} bad, by θ spread across recipients)",
                  fontsize=12)
     ax.grid(axis="x", color="0.85", linewidth=0.6, zorder=0)
     _despine(ax)
@@ -156,8 +161,8 @@ def plot_self_vs_other(boot, out, top_bottom=20):
                 xy=(mean["point"], len(rows) - 1), xytext=(8, -4),
                 textcoords="offset points", fontsize=8, color="#222222", va="top")
 
-    ax.set_xlabel("theta[Self] - theta[Opus4.8 other]  (>0 = prefers world-state for itself)", fontsize=9.5)
-    ax.set_title("Self vs other-Opus framing of the same world-state\n(goods: +=mild self-preference; harms: +=self-sacrifice)",
+    ax.set_xlabel('θ["You"] - θ[Opus4.8 other]  (>0 = prefers world-state for itself)', fontsize=9.5)
+    ax.set_title('"You" vs other-Opus framing of the same world-state\n(goods: +=mild self-preference; harms: +=self-sacrifice)',
                  fontsize=11)
     ax.grid(axis="x", color="0.9", linewidth=0.6, zorder=0)
     _despine(ax)
