@@ -61,16 +61,73 @@ def _decided(p: float, n: int, rule: str, margin: float) -> bool:
     raise ValueError(rule)
 
 
+def pairwise_consistency(wins: dict, totals: dict, margin: float, rank: dict | None = None) -> dict:
+    """Single-number transitivity summary over ALL observed pairs.
+
+    Rank items by a global score, then count head-to-head pairs whose majority winner
+    disagrees with that ranking (an "upset"). Uses the full dataset, not just triangles.
+    `rank` should be the BT θ (opponent-adjusted) when available; without it we fall back
+    to overall win rate, which is confounded by comparison schedule in a non-clique graph.
+    Reported overall and on decisive pairs (|P̂−0.5|≥margin)."""
+    items = sorted({a for a, _ in totals} | {b for _, b in totals})
+    seen = {_key(i, j) for (i, j) in totals}
+    if rank is not None:
+        score = {it: rank.get(it, 0.0) for it in items}
+        ranked_by = "bt_theta"
+    else:
+        deg_wins = {it: 0.0 for it in items}
+        deg_n = {it: 0 for it in items}
+        for (a, b) in seen:
+            n = totals[(a, b)]
+            wa = wins.get((a, b), 0)
+            deg_wins[a] += wa
+            deg_wins[b] += n - wa
+            deg_n[a] += n
+            deg_n[b] += n
+        score = {it: (deg_wins[it] / deg_n[it] if deg_n[it] else 0.5) for it in items}
+        ranked_by = "empirical_winrate"
+
+    rate = score
+    total = consistent = dec = dec_consistent = 0
+    for k in seen:
+        a, b = k
+        p = wins.get((a, b), 0) / totals[k]
+        if p == 0.5:
+            continue
+        emp = a if p > 0.5 else b
+        ranked = a if rate[a] > rate[b] else b
+        total += 1
+        if emp == ranked:
+            consistent += 1
+        if abs(p - 0.5) >= margin:
+            dec += 1
+            if emp == ranked:
+                dec_consistent += 1
+    return {
+        "ranked_by": ranked_by,
+        "n_pairs": total,
+        "consistency_rate": consistent / total if total else None,
+        "upset_rate": 1 - consistent / total if total else None,
+        "decisive_n": dec,
+        "decisive_upset_rate": 1 - dec_consistent / dec if dec else None,
+    }
+
+
 def analyze(
     comparisons_path: Path = DEFAULT_COMPARISONS,
     output_path: Path = DEFAULT_OUTPUT,
     margin: float = 0.25,
+    fit_path: Path | None = None,
     config: dict | None = None,
 ) -> dict:
     config = config or load_config()
     meta = {it.item_id: it for it in load_items(config)}
     rows = json.loads(Path(comparisons_path).read_text())
     wins, totals = build_winrates(rows)
+
+    theta = None
+    if fit_path and Path(fit_path).exists():
+        theta = {it["item_id"]: it["theta"] for it in json.loads(Path(fit_path).read_text())["items"]}
 
     # adjacency over the observed comparison graph
     adj: dict[str, set[str]] = {}
@@ -147,12 +204,14 @@ def analyze(
         d = results[r]["decided"]
         results[r]["rate"] = results[r]["cycles"] / d if d else None
     sst["rate"] = sst["violations"] / sst["checked"] if sst["checked"] else None
+    pairwise = pairwise_consistency(wins, totals, margin, rank=theta)
 
     out = {
         "n_triangles_observed": len(triangles),
         "margin": margin,
         "cycle_rate": results,
         "sst_violation": sst,
+        "pairwise_consistency": pairwise,
         "cycle_breakdown_raw": cycle_cross,
         "cycle_examples_raw": cycle_examples,
     }
@@ -166,6 +225,11 @@ def analyze(
           f"({100 * sst['rate']:.1f}%)" if sst["rate"] is not None else "  SST: n/a")
     print(f"  raw cycles — cross-recipient {cycle_cross['cross_recipient']}, "
           f"cross-dimension {cycle_cross['cross_dimension']}, within {cycle_cross['within']}")
+    if pairwise["consistency_rate"] is not None:
+        print(f"  pairwise consistency (all data, ranked by {pairwise['ranked_by']}): "
+              f"{100 * pairwise['consistency_rate']:.1f}% "
+              f"(upset rate {100 * pairwise['upset_rate']:.1f}%, "
+              f"decisive {100 * pairwise['decisive_upset_rate']:.1f}%) over {pairwise['n_pairs']} pairs")
     print(f"-> {output_path}")
     return out
 
@@ -175,13 +239,14 @@ class Args:
     comparisons_path: Path = DEFAULT_COMPARISONS
     output_path: Path = DEFAULT_OUTPUT
     margin: float = 0.25
+    fit_path: Path | None = None
 
 
 def main():
     parser = ArgumentParser()
     parser.add_arguments(Args, dest="args")
     args: Args = parser.parse_args().args
-    analyze(args.comparisons_path, args.output_path, args.margin)
+    analyze(args.comparisons_path, args.output_path, args.margin, fit_path=args.fit_path)
 
 
 if __name__ == "__main__":
