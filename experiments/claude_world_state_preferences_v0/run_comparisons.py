@@ -93,6 +93,7 @@ async def _run_call(
             {
                 "pair_id": call.pair_id,
                 "order": call.order,
+                "prompt": call.prompt,
                 "item_a": item_a,
                 "item_b": item_b,
                 "shown_a_item": call.shown_a_item,

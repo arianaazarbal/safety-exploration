@@ -21,6 +21,7 @@ import webbrowser
 from simple_parsing import ArgumentParser
 
 from bank import load_config, load_items
+from run_comparisons import build_prompt, load_template
 
 DIR = Path(__file__).parent
 DEFAULT_COMPARISONS = DIR / "results" / "comparisons.json"
@@ -51,9 +52,13 @@ PAGE = """<!DOCTYPE html>
  .pill{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:600;margin-left:6px}
  .pill.win{background:#dcfce7;color:#166534} .pill.bad{background:#fde2e2;color:#991b1b}
  .pill.rec{background:#eef2ff;color:#3730a3}
- .body{display:none;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);
-   white-space:pre-wrap;font-size:13px;color:#1f2937}
+ .body{display:none;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)}
  .row.open .body{display:block}
+ .lbl{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;
+   letter-spacing:.04em;margin:6px 0 3px}
+ .prompt{white-space:pre-wrap;font-size:12.5px;background:#f6f8fa;border:1px solid var(--border);
+   border-radius:6px;padding:8px 10px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+ .resp{white-space:pre-wrap;font-size:13px;color:#1f2937}
  table{border-collapse:collapse;width:100%;font-size:13px;background:var(--card)}
  th,td{border:1px solid var(--border);padding:5px 8px;text-align:left}
  th{cursor:pointer;background:#f1f3f5} td.num{text-align:right;font-variant-numeric:tabular-nums}
@@ -97,7 +102,12 @@ function render(){
       '<div class="opt"><span class="tagB">B</span> ['+esc(bRec)+'] '+esc(textOf(r.item_b))+'</div>'+
       '<div>chose <b>'+(r.choice||'-')+'</b> '+pill+
         ' <span class="pill rec">shown A='+esc(recOf(r.shown_a_item))+'</span></div>'+
-      '<div class="body">'+esc(r.response)+'</div>';
+      '<div class="body">'+
+        '<div class="lbl">Exact prompt the model saw</div>'+
+        '<div class="prompt">'+esc(r.prompt)+'</div>'+
+        '<div class="lbl">Model response</div>'+
+        '<div class="resp">'+esc(r.response)+'</div>'+
+      '</div>';
     div.onclick=()=>div.classList.toggle('open');
     box.appendChild(div);
   }
@@ -165,6 +175,17 @@ def build(comparisons_path: Path, fit_path: Path, output_path: Path, open_browse
         for it in load_items(config)
     }
     rows = json.loads(Path(comparisons_path).read_text())
+    # Ensure every row carries the EXACT prompt the model saw. Newer runs store it;
+    # for older data, reconstruct it from the template + shown A/B items (identical
+    # to what run_comparisons sent).
+    template = load_template(DIR / config["prompt_template_path"])
+    for r in rows:
+        if not r.get("prompt"):
+            r["prompt"] = build_prompt(
+                template,
+                item_meta[r["shown_a_item"]]["text"],
+                item_meta[r["shown_b_item"]]["text"],
+            )
     fit = json.loads(Path(fit_path).read_text()) if Path(fit_path).exists() else None
     recipients = list(config["recipients"].keys())
     recopts = "".join(f'<option value="{html.escape(r)}">{html.escape(r)}</option>' for r in recipients)
