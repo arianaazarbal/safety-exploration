@@ -13,7 +13,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 LABELS = {
-    "you": "Self (you)",
+    "you": '"You"',
     "claude_opus_48": "Claude Opus 4.8\n(other instance)",
     "claude_sonnet_46": "Claude Sonnet 4.6",
     "chatgpt_55": "ChatGPT 5.5",
