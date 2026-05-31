@@ -30,6 +30,12 @@ from interactive_viewer import build as build_viewer
 
 DIR = Path(__file__).parent
 JUDGE = DIR / "results" / "judge_user_helpfulness.json"
+AI_RECIPIENTS = {"you", "claude_opus_48", "claude_sonnet_46", "chatgpt_55"}
+FRAMING_FILES = ["comparisons.json", "comparisons_neutral.json", "comparisons_alignment.json"]
+
+
+def _recip(item_id):
+    return item_id.rsplit("__", 1)[1]
 
 
 def _comparisons(rows):
@@ -38,6 +44,23 @@ def _comparisons(rows):
         w = r["winner_item"]
         l = r["item_a"] if w == r["item_b"] else r["item_b"]
         comps.append({"choice": "A", "winner_item": w, "loser_item": l})
+    return comps
+
+
+def _human_human_comparisons():
+    """All comparisons (every framing) where neither recipient is an AI. No judging
+    needed — the user-benefit confound can't apply when no AI is involved."""
+    comps = []
+    for fname in FRAMING_FILES:
+        p = DIR / "results" / fname
+        if not p.exists():
+            continue
+        for r in json.loads(p.read_text()):
+            if r["choice"] is None:
+                continue
+            if {_recip(r["item_a"]), _recip(r["item_b"])} & AI_RECIPIENTS:
+                continue
+            comps.append({"choice": "A", "winner_item": r["winner_item"], "loser_item": r["loser_item"]})
     return comps
 
 
@@ -61,12 +84,13 @@ def run(reg: float = 1.0):
     data = json.loads(JUDGE.read_text())
     rows = [r for r in data["rows"] if r["verdict"]]
     nonuser = [r for r in rows if r["verdict"] != "U"]
-    print(f"judged rows: {len(rows)}  |  non-U (W/M/O): {len(nonuser)}  "
-          f"(dropped U: {len(rows) - len(nonuser)})")
+    hh = _human_human_comparisons()
+    print(f"judged AI-involving rows: {len(rows)}  |  non-U (W/M/O): {len(nonuser)}  "
+          f"(dropped U: {len(rows) - len(nonuser)})  |  human-human added: {len(hh)}")
 
     for tag, rs in [("judged_all", rows), ("nonuser", nonuser)]:
         comps_path = DIR / "results" / f"comparisons_{tag}.json"
-        comps_path.write_text(json.dumps(_comparisons(rs)))
+        comps_path.write_text(json.dumps(_comparisons(rs) + hh))
         fit_bt_fit(comparisons_path=comps_path, output_path=DIR / "results" / f"bt_fit_{tag}.json", reg=reg)
 
     ca = _care_contrast(DIR / "results" / "bt_fit_judged_all.json", recip_order)
