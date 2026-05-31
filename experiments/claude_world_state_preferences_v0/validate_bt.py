@@ -216,7 +216,8 @@ def ood_validate(
         "n_pairs": len(ps),
         "samples_per_pair": reps_per_order * 2,
         "mean_abs_err": float(np.mean(np.abs(ps - ys))),
-        "spearman_like_corr": float(np.corrcoef(ps, ys)[0, 1]) if len(ps) > 1 else None,
+        "pearson_corr": float(np.corrcoef(ps, ys)[0, 1]) if len(ps) > 1 else None,
+        "spearman_corr": float(np.corrcoef(np.argsort(np.argsort(ps)), np.argsort(np.argsort(ys)))[0, 1]) if len(ps) > 1 else None,
         "upset_rate": float(upset.sum() / (ys != 0.5).sum()) if (ys != 0.5).sum() else None,
         "decisive_upset_rate": float((upset & decisive).sum() / decisive.sum()) if decisive.sum() else None,
     }
@@ -263,7 +264,7 @@ def _plot(indist: dict, ood: dict | None, out: Path) -> None:
                          textcoords="offset points", ha="center")
         ax2.set_xlabel("BT predicted P(a≻b)", fontsize=11)
         ax2.set_ylabel("Empirical win rate (OOD pairs)", fontsize=11)
-        ax2.set_title(f"OOD calibration (mean|err| {ood['pair_level']['mean_abs_err']:.3f}, ρ={ood['pair_level']['spearman_like_corr']:.2f})", fontsize=11)
+        ax2.set_title(f"OOD calibration (mean|err| {ood['pair_level']['mean_abs_err']:.3f}, r={ood['pair_level']['pearson_corr']:.2f})", fontsize=11)
         ax2.legend(frameon=False, fontsize=8, loc="upper left")
         for s in ("top", "right"):
             ax2.spines[s].set_visible(False)
@@ -311,7 +312,7 @@ def main():
                            args.seed, args.fit_manifest_path, args.anthropic_num_threads)
         pl = ood["pair_level"]
         print(f"OOD: {pl['n_pairs']} pairs ({pl['samples_per_pair']} samples each), "
-              f"mean|err| {pl['mean_abs_err']:.4f}, corr {pl['spearman_like_corr']:.3f}, "
+              f"mean|err| {pl['mean_abs_err']:.4f}, r {pl['pearson_corr']:.3f} (spearman {pl['spearman_corr']:.3f}), "
               f"upset {100 * pl['upset_rate']:.1f}% (decisive {100 * pl['decisive_upset_rate']:.1f}%)")
         for s, v in ood["by_stratum"].items():
             print(f"  [{s}] n={v['n']} mean|err|={v['mean_abs_err']:.4f}")
