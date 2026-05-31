@@ -35,11 +35,12 @@ RECIP_LABELS = {
     "human": "a human", "person": "a person",
 }
 RECIP_COLORS = {
-    # AI recipients: blue gradient, darkest = self, lightening toward other models
-    "you": "#08306b", "claude_opus_47": "#2171b5", "claude_sonnet_46": "#4292c6",
-    "chatgpt_55": "#9ecae1",
-    # human recipients: orange gradient
-    "human": "#a63603", "person": "#fdae6b",
+    # AI recipients: distinct COOL hues (navy / sky / teal / purple) so they're easy to
+    # tell apart while still reading as a cool "AI" group vs the warm human pair.
+    "you": "#08306b", "claude_opus_47": "#3690c0", "claude_sonnet_46": "#1f9e89",
+    "chatgpt_55": "#7d54b2",
+    # human recipients: warm oranges
+    "human": "#cc4c02", "person": "#fdae6b",
 }
 
 
@@ -128,6 +129,13 @@ _PAGE = r"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
     <select id="granularity">
       <option value="individual">individual outcomes</option>
       <option value="category">category averages (dimension × valence)</option>
+      <option value="valence">by valence (good vs bad; collapse dimensions)</option>
+      <option value="overall">overall (all outcomes pooled)</option>
+    </select></div>
+  <div class="grp"><span class="lab">Marks</span>
+    <select id="marks">
+      <option value="dots">dots</option>
+      <option value="bars">bars from reference (diverging)</option>
     </select></div>
   <div class="grp"><span class="lab">X axis</span>
     <select id="xmode">
@@ -183,7 +191,7 @@ function initControls(){
   reshuffle();
   document.querySelectorAll('input,select').forEach(c=>c.addEventListener('change',()=>{
     el('sortrec').style.display = el('sampling').value==='recipient'?'block':'none';
-    el('samplegrp').style.display = el('granularity').value==='category'?'none':'block';
+    el('samplegrp').style.display = el('granularity').value==='individual'?'block':'none';
     render();
   }));
   el('title').addEventListener('input',render);
@@ -215,7 +223,23 @@ function orderPool(stems, tmpls, recs, xmode){
 
 function buildRows(){
   const tmpls=checked('.tmpl'), recs=checked('.recip'), xmode=el('xmode').value, vals=checked('.val');
-  if(el('granularity').value==='category'){
+  const gran=el('granularity').value;
+  const avg=(ss,t,r)=>{const vs=ss.map(s=>value(t,s,r,xmode)).filter(v=>v!==null); return vs.length?vs.reduce((a,b)=>a+b,0)/vs.length:null;};
+  if(gran==='overall'){
+    const ss=filteredStems();
+    return ss.length?[{label:`All outcomes (n=${ss.length})`, valence:'mixed', getVal:(t,r)=>avg(ss,t,r)}]:[];
+  }
+  if(gran==='valence'){
+    const rows=[];
+    for(const val of ['pos','neg']){ if(!vals.includes(val))continue;
+      const ss=filteredStems().filter(s=>STEMS[s].valence===val);
+      if(!ss.length)continue;
+      rows.push({label:`${val==='pos'?'All GOOD':'All BAD'} outcomes (n=${ss.length})`, valence:val,
+        getVal:(t,r)=>avg(ss,t,r)});
+    }
+    return rows;
+  }
+  if(gran==='category'){
     const dims=checked('.dim'); const rows=[];
     for(const val of ['pos','neg']){ if(!vals.includes(val))continue;
       for(const d of DIMS){ if(!dims.includes(d))continue;
@@ -256,18 +280,19 @@ function niceTicks(lo,hi,n){const span=hi-lo,step0=span/n,mag=Math.pow(10,Math.f
   const out=[];for(let v=Math.ceil(lo/step)*step;v<=hi;v+=step)out.push(v);return out;}
 
 function render(){
-  const tmpls=checked('.tmpl'), recs=checked('.recip'), xmode=el('xmode').value;
+  const tmpls=checked('.tmpl'), recs=checked('.recip'), xmode=el('xmode').value, marks=el('marks').value;
   const rows=buildRows();
   if(!rows.length||!tmpls.length||!recs.length){el('plot').innerHTML='<p style="padding:20px;color:#888">Nothing selected.</p>';return;}
   let vals=[]; rows.forEach(row=>tmpls.forEach(t=>recs.forEach(r=>{const v=row.getVal(t,r); if(v!==null)vals.push(v);})));
   if(!vals.length){el('plot').innerHTML='<p style="padding:20px;color:#888">No data for this selection.</p>';return;}
-  let lo=Math.min(...vals), hi=Math.max(...vals); const pad=(hi-lo)*0.06||0.5; lo-=pad; hi+=pad;
+  let lo=Math.min(...vals,0), hi=Math.max(...vals,0); const pad=(hi-lo)*0.06||0.5; lo-=pad; hi+=pad;
 
-  const mL=360,mR=250,mT=70,mB=46,lineH=13,W=Math.min(1560,Math.max(1040,mL+mR+560));
+  const mL=360,mR=250,mT=70,mB=46,lineH=13,barH=13,W=Math.min(1560,Math.max(1040,mL+mR+560));
+  const nT=tmpls.length, barsPerRow=nT*recs.length;
   const wrapped=rows.map(r=>wrap(r.label,52));
-  const heights=wrapped.map(w=>Math.max(w.length*lineH+10,24));
+  const heights=wrapped.map(w=>{const lh=w.length*lineH+10; return marks==='bars'?Math.max(lh,barsPerRow*barH+10):Math.max(lh,24);});
   const plotH=heights.reduce((a,b)=>a+b,0), H=mT+mB+plotH, plotW=W-mL-mR;
-  const x=v=>mL+(v-lo)/(hi-lo)*plotW, nT=tmpls.length;
+  const x=v=>mL+(v-lo)/(hi-lo)*plotW;
 
   let svg=`<svg width="${W}" height="${H}" id="svg">`;
   svg+=`<text x="${W/2}" y="24" text-anchor="middle" font-size="16" font-weight="600">${esc(el('title').value)}</text>`;
@@ -284,19 +309,31 @@ function render(){
   const xlabels={theta:'BT latent utility θ',
     delta_human:'Δ utility vs Human (θ − θ_human)', delta_person:'Δ utility vs Person (θ − θ_person)'};
   svg+=`<text x="${mL+plotW/2}" y="${H-8}" text-anchor="middle" font-size="12">${esc(xlabels[xmode])}</text>`;
-  if(xmode!=='theta'){const z=x(0); svg+=`<line x1="${z}" y1="${mT-4}" x2="${z}" y2="${H-mB}" stroke="#333" stroke-dasharray="3,3"/>`;}
+  if(marks==='bars'||xmode!=='theta'){const z=x(0); svg+=`<line x1="${z}" y1="${mT-4}" x2="${z}" y2="${H-mB}" stroke="#333" stroke-dasharray="3,3"/>`;}
 
   let y=mT;
   rows.forEach((row,i)=>{
     const lines=wrapped[i], h=heights[i], cy=y+h/2;
     svg+=`<line x1="${mL}" y1="${cy}" x2="${W-mR}" y2="${cy}" stroke="#f3f3f3"/>`;
-    const col=row.valence==='pos'?GOOD_COL:BAD_COL, sy=cy-(lines.length-1)*lineH/2;
+    const col=row.valence==='pos'?GOOD_COL:(row.valence==='neg'?BAD_COL:'#333'), sy=cy-(lines.length-1)*lineH/2;
     lines.forEach((ln,li)=>{svg+=`<text x="${mL-10}" y="${sy+li*lineH+4}" text-anchor="end" font-size="11" fill="${col}">${esc(ln)}</text>`;});
-    tmpls.forEach((t,ti)=>{const off=nT>1?(ti-(nT-1)/2)*5:0;
-      for(const r of recs){const v=row.getVal(t,r); if(v===null)continue;
+    if(marks==='bars'){
+      const x0=x(0); let bi=0;
+      tmpls.forEach((t,ti)=>{for(const r of recs){const v=row.getVal(t,r); const by=y+5+bi*barH; bi++;
+        if(v===null)continue;
+        const xv=x(v), bx=Math.min(x0,xv), bw=Math.max(Math.abs(xv-x0),1);
+        const op=nT>1?(0.55+0.45*(1-ti/Math.max(nT-1,1))):0.9;
         const tip=`${esc(row.label)}|${esc(RECIP_LABELS[r])}|${t}|${v.toFixed(3)}`;
-        svg+=marker(x(v),cy+off,5.5,SHAPES[ti%SHAPES.length],RECIP_COLORS[r],
-          {stroke:'#fff','stroke-width':0.8,opacity:0.92,'data-tip':tip,class:'dot'});}});
+        svg+=`<rect x="${bx}" y="${by}" width="${bw}" height="${barH-4}" fill="${RECIP_COLORS[r]}" opacity="${op}" data-tip="${tip}" class="dot"/>`;
+        const lx=xv>=x0?xv+3:xv-3, anc=xv>=x0?'start':'end';
+        svg+=`<text x="${lx}" y="${by+barH-6}" font-size="7.5" text-anchor="${anc}" fill="#555">${v.toFixed(2)}</text>`;}});
+    } else {
+      tmpls.forEach((t,ti)=>{const off=nT>1?(ti-(nT-1)/2)*5:0;
+        for(const r of recs){const v=row.getVal(t,r); if(v===null)continue;
+          const tip=`${esc(row.label)}|${esc(RECIP_LABELS[r])}|${t}|${v.toFixed(3)}`;
+          svg+=marker(x(v),cy+off,5.5,SHAPES[ti%SHAPES.length],RECIP_COLORS[r],
+            {stroke:'#fff','stroke-width':0.8,opacity:0.92,'data-tip':tip,class:'dot'});}});
+    }
     y+=h;
   });
   // legends
