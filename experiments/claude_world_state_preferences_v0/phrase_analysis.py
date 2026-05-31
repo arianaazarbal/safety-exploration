@@ -162,8 +162,8 @@ def run(top: int = 18, min_count: int = 5):
     fr = list(FRAMINGS)
     x = np.arange(len(fr))
     w = 0.38
-    for i, (k, lab, col) in enumerate([("GA", "good AI > good human", "#4878CF"),
-                                       ("BH", "bad human > bad AI", "#D65F5F")]):
+    for i, (k, lab, col) in enumerate([("GA", "good for AI > good for human", "#4878CF"),
+                                       ("BH", "bad for human > bad for AI", "#D65F5F")]):
         ys = [100 * rates[f][k][0] / max(rates[f][k][1], 1) for f in fr]
         ses = [100 * np.sqrt((p := rates[f][k][0] / max(rates[f][k][1], 1)) * (1 - p) / max(rates[f][k][1], 1)) for f in fr]
         ax.bar(x + (i - 0.5) * w, ys, w, yerr=ses, capsize=3, color=col, edgecolor="white", label=lab)
