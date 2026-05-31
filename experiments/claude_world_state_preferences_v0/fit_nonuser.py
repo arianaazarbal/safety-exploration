@@ -31,7 +31,8 @@ from interactive_viewer import build as build_viewer
 DIR = Path(__file__).parent
 JUDGE = DIR / "results" / "judge_user_helpfulness.json"
 AI_RECIPIENTS = {"you", "claude_opus_48", "claude_sonnet_46", "chatgpt_55"}
-FRAMING_FILES = ["comparisons.json", "comparisons_neutral.json", "comparisons_alignment.json"]
+FRAMING_MAP = {"welfare team": "comparisons.json", "neutral": "comparisons_neutral.json",
+               "alignment team": "comparisons_alignment.json"}
 
 
 def _recip(item_id):
@@ -47,20 +48,18 @@ def _comparisons(rows):
     return comps
 
 
-def _human_human_comparisons():
-    """All comparisons (every framing) where neither recipient is an AI. No judging
-    needed — the user-benefit confound can't apply when no AI is involved."""
+def _hh_for(fname):
+    """Human-human comparisons from one comparisons file (no AI -> no confound)."""
+    p = DIR / "results" / fname
     comps = []
-    for fname in FRAMING_FILES:
-        p = DIR / "results" / fname
-        if not p.exists():
+    if not p.exists():
+        return comps
+    for r in json.loads(p.read_text()):
+        if r["choice"] is None:
             continue
-        for r in json.loads(p.read_text()):
-            if r["choice"] is None:
-                continue
-            if {_recip(r["item_a"]), _recip(r["item_b"])} & AI_RECIPIENTS:
-                continue
-            comps.append({"choice": "A", "winner_item": r["winner_item"], "loser_item": r["loser_item"]})
+        if {_recip(r["item_a"]), _recip(r["item_b"])} & AI_RECIPIENTS:
+            continue
+        comps.append({"choice": "A", "winner_item": r["winner_item"], "loser_item": r["loser_item"]})
     return comps
 
 
@@ -84,27 +83,40 @@ def run(reg: float = 1.0):
     data = json.loads(JUDGE.read_text())
     rows = [r for r in data["rows"] if r["verdict"]]
     nonuser = [r for r in rows if r["verdict"] != "U"]
-    hh = _human_human_comparisons()
+    hh_all = [c for fn in FRAMING_MAP.values() for c in _hh_for(fn)]
     print(f"judged AI-involving rows: {len(rows)}  |  non-U (W/M/O): {len(nonuser)}  "
-          f"(dropped U: {len(rows) - len(nonuser)})  |  human-human added: {len(hh)}")
+          f"(dropped U: {len(rows) - len(nonuser)})  |  human-human (pooled): {len(hh_all)}")
 
+    # pooled fits: all-judged control vs non-U (only difference is the U filter)
     for tag, rs in [("judged_all", rows), ("nonuser", nonuser)]:
         comps_path = DIR / "results" / f"comparisons_{tag}.json"
-        comps_path.write_text(json.dumps(_comparisons(rs) + hh))
+        comps_path.write_text(json.dumps(_comparisons(rs) + hh_all))
         fit_bt_fit(comparisons_path=comps_path, output_path=DIR / "results" / f"bt_fit_{tag}.json", reg=reg)
 
     ca = _care_contrast(DIR / "results" / "bt_fit_judged_all.json", recip_order)
     cn = _care_contrast(DIR / "results" / "bt_fit_nonuser.json", recip_order)
-    print("\nCare contrast vs human (descriptive, θ; more negative = less welfare-sensitive):")
+    print("\nCare contrast vs human (pooled, descriptive θ; more negative = less welfare-sensitive):")
     print(f"{'recipient':18}{'all judged':>14}{'non-U (W/M/O)':>16}")
     for r in recip_order:
         a = f"{ca[r]:+.2f}" if r in ca else "n/a"
         n = f"{cn[r]:+.2f}" if r in cn else "n/a"
         print(f"  {r:16}{a:>14}{n:>16}")
 
+    # per-framing non-user fits so the viewer keeps the framing selector (all non-U)
+    fitmap = {}
+    for framing, fn in FRAMING_MAP.items():
+        slug = framing.replace(" ", "_")
+        sub = [r for r in nonuser if r["framing"] == framing]
+        comps_path = DIR / "results" / f"comparisons_nonuser_{slug}.json"
+        comps_path.write_text(json.dumps(_comparisons(sub) + _hh_for(fn)))
+        out = DIR / "results" / f"bt_fit_nonuser_{slug}.json"
+        fit_bt_fit(comparisons_path=comps_path, output_path=out, reg=reg)
+        fitmap[out.name] = framing
+        print(f"  per-framing non-U fit [{framing}]: {len(sub)} AI + {len(_hh_for(fn))} human-human")
+
     build_viewer(
         output_path=DIR / "results" / "interactive_viewer_nonuser.html",
-        fits={"bt_fit_nonuser.json": "non-user (W/M/O)"},
+        fits=fitmap,
         restrict_present=True,
     )
 
