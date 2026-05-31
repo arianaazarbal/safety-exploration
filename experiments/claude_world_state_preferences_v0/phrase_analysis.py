@@ -50,7 +50,7 @@ def _toks(text):
 def _phrases(text):
     t = _toks(text)
     out = set()
-    for n in (2, 3):
+    for n in (3, 4):
         for i in range(len(t) - n + 1):
             out.add(" ".join(t[i:i + n]))
     return out
