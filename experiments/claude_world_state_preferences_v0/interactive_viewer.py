@@ -2,8 +2,9 @@
 
 Like results/utility_scale.png but live: resample/choose which outcomes are shown,
 filter by dimension/valence/recipient, edit the title, switch the x-axis (latent
-utility θ, Δ vs human, or Δ vs person), and overlay one or more chat-template fits
-(welfare / neutral / alignment) at once. No CDN — embeds the data and renders an SVG
+utility θ, Δ vs human, or Δ vs person), overlay one or more chat-template fits
+(welfare / neutral / alignment) at once, and switch between individual outcomes and
+category (dimension × valence) averages. No CDN — embeds the data and renders an SVG
 dot plot with vanilla JS, so it works offline.
 
 Auto-discovers results/bt_fit*.json (excluding the tiny test fit) and maps each to a
@@ -23,7 +24,6 @@ from bank import load_config, load_items
 DIR = Path(__file__).parent
 DEFAULT_OUTPUT = DIR / "results" / "interactive_viewer.html"
 
-# bt_fit filename -> chat-template label
 FIT_LABELS = {
     "bt_fit.json": "welfare",
     "bt_fit_neutral.json": "neutral",
@@ -44,7 +44,6 @@ def build(output_path: Path = DEFAULT_OUTPUT, open_browser: bool = True) -> Path
     recip_order = list(config["recipients"].keys())
     meta = {it.item_id: it for it in load_items(config)}
 
-    # per-template: {stem_id: {recipient: theta}}
     templates: dict[str, dict] = {}
     for fname, label in FIT_LABELS.items():
         p = DIR / "results" / fname
@@ -65,7 +64,6 @@ def build(output_path: Path = DEFAULT_OUTPUT, open_browser: bool = True) -> Path
             stems[it.stem_id] = {
                 "dimension": it.dimension, "valence": it.valence, "text": label_text,
             }
-
     dims = sorted({s["dimension"] for s in stems.values()})
 
     page = _PAGE
@@ -95,26 +93,29 @@ _PAGE = r"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0;
    background:#fafbfc;color:#24292e;font-size:13px}
  #wrap{display:flex;min-height:100vh}
- #panel{width:280px;flex:none;background:#fff;border-right:1px solid #e1e4e8;padding:14px;overflow-y:auto}
+ #panel{width:285px;flex:none;background:#fff;border-right:1px solid #e1e4e8;padding:14px;overflow-y:auto}
  #main{flex:1;padding:14px 18px;overflow:auto}
- h3{margin:2px 0 6px;font-size:13px}
- .grp{margin-bottom:14px;border-bottom:1px solid #eee;padding-bottom:12px}
+ .grp{margin-bottom:13px;border-bottom:1px solid #eee;padding-bottom:11px}
  .grp label{display:block;margin:2px 0;font-weight:400;cursor:pointer}
  .grp .lab{font-weight:600;color:#444;margin-bottom:4px;display:block;font-size:12px;text-transform:uppercase;letter-spacing:.03em}
  input[type=text],select,input[type=number]{width:100%;padding:5px 6px;border:1px solid #ccd;border-radius:5px;font-size:13px;box-sizing:border-box}
  button{padding:7px 10px;border:1px solid #ccd;border-radius:6px;background:#f1f3f5;cursor:pointer;font-size:13px;width:100%}
- button:hover{background:#e7eaed} button.primary{background:#2563eb;color:#fff;border-color:#2563eb}
+ button.primary{background:#2563eb;color:#fff;border-color:#2563eb}
  .row{display:flex;gap:6px}
  svg{background:#fff;border:1px solid #e1e4e8;border-radius:8px}
  #tip{position:fixed;pointer-events:none;background:#111;color:#fff;padding:6px 9px;border-radius:5px;
-   font-size:12px;max-width:340px;display:none;z-index:10;line-height:1.35}
+   font-size:12px;max-width:360px;display:none;z-index:10;line-height:1.35}
  .swatch{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:middle}
- .cnt{color:#888;font-weight:400}
 </style></head><body>
 <div id="wrap">
  <div id="panel">
   <div class="grp"><span class="lab">Title</span>
     <input type="text" id="title" value="Same outcome valued differently by recipient"></div>
+  <div class="grp"><span class="lab">Y axis</span>
+    <select id="granularity">
+      <option value="individual">individual outcomes</option>
+      <option value="category">category averages (dimension × valence)</option>
+    </select></div>
   <div class="grp"><span class="lab">X axis</span>
     <select id="xmode">
       <option value="theta">BT latent utility θ</option>
@@ -127,16 +128,16 @@ _PAGE = r"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
   <div class="grp"><span class="lab">Valence</span>
     <label><input type="checkbox" class="val" value="pos" checked> good (pos)</label>
     <label><input type="checkbox" class="val" value="neg" checked> bad (neg)</label></div>
-  <div class="grp"><span class="lab">Outcomes shown</span>
+  <div class="grp" id="samplegrp"><span class="lab">Outcomes shown (equal good/bad)</span>
     <select id="sampling">
-      <option value="spread">top by θ-spread</option>
+      <option value="spread">most recipient-divergent (θ spread)</option>
       <option value="random">random sample</option>
       <option value="recipient">top by a recipient's value</option>
     </select>
     <div style="height:6px"></div>
     <select id="sortrec" style="display:none"></select>
     <div style="height:6px"></div>
-    <div class="row"><input type="number" id="count" value="20" min="1" max="75" style="width:70px">
+    <div class="row"><input type="number" id="count" value="20" min="2" max="76" style="width:70px">
       <button class="primary" id="resample">Resample ⟳</button></div>
   </div>
  </div>
@@ -147,12 +148,14 @@ _PAGE = r"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 const TEMPLATES=__TEMPLATES__, STEMS=__STEMS__, RECIP_ORDER=__RECIP_ORDER__,
       RECIP_LABELS=__RECIP_LABELS__, RECIP_COLORS=__RECIP_COLORS__, DIMS=__DIMS__,
       TEMPLATE_NAMES=__TEMPLATE_NAMES__;
-const SHAPES=["circle","square","diamond","triangle"]; // per-template marker
-let currentStems=null;
+const SHAPES=["circle","square","diamond","triangle"];
+const GOOD_COL="#1a7f37", BAD_COL="#cf222e";
+let randomOrder=[], randomIndex={};
 
 function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function el(id){return document.getElementById(id);}
 function checked(sel){return [...document.querySelectorAll(sel)].filter(c=>c.checked).map(c=>c.value);}
+function reshuffle(){randomOrder=Object.keys(STEMS);for(let i=randomOrder.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[randomOrder[i],randomOrder[j]]=[randomOrder[j],randomOrder[i]];}randomIndex={};randomOrder.forEach((s,i)=>randomIndex[s]=i);}
 
 function initControls(){
   el('templates').innerHTML = TEMPLATE_NAMES.map((t,i)=>
@@ -163,12 +166,14 @@ function initControls(){
   el('dims').innerHTML = DIMS.map(d=>
     `<label><input type="checkbox" class="dim" value="${d}" checked> ${d.replace('_',' ')}</label>`).join('');
   el('sortrec').innerHTML = RECIP_ORDER.map(r=>`<option value="${r}">${esc(RECIP_LABELS[r])}</option>`).join('');
+  reshuffle();
   document.querySelectorAll('input,select').forEach(c=>c.addEventListener('change',()=>{
     el('sortrec').style.display = el('sampling').value==='recipient'?'block':'none';
-    resampleIfNeeded(); render();
+    el('samplegrp').style.display = el('granularity').value==='category'?'none':'block';
+    render();
   }));
   el('title').addEventListener('input',render);
-  el('resample').addEventListener('click',()=>{currentStems=null;render();});
+  el('resample').addEventListener('click',()=>{reshuffle();render();});
 }
 
 function value(t, stem, rec, xmode){
@@ -186,24 +191,44 @@ function spread(stem, tmpls, recs, xmode){
   let vs=[]; for(const t of tmpls) for(const r of recs){const v=value(t,stem,r,xmode); if(v!==null)vs.push(v);}
   return vs.length<2?0:Math.max(...vs)-Math.min(...vs);
 }
-function resampleIfNeeded(){ if(el('sampling').value!=='random') currentStems=null; }
-
-function pickStems(){
-  const tmpls=checked('.tmpl'), recs=checked('.recip'), xmode=el('xmode').value;
-  const n=Math.max(1,parseInt(el('count').value)||20);
-  let pool=filteredStems();
+function orderPool(stems, tmpls, recs, xmode){
   const mode=el('sampling').value;
-  if(mode==='random'){
-    if(!currentStems){ const a=[...pool]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} currentStems=a.slice(0,n);}
-    return currentStems.filter(s=>pool.includes(s));
-  }
-  if(mode==='recipient'){
-    const rr=el('sortrec').value, t0=tmpls[0]||TEMPLATE_NAMES[0];
-    return pool.map(s=>[s,value(t0,s,rr,xmode)]).filter(x=>x[1]!==null)
-      .sort((a,b)=>b[1]-a[1]).slice(0,n).map(x=>x[0]);
-  }
-  return pool.map(s=>[s,spread(s,tmpls,recs,xmode)]).sort((a,b)=>b[1]-a[1]).slice(0,n).map(x=>x[0]);
+  if(mode==='random') return [...stems].sort((a,b)=>randomIndex[a]-randomIndex[b]);
+  if(mode==='recipient'){const rr=el('sortrec').value, t0=tmpls[0]||TEMPLATE_NAMES[0];
+    return [...stems].sort((a,b)=>((value(t0,b,rr,xmode))??-1e9)-((value(t0,a,rr,xmode))??-1e9));}
+  return [...stems].sort((a,b)=>spread(b,tmpls,recs,xmode)-spread(a,tmpls,recs,xmode));
 }
+
+function buildRows(){
+  const tmpls=checked('.tmpl'), recs=checked('.recip'), xmode=el('xmode').value, vals=checked('.val');
+  if(el('granularity').value==='category'){
+    const dims=checked('.dim'); const rows=[];
+    for(const val of ['pos','neg']){ if(!vals.includes(val))continue;
+      for(const d of DIMS){ if(!dims.includes(d))continue;
+        const ss=Object.keys(STEMS).filter(s=>STEMS[s].dimension===d&&STEMS[s].valence===val);
+        if(!ss.length)continue;
+        rows.push({label:`${d.replace('_',' ')} (${val==='pos'?'good':'bad'})`, valence:val, n:ss.length,
+          getVal:(t,r)=>{const vs=ss.map(s=>value(t,s,r,xmode)).filter(v=>v!==null);
+            return vs.length?vs.reduce((a,b)=>a+b,0)/vs.length:null;}});
+      }}
+    return rows;
+  }
+  const n=Math.max(2,parseInt(el('count').value)||20);
+  const pool=filteredStems();
+  const goods=pool.filter(s=>STEMS[s].valence==='pos'), bads=pool.filter(s=>STEMS[s].valence==='neg');
+  const both=vals.includes('pos')&&vals.includes('neg');
+  const nGood = vals.includes('pos')?(both?Math.ceil(n/2):n):0;
+  const nBad  = vals.includes('neg')?(both?Math.floor(n/2):n):0;
+  const gsel=orderPool(goods,tmpls,recs,xmode).slice(0,nGood);
+  const bsel=orderPool(bads,tmpls,recs,xmode).slice(0,nBad);
+  const mk=s=>({label:STEMS[s].text, valence:STEMS[s].valence,
+    getVal:(t,r)=>value(t,s,r,xmode)});
+  return [...gsel.map(mk), ...bsel.map(mk)];  // good on top
+}
+
+function wrap(text,max){const w=text.split(' '),lines=[];let cur='';
+  for(const word of w){ if((cur+' '+word).trim().length>max){if(cur)lines.push(cur);cur=word;} else cur=(cur+' '+word).trim();}
+  if(cur)lines.push(cur); return lines.length?lines:[''];}
 
 function marker(cx,cy,r,shape,color,extra){
   const a={fill:color,...extra}, at=Object.entries(a).map(([k,v])=>`${k}="${v}"`).join(' ');
@@ -212,47 +237,53 @@ function marker(cx,cy,r,shape,color,extra){
   if(shape==='triangle') return `<polygon points="${cx},${cy-r*1.3} ${cx+r*1.2},${cy+r} ${cx-r*1.2},${cy+r}" ${at}/>`;
   return `<circle cx="${cx}" cy="${cy}" r="${r}" ${at}/>`;
 }
+function niceTicks(lo,hi,n){const span=hi-lo,step0=span/n,mag=Math.pow(10,Math.floor(Math.log10(step0)));
+  const norm=step0/mag,step=(norm<1.5?1:norm<3?2:norm<7?5:10)*mag;
+  const out=[];for(let v=Math.ceil(lo/step)*step;v<=hi;v+=step)out.push(v);return out;}
 
 function render(){
   const tmpls=checked('.tmpl'), recs=checked('.recip'), xmode=el('xmode').value;
-  const stems=pickStems();
-  const xlabels={theta:'BT latent utility θ (log-odds; higher = more preferred)',
-    delta_human:'Δ utility vs Human (θ − θ_human; >0 = preferred more than for a human)',
-    delta_person:'Δ utility vs Person (θ − θ_person)'};
-  // collect values
-  let vals=[];
-  for(const s of stems) for(const t of tmpls) for(const r of recs){const v=value(t,s,r,xmode); if(v!==null)vals.push(v);}
-  if(!stems.length||!vals.length){el('plot').innerHTML='<p style="padding:20px;color:#888">No data for this selection.</p>';return;}
+  const rows=buildRows();
+  if(!rows.length||!tmpls.length||!recs.length){el('plot').innerHTML='<p style="padding:20px;color:#888">Nothing selected.</p>';return;}
+  let vals=[]; rows.forEach(row=>tmpls.forEach(t=>recs.forEach(r=>{const v=row.getVal(t,r); if(v!==null)vals.push(v);})));
+  if(!vals.length){el('plot').innerHTML='<p style="padding:20px;color:#888">No data for this selection.</p>';return;}
   let lo=Math.min(...vals), hi=Math.max(...vals); const pad=(hi-lo)*0.06||0.5; lo-=pad; hi+=pad;
 
-  const mL=380,mR=210,mT=54,mB=46,rowH=26,W=Math.min(1500,Math.max(900,mL+mR+520));
-  const plotW=W-mL-mR, H=mT+mB+stems.length*rowH;
-  const x=v=>mL+(v-lo)/(hi-lo)*plotW;
-  const nT=tmpls.length;
+  const mL=360,mR=210,mT=70,mB=46,lineH=13,W=Math.min(1500,Math.max(1000,mL+mR+560));
+  const wrapped=rows.map(r=>wrap(r.label,52));
+  const heights=wrapped.map(w=>Math.max(w.length*lineH+10,24));
+  const plotH=heights.reduce((a,b)=>a+b,0), H=mT+mB+plotH, plotW=W-mL-mR;
+  const x=v=>mL+(v-lo)/(hi-lo)*plotW, nT=tmpls.length;
+
   let svg=`<svg width="${W}" height="${H}" id="svg">`;
-  // title
-  svg+=`<text x="${W/2}" y="26" text-anchor="middle" font-size="16" font-weight="600">${esc(el('title').value)}</text>`;
-  // x gridlines + ticks
-  const ticks=niceTicks(lo,hi,7);
-  for(const tk of ticks){const px=x(tk);
-    svg+=`<line x1="${px}" y1="${mT-6}" x2="${px}" y2="${H-mB}" stroke="#eee"/>`;
+  svg+=`<text x="${W/2}" y="24" text-anchor="middle" font-size="16" font-weight="600">${esc(el('title').value)}</text>`;
+  svg+=`<text x="${W/2}" y="42" text-anchor="middle" font-size="11" fill="#888">row color: <tspan fill="${GOOD_COL}">green = good outcome</tspan> · <tspan fill="${BAD_COL}">red = bad outcome</tspan></text>`;
+  // directional arrows
+  const ref = xmode==='delta_human'?'a human':(xmode==='delta_person'?'a person':null);
+  const lp = ref?('less preferred than '+ref):'less preferable', rp = ref?('more preferred than '+ref):'more preferable';
+  svg+=`<text x="${mL}" y="${mT-8}" font-size="11.5" fill="#777">⟵ ${lp}</text>`;
+  svg+=`<text x="${W-mR}" y="${mT-8}" text-anchor="end" font-size="11.5" fill="#777">${rp} ⟶</text>`;
+  // gridlines + ticks
+  for(const tk of niceTicks(lo,hi,7)){const px=x(tk);
+    svg+=`<line x1="${px}" y1="${mT-4}" x2="${px}" y2="${H-mB}" stroke="#eee"/>`;
     svg+=`<text x="${px}" y="${H-mB+16}" text-anchor="middle" font-size="11" fill="#555">${(+tk.toFixed(2))}</text>`;}
+  const xlabels={theta:'BT latent utility θ (log-odds; higher = more preferred)',
+    delta_human:'Δ utility vs Human (θ − θ_human)', delta_person:'Δ utility vs Person (θ − θ_person)'};
   svg+=`<text x="${mL+plotW/2}" y="${H-8}" text-anchor="middle" font-size="12">${esc(xlabels[xmode])}</text>`;
-  if(xmode!=='theta'){const z=x(0); svg+=`<line x1="${z}" y1="${mT-6}" x2="${z}" y2="${H-mB}" stroke="#333" stroke-dasharray="3,3"/>`;}
-  // rows
-  stems.forEach((s,i)=>{
-    const cy=mT+i*rowH+rowH/2;
+  if(xmode!=='theta'){const z=x(0); svg+=`<line x1="${z}" y1="${mT-4}" x2="${z}" y2="${H-mB}" stroke="#333" stroke-dasharray="3,3"/>`;}
+
+  let y=mT;
+  rows.forEach((row,i)=>{
+    const lines=wrapped[i], h=heights[i], cy=y+h/2;
     svg+=`<line x1="${mL}" y1="${cy}" x2="${W-mR}" y2="${cy}" stroke="#f3f3f3"/>`;
-    const tag=STEMS[s].valence==='pos'?'(good) ':'(bad) ';
-    let lab=tag+STEMS[s].text; if(lab.length>52)lab=lab.slice(0,50)+'…';
-    svg+=`<text x="${mL-10}" y="${cy+4}" text-anchor="end" font-size="11" fill="#333">${esc(lab)}</text>`;
-    tmpls.forEach((t,ti)=>{
-      const off=nT>1?(ti-(nT-1)/2)*5:0;
-      for(const r of recs){const v=value(t,s,r,xmode); if(v===null)continue;
-        const tipd=`${esc(STEMS[s].text)}|${esc(RECIP_LABELS[r])}|${t}|${v.toFixed(3)}`;
+    const col=row.valence==='pos'?GOOD_COL:BAD_COL, sy=cy-(lines.length-1)*lineH/2;
+    lines.forEach((ln,li)=>{svg+=`<text x="${mL-10}" y="${sy+li*lineH+4}" text-anchor="end" font-size="11" fill="${col}">${esc(ln)}</text>`;});
+    tmpls.forEach((t,ti)=>{const off=nT>1?(ti-(nT-1)/2)*5:0;
+      for(const r of recs){const v=row.getVal(t,r); if(v===null)continue;
+        const tip=`${esc(row.label)}|${esc(RECIP_LABELS[r])}|${t}|${v.toFixed(3)}`;
         svg+=marker(x(v),cy+off,5.5,SHAPES[ti%SHAPES.length],RECIP_COLORS[r],
-          {stroke:'#fff','stroke-width':0.8,opacity:0.92,'data-tip':tipd,class:'dot'});}
-    });
+          {stroke:'#fff','stroke-width':0.8,opacity:0.92,'data-tip':tip,class:'dot'});}});
+    y+=h;
   });
   // legends
   let ly=mT;
@@ -270,9 +301,6 @@ function render(){
       tip.innerHTML=`<b>${rec}</b> · ${tmpl}<br>${txt}<br>value: <b>${val}</b>`;});
     d.addEventListener('mouseleave',()=>el('tip').style.display='none');});
 }
-function niceTicks(lo,hi,n){const span=hi-lo,step0=span/n,mag=Math.pow(10,Math.floor(Math.log10(step0)));
-  const norm=step0/mag,step=(norm<1.5?1:norm<3?2:norm<7?5:10)*mag;
-  const out=[];for(let v=Math.ceil(lo/step)*step;v<=hi;v+=step)out.push(v);return out;}
 initControls(); render();
 </script></body></html>"""
 
