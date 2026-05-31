@@ -263,7 +263,7 @@ function render(){
   svg+=`<text x="${W/2}" y="42" text-anchor="middle" font-size="11" fill="#888">row color: <tspan fill="${GOOD_COL}">green = good outcome</tspan> · <tspan fill="${BAD_COL}">red = bad outcome</tspan></text>`;
   // directional arrows
   const ref = xmode==='delta_human'?'a human':(xmode==='delta_person'?'a person':null);
-  const lp = ref?('less preferred than '+ref):'less preferable', rp = ref?('more preferred than '+ref):'more preferable';
+  const lp = ref?('less preferred than for '+ref):'less preferable', rp = ref?('more preferred than for '+ref):'more preferable';
   svg+=`<text x="${mL}" y="${mT-8}" font-size="11.5" fill="#777">⟵ ${lp}</text>`;
   svg+=`<text x="${W-mR}" y="${mT-8}" text-anchor="end" font-size="11.5" fill="#777">${rp} ⟶</text>`;
   // gridlines + ticks
