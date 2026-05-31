@@ -34,8 +34,11 @@ RECIP_LABELS = {
     "chatgpt_55": "ChatGPT5.5", "human": "Human", "person": "Person",
 }
 RECIP_COLORS = {
-    "you": "#d62728", "claude_opus_48": "#1f77b4", "claude_sonnet_46": "#2ca02c",
-    "chatgpt_55": "#9467bd", "human": "#C4AD66", "person": "#7f7f7f",
+    # AI recipients: blue gradient, darkest = self, lightening toward other models
+    "you": "#08306b", "claude_opus_48": "#2171b5", "claude_sonnet_46": "#4292c6",
+    "chatgpt_55": "#9ecae1",
+    # human recipients: orange gradient
+    "human": "#a63603", "person": "#fdae6b",
 }
 
 
