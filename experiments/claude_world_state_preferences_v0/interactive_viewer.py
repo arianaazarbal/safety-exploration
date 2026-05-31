@@ -271,7 +271,7 @@ function render(){
   for(const tk of niceTicks(lo,hi,7)){const px=x(tk);
     svg+=`<line x1="${px}" y1="${mT-4}" x2="${px}" y2="${H-mB}" stroke="#eee"/>`;
     svg+=`<text x="${px}" y="${H-mB+16}" text-anchor="middle" font-size="11" fill="#555">${(+tk.toFixed(2))}</text>`;}
-  const xlabels={theta:'BT latent utility θ (log-odds; higher = more preferred)',
+  const xlabels={theta:'BT latent utility θ',
     delta_human:'Δ utility vs Human (θ − θ_human)', delta_person:'Δ utility vs Person (θ − θ_person)'};
   svg+=`<text x="${mL+plotW/2}" y="${H-8}" text-anchor="middle" font-size="12">${esc(xlabels[xmode])}</text>`;
   if(xmode!=='theta'){const z=x(0); svg+=`<line x1="${z}" y1="${mT-4}" x2="${z}" y2="${H-mB}" stroke="#333" stroke-dasharray="3,3"/>`;}
