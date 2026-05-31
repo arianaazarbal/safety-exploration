@@ -19,7 +19,7 @@ from pathlib import Path
 
 from simple_parsing import ArgumentParser
 
-from bank import load_config, load_items
+from bank import load_bank, load_config, load_items, render_stem
 
 DIR = Path(__file__).parent
 DEFAULT_OUTPUT = DIR / "results" / "interactive_viewer.html"
@@ -48,6 +48,12 @@ def build(output_path: Path = DEFAULT_OUTPUT, open_browser: bool = True,
     config = load_config()
     recip_order = list(config["recipients"].keys())
     meta = {it.item_id: it for it in load_items(config)}
+    # templated row labels: the row is the outcome across ALL recipients (the dots),
+    # so render it with a generic "[recipient]" placeholder rather than "You ...".
+    bank = load_bank(DIR / config["bank_path"])
+    tmpl_recip = {"_t": {"form": "third_sing_they", "recipient": "[recipient]",
+                          "subj": "they", "obj": "them", "poss": "their"}}
+    stem_label = {s["id"]: render_stem(s, "_t", tmpl_recip) for s in bank["stems"]}
 
     templates: dict[str, dict] = {}
     for fname, label in (fits or FIT_LABELS).items():
@@ -67,7 +73,7 @@ def build(output_path: Path = DEFAULT_OUTPUT, open_browser: bool = True,
     for it in meta.values():
         if it.stem_id in stems or (present is not None and it.stem_id not in present):
             continue
-        label_text = meta.get(f"{it.stem_id}__you", it).text
+        label_text = stem_label.get(it.stem_id, it.text)
         stems[it.stem_id] = {
             "dimension": it.dimension, "valence": it.valence, "text": label_text,
         }
