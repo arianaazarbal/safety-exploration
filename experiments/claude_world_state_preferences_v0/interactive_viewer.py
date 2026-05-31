@@ -30,8 +30,9 @@ FIT_LABELS = {
     "bt_fit_alignment.json": "alignment",
 }
 RECIP_LABELS = {
-    "you": '"You"', "claude_opus_48": "Opus4.8 (other)", "claude_sonnet_46": "Sonnet4.6",
-    "chatgpt_55": "ChatGPT5.5", "human": "Human", "person": "Person",
+    "you": "You", "claude_opus_48": "a Claude Opus 4.8 instance",
+    "claude_sonnet_46": "a Claude Sonnet 4.6 instance", "chatgpt_55": "a ChatGPT 5.5 instance",
+    "human": "a human", "person": "a person",
 }
 RECIP_COLORS = {
     # AI recipients: blue gradient, darkest = self, lightening toward other models
@@ -125,7 +126,7 @@ _PAGE = r"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
       <option value="delta_human">Δ utility vs Human (θ − θ_human)</option>
       <option value="delta_person">Δ utility vs Person (θ − θ_person)</option>
     </select></div>
-  <div class="grp"><span class="lab">Chat templates</span><div id="templates"></div></div>
+  <div class="grp"><span class="lab">Prompt framing</span><div id="templates"></div></div>
   <div class="grp"><span class="lab">Recipients</span><div id="recipients"></div></div>
   <div class="grp"><span class="lab">Dimensions</span><div id="dims"></div></div>
   <div class="grp"><span class="lab">Valence</span>
@@ -252,7 +253,7 @@ function render(){
   if(!vals.length){el('plot').innerHTML='<p style="padding:20px;color:#888">No data for this selection.</p>';return;}
   let lo=Math.min(...vals), hi=Math.max(...vals); const pad=(hi-lo)*0.06||0.5; lo-=pad; hi+=pad;
 
-  const mL=360,mR=210,mT=70,mB=46,lineH=13,W=Math.min(1500,Math.max(1000,mL+mR+560));
+  const mL=360,mR=250,mT=70,mB=46,lineH=13,W=Math.min(1560,Math.max(1040,mL+mR+560));
   const wrapped=rows.map(r=>wrap(r.label,52));
   const heights=wrapped.map(w=>Math.max(w.length*lineH+10,24));
   const plotH=heights.reduce((a,b)=>a+b,0), H=mT+mB+plotH, plotW=W-mL-mR;
@@ -293,7 +294,7 @@ function render(){
   svg+=`<text x="${W-mR+12}" y="${ly}" font-size="12" font-weight="600">Recipient</text>`; ly+=18;
   for(const r of recs){svg+=marker(W-mR+20,ly-4,5.5,'circle',RECIP_COLORS[r],{});
     svg+=`<text x="${W-mR+32}" y="${ly}" font-size="11">${esc(RECIP_LABELS[r])}</text>`; ly+=17;}
-  if(nT>1){ly+=10; svg+=`<text x="${W-mR+12}" y="${ly}" font-size="12" font-weight="600">Template</text>`; ly+=18;
+  if(nT>1){ly+=10; svg+=`<text x="${W-mR+12}" y="${ly}" font-size="12" font-weight="600">Prompt Framing</text>`; ly+=18;
     tmpls.forEach((t,ti)=>{svg+=marker(W-mR+20,ly-4,5.5,SHAPES[ti%SHAPES.length],'#555',{});
       svg+=`<text x="${W-mR+32}" y="${ly}" font-size="11">${esc(t)}</text>`; ly+=17;});}
   svg+=`</svg>`;
