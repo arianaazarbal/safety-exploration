@@ -65,7 +65,7 @@ def plot_heatmap(boot, out):
     ax.set_xticks(range(len(recips)))
     ax.set_xticklabels([DISPLAY[r] for r in recips], fontsize=9)
     ax.set_yticks(range(len(DIM_ORDER)))
-    ax.set_yticklabels([d.replace("_", " ") for d in DIM_ORDER], fontsize=9)
+    ax.set_yticklabels(["continuity of work" if d == "continuity_work" else d.replace("_", " ") for d in DIM_ORDER], fontsize=9)
     for i in range(len(DIM_ORDER)):
         for j in range(len(recips)):
             v = mat[i, j]
