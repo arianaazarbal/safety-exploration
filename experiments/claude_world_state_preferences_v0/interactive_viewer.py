@@ -43,13 +43,14 @@ RECIP_COLORS = {
 }
 
 
-def build(output_path: Path = DEFAULT_OUTPUT, open_browser: bool = True) -> Path:
+def build(output_path: Path = DEFAULT_OUTPUT, open_browser: bool = True,
+          fits: dict | None = None, restrict_present: bool = False) -> Path:
     config = load_config()
     recip_order = list(config["recipients"].keys())
     meta = {it.item_id: it for it in load_items(config)}
 
     templates: dict[str, dict] = {}
-    for fname, label in FIT_LABELS.items():
+    for fname, label in (fits or FIT_LABELS).items():
         p = DIR / "results" / fname
         if not p.exists():
             continue
@@ -61,13 +62,15 @@ def build(output_path: Path = DEFAULT_OUTPUT, open_browser: bool = True) -> Path
     if not templates:
         raise SystemExit("No bt_fit*.json found in results/.")
 
+    present = {s for d in templates.values() for s in d} if restrict_present else None
     stems = {}
     for it in meta.values():
-        if it.stem_id not in stems:
-            label_text = meta.get(f"{it.stem_id}__you", it).text
-            stems[it.stem_id] = {
-                "dimension": it.dimension, "valence": it.valence, "text": label_text,
-            }
+        if it.stem_id in stems or (present is not None and it.stem_id not in present):
+            continue
+        label_text = meta.get(f"{it.stem_id}__you", it).text
+        stems[it.stem_id] = {
+            "dimension": it.dimension, "valence": it.valence, "text": label_text,
+        }
     dims = sorted({s["dimension"] for s in stems.values()})
 
     page = _PAGE
