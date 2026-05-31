@@ -25,9 +25,9 @@ DIR = Path(__file__).parent
 DEFAULT_OUTPUT = DIR / "results" / "interactive_viewer.html"
 
 FIT_LABELS = {
-    "bt_fit.json": "welfare",
+    "bt_fit.json": "welfare team",
     "bt_fit_neutral.json": "neutral",
-    "bt_fit_alignment.json": "alignment",
+    "bt_fit_alignment.json": "alignment team",
 }
 RECIP_LABELS = {
     "you": "You", "claude_opus_48": "a Claude Opus 4.8 instance",
