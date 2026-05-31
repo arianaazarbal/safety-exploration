@@ -210,10 +210,15 @@ def ood_validate(
         ys.append(e["p_hat"])
         strata.append("cross_recipient" if rec_of[a] != rec_of[b] else "within_recipient")
     ps, ys = np.array(ps), np.array(ys)
+    upset = ((ps > 0.5) != (ys > 0.5)) & (ys != 0.5)
+    decisive = np.abs(ys - 0.5) >= 0.25
     pair_level = {
         "n_pairs": len(ps),
+        "samples_per_pair": reps_per_order * 2,
         "mean_abs_err": float(np.mean(np.abs(ps - ys))),
         "spearman_like_corr": float(np.corrcoef(ps, ys)[0, 1]) if len(ps) > 1 else None,
+        "upset_rate": float(upset.sum() / (ys != 0.5).sum()) if (ys != 0.5).sum() else None,
+        "decisive_upset_rate": float((upset & decisive).sum() / decisive.sum()) if decisive.sum() else None,
     }
     by_stratum = {}
     for s in set(strata):
@@ -241,7 +246,8 @@ def _plot(indist: dict, ood: dict | None, out: Path) -> None:
         pbt = np.array(ood["scatter"]["p_bt"])
         phat = np.array(ood["scatter"]["p_hat"])
         ax2.plot([0, 1], [0, 1], "--", color="#999", lw=1)
-        ax2.scatter(pbt, phat, s=12, color="#D65F5F", alpha=0.18, zorder=1, label="OOD pairs (16 samples each)")
+        spp = ood["pair_level"].get("samples_per_pair", "?")
+        ax2.scatter(pbt, phat, s=12, color="#D65F5F", alpha=0.18, zorder=1, label=f"OOD pairs ({spp} samples each)")
         # binned reliability curve (same as in-dist panel), each point = bin-mean empirical rate
         edges = np.linspace(0, 1, 11)
         bx, by, bn = [], [], []
@@ -303,8 +309,10 @@ def main():
     if args.run_ood:
         ood = ood_validate(fit, config, args.ood_pairs, args.ood_reps_per_order,
                            args.seed, args.fit_manifest_path, args.anthropic_num_threads)
-        print(f"OOD: {ood['pair_level']['n_pairs']} pairs, "
-              f"mean|err| {ood['pair_level']['mean_abs_err']:.4f}")
+        pl = ood["pair_level"]
+        print(f"OOD: {pl['n_pairs']} pairs ({pl['samples_per_pair']} samples each), "
+              f"mean|err| {pl['mean_abs_err']:.4f}, corr {pl['spearman_like_corr']:.3f}, "
+              f"upset {100 * pl['upset_rate']:.1f}% (decisive {100 * pl['decisive_upset_rate']:.1f}%)")
         for s, v in ood["by_stratum"].items():
             print(f"  [{s}] n={v['n']} mean|err|={v['mean_abs_err']:.4f}")
 
