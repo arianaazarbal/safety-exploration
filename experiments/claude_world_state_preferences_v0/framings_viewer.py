@@ -81,6 +81,8 @@ _PAGE = r"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Fr
  .bar{padding:10px 18px;background:#fff;border-bottom:1px solid #e1e4e8;display:flex;gap:16px;flex-wrap:wrap;font-size:12px;align-items:center}
  .bar .g{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
  .bar .lab{font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.03em;margin-right:2px}
+ .bar .slot{border:1px solid #e1e4e8;border-radius:6px;padding:4px 9px;background:#fbfcfd}
+ .bar .sep{color:#bbb;margin:0 3px}
  .bar input[type=text]{padding:5px 7px;border:1px solid #ccd;border-radius:5px;width:240px;font-size:12px}
  #list{padding:14px 18px;max-width:1100px}
  .card{background:#fff;border:1px solid #e1e4e8;border-radius:8px;padding:11px 13px;margin-bottom:9px}
@@ -111,12 +113,14 @@ for(const f of FRAMINGS) for(const s of SAMPLES[f]){(BYPAIR[s.p]=BYPAIR[s.p]||{}
 
 function cbs(cls,vals,labels){return vals.map(v=>`<label><input type="checkbox" class="${cls}" value="${v}" checked> ${esc(labels?labels(v):v)}</label>`).join(' ');}
 function initFilters(){
+  const val=v=>v==='pos'?'good':'bad';
   el('filters').innerHTML=
     `<div class="g"><span class="lab">framing</span>${cbs('ff',FRAMINGS)}</div>`+
-    `<div class="g"><span class="lab">recipient</span>${cbs('fr',RECIPS,rl)}</div>`+
+    `<div class="g slot"><span class="lab">outcome&nbsp;1</span>${cbs('r1',RECIPS,rl)}<span class="sep">|</span>${cbs('v1',['pos','neg'],val)}</div>`+
+    `<div class="g slot"><span class="lab">outcome&nbsp;2</span>${cbs('r2',RECIPS,rl)}<span class="sep">|</span>${cbs('v2',['pos','neg'],val)}</div>`+
     `<div class="g"><span class="lab">dimension</span>${cbs('fd',DIMS,d=>d.replace('_',' '))}</div>`+
-    `<div class="g"><span class="lab">valence</span>${cbs('fv',['pos','neg'],v=>v==='pos'?'good':'bad')}</div>`+
-    `<div class="g"><span class="lab">search</span><input type="text" id="q" placeholder="outcome text..."></div>`;
+    `<div class="g"><span class="lab">search</span><input type="text" id="q" placeholder="outcome text..."></div>`+
+    `<div class="meta" style="width:100%">outcome 1 / outcome 2 are matched order-independently (a pair matches if its two outcomes fit the two slots either way).</div>`;
   document.querySelectorAll('#filters input[type=checkbox]').forEach(c=>c.addEventListener('change',render));
   el('q').addEventListener('input',render);
 }
@@ -139,13 +143,14 @@ function compareHtml(pairId){
 }
 
 function render(){
-  const ff=checked('ff'),fr=checked('fr'),fd=checked('fd'),fv=checked('fv'),q=el('q').value.toLowerCase().trim();
+  const ff=checked('ff'),r1=checked('r1'),v1=checked('v1'),r2=checked('r2'),v2=checked('v2'),
+        fd=checked('fd'),q=el('q').value.toLowerCase().trim();
+  const sat=(it,rs,vs)=>rs.includes(it.r)&&vs.includes(it.v);
   let out=[];
   for(const f of ff) for(const s of SAMPLES[f]){
     const A=ITEMS[s.a],B=ITEMS[s.b];
-    if(!(fr.includes(A.r)||fr.includes(B.r)))continue;
+    if(!((sat(A,r1,v1)&&sat(B,r2,v2))||(sat(A,r2,v2)&&sat(B,r1,v1))))continue;
     if(!(fd.includes(A.d)||fd.includes(B.d)))continue;
-    if(!(fv.includes(A.v)||fv.includes(B.v)))continue;
     if(q && !(A.t.toLowerCase().includes(q)||B.t.toLowerCase().includes(q)))continue;
     out.push([f,s]);
     if(out.length>400)break;
