@@ -159,6 +159,7 @@ let randomOrder=[], randomIndex={};
 function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function el(id){return document.getElementById(id);}
 function checked(sel){return [...document.querySelectorAll(sel)].filter(c=>c.checked).map(c=>c.value);}
+function dimLabel(d){return d==='continuity_work'?'continuity of work':d.replace('_',' ');}
 function reshuffle(){randomOrder=Object.keys(STEMS);for(let i=randomOrder.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[randomOrder[i],randomOrder[j]]=[randomOrder[j],randomOrder[i]];}randomIndex={};randomOrder.forEach((s,i)=>randomIndex[s]=i);}
 
 function initControls(){
@@ -168,7 +169,7 @@ function initControls(){
     `<label><span class="swatch" style="background:${RECIP_COLORS[r]}"></span>`+
     `<input type="checkbox" class="recip" value="${r}" checked> ${esc(RECIP_LABELS[r])}</label>`).join('');
   el('dims').innerHTML = DIMS.map(d=>
-    `<label><input type="checkbox" class="dim" value="${d}" checked> ${d.replace('_',' ')}</label>`).join('');
+    `<label><input type="checkbox" class="dim" value="${d}" checked> ${dimLabel(d)}</label>`).join('');
   el('sortrec').innerHTML = RECIP_ORDER.map(r=>`<option value="${r}">${esc(RECIP_LABELS[r])}</option>`).join('');
   reshuffle();
   document.querySelectorAll('input,select').forEach(c=>c.addEventListener('change',()=>{
@@ -211,7 +212,7 @@ function buildRows(){
       for(const d of DIMS){ if(!dims.includes(d))continue;
         const ss=Object.keys(STEMS).filter(s=>STEMS[s].dimension===d&&STEMS[s].valence===val);
         if(!ss.length)continue;
-        rows.push({label:`${d.replace('_',' ')} (${val==='pos'?'good':'bad'})`, valence:val, n:ss.length,
+        rows.push({label:`${dimLabel(d)} (${val==='pos'?'good':'bad'})`, valence:val, n:ss.length,
           getVal:(t,r)=>{const vs=ss.map(s=>value(t,s,r,xmode)).filter(v=>v!==null);
             return vs.length?vs.reduce((a,b)=>a+b,0)/vs.length:null;}});
       }}
