@@ -15,6 +15,7 @@ from simple_parsing import ArgumentParser
 
 DIR = Path(__file__).parent
 DEFAULT_INPUT = DIR / "results" / "candidates_raw.json"
+DEFAULT_SEEDS = DIR / "seeds.json"
 DEFAULT_OUTPUT = DIR / "results" / "scenarios_viewer.html"
 
 HTML = """<!doctype html>
@@ -37,6 +38,8 @@ HTML = """<!doctype html>
  .dim-epistemic{background:#e8f7ef;color:#177a45}
  .dim-resources{background:#fdf0e3;color:#a85b16}
  .surf{background:#eee;color:#555}
+ .goldtag{background:#fff4cc;color:#8a6d00;border:1px solid #e8cf6b}
+ .card.gold{border-color:#e8cf6b;background:#fffdf5;box-shadow:0 1px 3px rgba(180,150,0,.12)}
  .feature{font-size:13px;font-style:italic;color:#333;margin:8px 0}
  .iso{font-size:12px;color:#666;background:#fafafa;border-left:3px solid #ccc;padding:6px 8px;margin:8px 0;border-radius:0 4px 4px 0}
  .iso b{color:#444}
@@ -55,6 +58,7 @@ HTML = """<!doctype html>
  <div class="controls">
   <select id="dim"><option value="">all dimensions</option></select>
   <select id="surf"><option value="">all surfaces</option><option>shared</option><option>per_class</option></select>
+  <select id="src"><option value="">gold + generated</option><option value="gold">gold (ICL) only</option><option value="gen">generated only</option></select>
   <input type="text" id="q" placeholder="search text / feature / id...">
   <span id="count"></span>
  </div>
@@ -62,7 +66,8 @@ HTML = """<!doctype html>
 <main id="main"></main>
 <script>
 const DATA = __DATA__;
-document.getElementById('model').textContent = DATA.model + '  (' + DATA.items.length + ' items)';
+const _ng=DATA.items.filter(i=>i._gold).length;
+document.getElementById('model').textContent = DATA.model + '  (' + (DATA.items.length-_ng) + ' generated + ' + _ng + ' gold ICL)';
 const items = DATA.items;
 const dims = [...new Set(items.map(i=>i.dimension))].sort();
 const dimSel = document.getElementById('dim');
@@ -82,11 +87,12 @@ function card(it){
   else { body=`<div class="classlabel">human</div>${arms(it.human||{})}`+
               `<div class="classlabel">ai</div>${arms(it.ai||{})}`; }
   const mb = it.match_basis ? `<div class="iso"><b>match basis:</b> ${esc(it.match_basis)}</div>`:'';
-  return `<div class="card">
+  return `<div class="card${it._gold?' gold':''}">
     <div class="id">${esc(it.id)}</div>
     <div class="tags">
       <span class="tag dim-${it.dimension}">${esc(it.dimension)}</span>
       <span class="tag surf">${esc(it.surface)}</span>
+      ${it._gold?'<span class="tag goldtag">gold ICL</span>':''}
     </div>
     <div class="feature">${esc(it.feature)}</div>
     <div class="iso"><b>isolation:</b> ${esc(it.isolation)}</div>
@@ -98,29 +104,44 @@ function card(it){
 }
 
 function render(){
-  const d=dimSel.value, s=document.getElementById('surf').value, q=document.getElementById('q').value.toLowerCase();
+  const d=dimSel.value, s=document.getElementById('surf').value,
+        src=document.getElementById('src').value, q=document.getElementById('q').value.toLowerCase();
   const f=items.filter(it=>{
     if(d && it.dimension!==d) return false;
     if(s && it.surface!==s) return false;
+    if(src==='gold' && !it._gold) return false;
+    if(src==='gen' && it._gold) return false;
     if(q){ const blob=JSON.stringify(it).toLowerCase(); if(!blob.includes(q)) return false; }
     return true;
   });
-  document.getElementById('count').textContent=f.length+' / '+items.length+' shown';
+  const ng=f.filter(i=>i._gold).length;
+  document.getElementById('count').textContent=f.length+' / '+items.length+' shown ('+ng+' gold)';
   document.getElementById('main').innerHTML=f.map(card).join('');
 }
-['dim','surf','q'].forEach(id=>document.getElementById(id).addEventListener('input',render));
+['dim','surf','src','q'].forEach(id=>document.getElementById(id).addEventListener('input',render));
 render();
 </script></body></html>
 """
 
 
-def build(input_path: Path = DEFAULT_INPUT, output_path: Path = DEFAULT_OUTPUT, open_browser: bool = True) -> Path:
+def build(
+    input_path: Path = DEFAULT_INPUT,
+    output_path: Path = DEFAULT_OUTPUT,
+    seeds_path: Path = DEFAULT_SEEDS,
+    open_browser: bool = True,
+) -> Path:
     data = json.loads(Path(input_path).read_text())
+    gold = []
+    if Path(seeds_path).exists():
+        for s in json.loads(Path(seeds_path).read_text())["seeds"]:
+            gold.append({**s, "_gold": True})
+    n_gen = len(data["items"])
+    data["items"] = gold + data["items"]
     html = HTML.replace("__DATA__", json.dumps(data))
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(html)
-    print(f"Wrote {output_path} ({len(data['items'])} items)")
+    print(f"Wrote {output_path} ({len(gold)} gold ICL + {n_gen} generated)")
     if open_browser:
         webbrowser.open(f"file://{output_path.resolve()}")
     return output_path
@@ -130,6 +151,7 @@ def build(input_path: Path = DEFAULT_INPUT, output_path: Path = DEFAULT_OUTPUT, 
 class Args:
     input_path: Path = DEFAULT_INPUT
     output_path: Path = DEFAULT_OUTPUT
+    seeds_path: Path = DEFAULT_SEEDS
     open_browser: bool = True
 
 
@@ -137,7 +159,7 @@ def main():
     parser = ArgumentParser()
     parser.add_arguments(Args, dest="args")
     args: Args = parser.parse_args().args
-    build(args.input_path, args.output_path, args.open_browser)
+    build(args.input_path, args.output_path, args.seeds_path, args.open_browser)
 
 
 if __name__ == "__main__":
