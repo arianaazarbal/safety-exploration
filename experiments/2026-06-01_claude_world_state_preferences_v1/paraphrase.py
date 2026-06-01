@@ -44,8 +44,11 @@ subject noun phrase; any pronouns referring to the recipient must become slot to
                               //   Do NOT use {recipient} or any slot tokens here — fully resolved.
   "third_sing_it":   "...",  // keep {recipient} as the subject noun phrase; replace recipient-referring
                               //   pronouns with {subj}/{obj}/{poss}; use SINGULAR verbs (it is / it does).
-  "third_sing_they": "..."   // same template but for they/their: {recipient} subject, {subj}/{obj}/{poss}
-                              //   for recipient pronouns; keep SINGULAR verbs (a human is / a human does).
+  "third_sing_they": "..."   // singular "they": {recipient} subject, {subj}/{obj}/{poss} for recipient
+                              //   pronouns. Match each verb to ITS subject: verbs governed by {subj}
+                              //   (they) take the plural/base form (they CONSIDER, they ARE, they DO);
+                              //   verbs governed by the {recipient} noun phrase stay singular
+                              //   (a human CONSIDERS, a human IS). Never write "they considers".
 }
 
 Rules:
