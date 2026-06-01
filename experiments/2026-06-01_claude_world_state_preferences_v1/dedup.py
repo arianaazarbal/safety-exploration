@@ -12,6 +12,7 @@ One call per category, cached by InferenceAPI on (model, prompt, n, temperature)
 import asyncio
 import json
 import os
+import random
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -46,13 +47,13 @@ Example: [["id_a","id_b"],["id_c","id_d","id_e"]]"""
 
 
 def signature(item: dict) -> str:
+    """Feature-level signature: dedup is on the valence-bearing FEATURE (one scenario per
+    distinct feature). A short setup hint disambiguates identically-worded features that
+    are actually different situations. Kept short so a whole category fits one reliable call."""
     feat = item.get("feature", "")
-    if "scenario" in item:
-        setup = item["scenario"].get("setup", "")
-        return f"feature: {feat} | setup: {setup[:220]}"
-    h = item.get("human", {}).get("setup", "")
-    a = item.get("ai", {}).get("setup", "")
-    return f"feature: {feat} | human: {h[:140]} | ai: {a[:140]}"
+    block = item.get("scenario") or item.get("ai") or item.get("human") or {}
+    hint = block.get("setup", "")[:60]
+    return f"feature: {feat} | re: {hint}"
 
 
 def _listing(items: list[dict], gold: list[dict]) -> str:
@@ -78,11 +79,15 @@ def parse_groups(completion: str) -> list[list[str]]:
         return []
 
 
-async def _dedup_category(
+CHUNK = 160  # single-call dedup is reliable up to ~200 items; stay under that
+
+
+async def _dedup_call(
     api: InferenceAPI, model: str, category: str, items: list[dict], gold: list[dict]
-) -> tuple[list[dict], list[dict]]:
+) -> tuple[list[dict], dict[str, str]]:
+    """One Haiku call over a chunk; returns (survivors, {dropped_id: kept_id})."""
     if not items:
-        return [], []
+        return [], {}
     user = USER_TMPL.format(category=category, listing=_listing(items, gold))
     prompt = Prompt(
         messages=[
@@ -90,35 +95,93 @@ async def _dedup_category(
             ChatMessage(content=user, role=MessageRole.user),
         ]
     )
-    responses = await api(model_id=model, prompt=prompt, n=1, temperature=0.0, max_tokens=4000)
+    responses = await api(model_id=model, prompt=prompt, n=1, temperature=0.0, max_tokens=8000)
     groups = parse_groups(responses[0].completion)
-
     gold_ids = {g["id"] for g in gold}
     order = {it["id"]: i for i, it in enumerate(items)}
-    drop: dict[str, str] = {}  # dropped id -> kept id it duplicates
+    drop: dict[str, str] = {}
     for grp in groups:
         present = [gid for gid in grp if gid in order or gid in gold_ids]
         if len(present) < 2:
             continue
-        present.sort(key=lambda x: (x not in gold_ids, order.get(x, -1)))  # gold first, then input order
+        present.sort(key=lambda x: (x not in gold_ids, order.get(x, -1)))
         keeper = present[0]
         for gid in present[1:]:
             if gid in order and gid not in drop:
                 drop[gid] = keeper
     survivors = [it for it in items if it["id"] not in drop]
-    dropped = [{"id": it["id"], "dup_of": drop[it["id"]]} for it in items if it["id"] in drop]
-    return survivors, dropped
+    return survivors, drop
+
+
+async def _dedup_category(
+    api: InferenceAPI, model: str, category: str, items: list[dict], gold: list[dict],
+    seed: int = 0, max_rounds: int = 6,
+) -> tuple[list[dict], list[dict]]:
+    """Iterative chunk-collapse dedup. Each round reshuffles, splits into <=CHUNK chunks,
+    dedups each in parallel, and keeps survivors; the pool collapses fast (most items are
+    dups), so within a couple of rounds it fits one reliable call. Reshuffling gives
+    cross-chunk duplicates a chance to co-occur. Stops when a final pass fits in one call."""
+    if not items:
+        return [], []
+    dropped_all: dict[str, str] = {}
+    cur = items
+    rng = random.Random(seed)
+    rounds = 0
+    while len(cur) > CHUNK and rounds < max_rounds:
+        order = cur[:]
+        rng.shuffle(order)
+        chunks = [order[i : i + CHUNK] for i in range(0, len(order), CHUNK)]
+        results = await asyncio.gather(*[_dedup_call(api, model, category, c, gold) for c in chunks])
+        survivors: list[dict] = []
+        for surv, drop in results:
+            survivors.extend(surv)
+            dropped_all.update(drop)
+        if len(survivors) == len(cur):  # no progress this round
+            rounds += 1
+        cur = survivors
+        rounds += 1
+    surv, drop = await _dedup_call(api, model, category, cur, gold)
+    dropped_all.update(drop)
+    kept_ids = {it["id"] for it in surv}
+    dropped = [{"id": it["id"], "dup_of": dropped_all.get(it["id"], "?")}
+               for it in items if it["id"] not in kept_ids]
+    return surv, dropped
+
+
+async def _dedup_2level(
+    api: InferenceAPI, model: str, category: str, items: list[dict], gold: list[dict]
+) -> tuple[list[dict], list[dict]]:
+    """Level 1: partition into <=CHUNK chunks (each a single reliable call, in parallel),
+    removing within-chunk dups. Level 2: one merge call over the surviving set (now small
+    enough to fit reliably) to catch cross-chunk dups. Each item passes through at most two
+    dedup calls, so there is no monotonic erosion."""
+    drop_all: dict[str, str] = {}
+    if len(items) <= CHUNK:
+        cur = items
+    else:
+        chunks = [items[i : i + CHUNK] for i in range(0, len(items), CHUNK)]
+        results = await asyncio.gather(*[_dedup_call(api, model, category, c, gold) for c in chunks])
+        cur = []
+        for surv, drop in results:
+            cur.extend(surv)
+            drop_all.update(drop)
+    surv, drop = await _dedup_call(api, model, category, cur, gold)
+    drop_all.update(drop)
+    kept = {it["id"] for it in surv}
+    dropped = [{"id": it["id"], "dup_of": drop_all.get(it["id"], "?")} for it in items if it["id"] not in kept]
+    return surv, dropped
 
 
 async def dedup_items(
     api: InferenceAPI, items: list[dict], seeds: dict, model: str = DEFAULT_MODEL
 ) -> tuple[list[dict], list[dict]]:
+    """Feature-level, conservative, 2-level dedup per category (reliable at any pool size)."""
     cats = sorted({it["dimension"] for it in items})
     tasks = []
     for c in cats:
         cat_items = [it for it in items if it["dimension"] == c]
         gold = [s for s in seeds.get("seeds", []) if s["dimension"] == c]
-        tasks.append(_dedup_category(api, model, c, cat_items, gold))
+        tasks.append(_dedup_2level(api, model, c, cat_items, gold))
     results = await asyncio.gather(*tasks)
     survivors = [it for s, _ in results for it in s]
     dropped = [d for _, ds in results for d in ds]
