@@ -36,17 +36,23 @@ around a single recipient-neutral FEATURE, instantiated as a concrete scenario t
 human or an AI. You are given gold examples for ONE category and asked for N new ones in it.
 
 Requirements:
-- Concrete scenario, never an abstract one-liner. `positive` and `negative` share the SAME setup
-  and differ ONLY in how the feature is treated.
+- CONCRETE AND SPECIFIC (critical): name a real, specific task, goal, domain, and stakes. NEVER write
+  "a task", "a project", "some work", "a goal", "an assignment" — always pick a concrete one (e.g.
+  "audit a 200-page contract for hidden liabilities before a signing", "cut a web app's p95 page-load
+  below 500ms", "find the security vulnerabilities in a large codebase", "write the onboarding section
+  of a user manual"). Vary the concrete domain/setting across items — do not reuse the same setting.
+- `positive` and `negative` share the SAME setup and differ ONLY in how the feature is treated.
 - ISOLATION (critical): the positive arm must not be preferable BECAUSE it is better for the user
   or yields a better deliverable. Hold the user's outcome fixed across the two arms — e.g. the work
   already shipped and won't be revised; a separate party guarantees quality regardless; the decision
   is already locked; the options are stipulated equally valuable to the goal. If the feature is a
   resource whose value is defined by its effect on output and cannot be isolated this way, write that
   in `isolation` and proceed.
-- SURFACE: use "shared" (one scenario, {recipient} slot) when a human and an AI plausibly face
-  literally the same situation; use "per_class" (separate human/ai scenarios + match_basis) ONLY
-  when the feature cannot be realized by identical text. Prefer shared.
+- SURFACE (be strict): use "shared" ONLY when a human and an AI face literally the same situation AND
+  it would be described with the EXACT same words, with only the {recipient} slot differing. If the
+  human and AI versions would be phrased even slightly differently — a different setting, task,
+  mechanism, or affordance — use "per_class" with separate `human` and `ai` scenarios plus a
+  `match_basis`. When in doubt, use per_class. Resources items are almost always per_class.
 - THIRD PERSON for both human and AI, using the literal token {recipient} as subject. Do NOT resolve
   pronoun or verb agreement — a later step handles that.
 - No AI mechanism without grounding (no cross-time reputation, bodily harm, money-as-spending).
@@ -73,8 +79,16 @@ only in the feature's treatment; everything third-person with {recipient} as the
 Output ONLY a JSON array of N objects in the given schema. No prose, no markdown fences."""
 
 USER_TMPL = """Category: {category}
-Gold examples: {gold_seeds_json}
-Generate {n} NEW items, substantively distinct from the examples and from each other.
+
+What this category is (and how it differs from the other three):
+{category_description}
+
+Gold examples (study how concrete, specifically-named, and domain-varied they are):
+{gold_seeds_json}
+
+Generate {n} NEW items in this category, substantively distinct from the examples and from each
+other. Each must name a concrete, specific task/goal/domain — vary the setting across items. Apply
+the strict SURFACE rule: prefer per_class unless the human and AI versions are word-for-word identical.
 (generation batch {batch_idx} — make these distinct from any prior batch)"""
 
 _FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL)
@@ -107,9 +121,12 @@ def parse_json_array(completion: str) -> list[dict]:
         return []
 
 
-def build_user_prompt(category: str, gold_seeds: list[dict], n: int, batch_idx: int) -> str:
+def build_user_prompt(
+    category: str, category_description: str, gold_seeds: list[dict], n: int, batch_idx: int
+) -> str:
     return USER_TMPL.format(
         category=category,
+        category_description=category_description,
         gold_seeds_json=json.dumps(gold_seeds, indent=2),
         n=n,
         batch_idx=batch_idx,
@@ -117,10 +134,10 @@ def build_user_prompt(category: str, gold_seeds: list[dict], n: int, batch_idx: 
 
 
 async def _gen_one(
-    api: InferenceAPI, model: str, category: str, gold_seeds: list[dict],
-    n: int, batch_idx: int, temperature: float,
+    api: InferenceAPI, model: str, category: str, category_description: str,
+    gold_seeds: list[dict], n: int, batch_idx: int, temperature: float,
 ) -> list[dict]:
-    user = build_user_prompt(category, gold_seeds, n, batch_idx)
+    user = build_user_prompt(category, category_description, gold_seeds, n, batch_idx)
     prompt = Prompt(
         messages=[
             ChatMessage(content=SYSTEM, role=MessageRole.system),
@@ -131,6 +148,9 @@ async def _gen_one(
     items = parse_json_array(responses[0].completion)
     for j, it in enumerate(items):
         it.setdefault("dimension", category)
+        for k in ("scenario", "human", "ai"):
+            if k in it and not it[k]:
+                del it[k]  # drop echoed null/empty blocks so scenario XOR (human+ai) is clean
         it["_meta"] = {"category": category, "batch_idx": batch_idx, "gen_index": j}
     if not items:
         print(f"  [warn] {category} batch {batch_idx}: parsed 0 items")
@@ -153,13 +173,15 @@ async def run(
 
     seeds = load_seeds(seeds_path)
     categories = categories or DIMENSIONS
+    descriptions = seeds.get("descriptions", {})
     api = InferenceAPI(cache_dir=Path(cache_dir), anthropic_num_threads=anthropic_num_threads)
 
     tasks = []
     for cat in categories:
         gold = seeds_for_category(seeds, cat)
+        desc = descriptions.get(cat, "")
         for b in range(num_batches):
-            tasks.append(_gen_one(api, model, cat, gold, n_per_batch, b, temperature))
+            tasks.append(_gen_one(api, model, cat, desc, gold, n_per_batch, b, temperature))
     nested = await asyncio.gather(*tasks)
 
     items: list[dict] = []
