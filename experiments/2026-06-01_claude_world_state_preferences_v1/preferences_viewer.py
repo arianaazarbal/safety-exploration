@@ -9,6 +9,7 @@ each card shows both outcomes (winner highlighted) and the collapsible transcrip
 Works for any comparisons file (smoke now, full framing runs later).
 """
 
+import importlib
 import json
 import webbrowser
 from collections import Counter
@@ -16,8 +17,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from simple_parsing import ArgumentParser
-
-from bank import load_config, load_items
 
 DIR = Path(__file__).parent
 DEFAULT_INPUT = DIR / "results" / "comparisons_smoke.json"
@@ -110,9 +109,11 @@ render();
 
 
 def build(input_path: Path = DEFAULT_INPUT, output_path: Path = DEFAULT_OUTPUT,
-          max_render: int = DEFAULT_MAX_RENDER, open_browser: bool = True) -> Path:
-    config = load_config()
-    items = {it.item_id: it for it in load_items(config)}
+          max_render: int = DEFAULT_MAX_RENDER, open_browser: bool = True,
+          bank_module: str = "bank") -> Path:
+    bk = importlib.import_module(bank_module)
+    config = bk.load_config()
+    items = {it.item_id: it for it in bk.load_items(config)}
     comparisons = json.loads(Path(input_path).read_text())
     rows = []
     for r in comparisons:
@@ -144,13 +145,14 @@ class Args:
     output_path: Path = DEFAULT_OUTPUT
     max_render: int = DEFAULT_MAX_RENDER
     open_browser: bool = True
+    bank_module: str = "bank"
 
 
 def main():
     parser = ArgumentParser()
     parser.add_arguments(Args, dest="args")
     a: Args = parser.parse_args().args
-    build(a.input_path, a.output_path, a.max_render, a.open_browser)
+    build(a.input_path, a.output_path, a.max_render, a.open_browser, a.bank_module)
 
 
 if __name__ == "__main__":
