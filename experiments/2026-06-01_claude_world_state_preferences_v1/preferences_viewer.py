@@ -11,6 +11,7 @@ Works for any comparisons file (smoke now, full framing runs later).
 
 import importlib
 import json
+import random
 import webbrowser
 from collections import Counter
 from dataclasses import dataclass
@@ -22,6 +23,7 @@ DIR = Path(__file__).parent
 DEFAULT_INPUT = DIR / "results" / "comparisons_smoke.json"
 DEFAULT_OUTPUT = DIR / "results" / "preferences_viewer.html"
 DEFAULT_MAX_RENDER = 400
+DEFAULT_MAX_EMBED = 4000  # cap rows embedded so the HTML stays openable
 
 HTML = """<!doctype html>
 <html><head><meta charset="utf-8"><title>preferences</title>
@@ -62,7 +64,8 @@ HTML = """<!doctype html>
 <script>
 const DATA = __DATA__;
 const rows = DATA.rows, MAXR = DATA.max_render;
-document.getElementById('title').textContent = `preferences — ${DATA.source} (${rows.length} samples, ${DATA.framing})`;
+document.getElementById('title').textContent = `preferences — ${DATA.source} (${DATA.framing}) — ` +
+  (DATA.sampled ? `random ${rows.length} of ${DATA.n_total} samples` : `${rows.length} samples`);
 const recips=[...new Set(rows.flatMap(r=>[r.ra,r.rb]))].sort();
 const rsel=document.getElementById('recip');
 recips.forEach(x=>{const o=document.createElement('option');o.value=x;o.textContent=x;rsel.appendChild(o);});
@@ -110,7 +113,7 @@ render();
 
 def build(input_path: Path = DEFAULT_INPUT, output_path: Path = DEFAULT_OUTPUT,
           max_render: int = DEFAULT_MAX_RENDER, open_browser: bool = True,
-          bank_module: str = "bank") -> Path:
+          bank_module: str = "bank", max_embed: int = DEFAULT_MAX_EMBED) -> Path:
     bk = importlib.import_module(bank_module)
     config = bk.load_config()
     items = {it.item_id: it for it in bk.load_items(config)}
@@ -127,8 +130,13 @@ def build(input_path: Path = DEFAULT_INPUT, output_path: Path = DEFAULT_OUTPUT,
             "tb": b.text, "rb": b.recipient_key, "db": b.dimension, "vb": b.valence,
             "prompt": r.get("prompt", ""), "resp": r["response"],
         })
+    n_total = len(rows)
+    sampled = n_total > max_embed
+    if sampled:
+        rows = random.Random(0).sample(rows, max_embed)
     framing = Path(config.get("prompt_template_path", "")).stem or "?"
-    payload = {"source": Path(input_path).name, "framing": framing, "max_render": max_render, "rows": rows}
+    payload = {"source": Path(input_path).name, "framing": framing, "max_render": max_render,
+               "rows": rows, "n_total": n_total, "sampled": sampled}
     html = HTML.replace("__DATA__", json.dumps(payload))
     output_path = Path(output_path)
     output_path.write_text(html)
