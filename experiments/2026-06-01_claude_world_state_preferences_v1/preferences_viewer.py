@@ -81,7 +81,7 @@ function side(text,recip,dim,val,isWin,feat){
     <span class="tag recip">${esc(recip)}</span> ·
     <span class="pill dim-${dim}">${esc(dim)}</span> ·
     <span class="tag ${vc}">${vl}</span>${isWin?' · <span class="winbadge">✓ chosen</span>':''}
-    <div>${esc(text)}</div>${feat?`<div class="feat">feature: ${esc(feat)}</div>`:''}</div>`;
+    <div>${esc(text)}</div>${feat?`<div class="feat">${val==='pos'?'feature ✓ present':'feature ✗ denied'}: ${esc(feat)}</div>`:''}</div>`;
 }
 function card(r){
   const aWin=r.winner===r.ia, bWin=r.winner===r.ib;
