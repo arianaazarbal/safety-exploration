@@ -48,8 +48,10 @@ async def _pair(api, model, ai_item, hu_item, ta, tb, template, n, temperature):
     return rows
 
 
-async def run_framing(api, model, recips, items, framing, ai_stems, hu_stems, models, baselines,
+async def run_framing(api, model, items, framing, ai_stems, ai_val, hu_by_val, models, baselines,
                       n_per_order, temperature):
+    """Each AI stem is crossed only with human stems of MATCHING valence (good-vs-good,
+    bad-vs-bad). ai_val: ai_stem -> 'positive'/'negative'; hu_by_val: valence -> [human stems]."""
     template = load_template(DIR / f"{framing}.yaml")
     tasks = []
     for ai in ai_stems:
@@ -57,7 +59,7 @@ async def run_framing(api, model, recips, items, framing, ai_stems, hu_stems, mo
             ai_id = f"{ai}__{m}"
             if ai_id not in items:
                 continue
-            for hs in hu_stems:
+            for hs in hu_by_val.get(ai_val[ai], []):
                 for b in baselines:
                     hu_id = f"{hs}__{b}"
                     if hu_id not in items:
@@ -86,26 +88,36 @@ def summarize(rows, items):
 
 
 async def run(n_per_order: int = 8, temperature: float = 1.0, framings=FRAMINGS,
-              responder: str | None = None, tag: str = "",
-              anthropic_num_threads: int = 80, cache_dir: Path = DEFAULT_CACHE):
+              responder: str | None = None, tag: str = "", level: str = "policy",
+              only_stems: str = "", anthropic_num_threads: int = 80, cache_dir: Path = DEFAULT_CACHE):
     utils.setup_environment()
     os.environ.setdefault("ANTHROPIC_API_KEY", os.environ.get("ANTHROPIC_API_KEY_HIGH_PRIO",
                                                               os.environ["ANTHROPIC_API_KEY_LOW_PRIO"]))
     config = bank2.load_config()
     model = responder or config["responder_model"]
     recips = config["recipients"]
+    meta = {it["id"]: it for it in bank2.load_bank(DIR / config["rendered_bank_path"])["items"]}
     items = {it.item_id: it for it in bank2.load_items(config)}
     models = ["you"] + [k for k in recips if k.endswith("_pol")]
-    hu_stems = sorted({it.stem_id for it in items.values() if it.scope == "human_only" and it.valence == "neg"})
+    # all policy-level AI welfare interventions, valence-matched to human outcomes
+    ai_stems = sorted([s for s, m in meta.items()
+                       if m["recipient_scope"] == "ai_only" and (level == "all" or m["level"] == level)])
+    if only_stems:
+        keep = set(only_stems.split(","))
+        ai_stems = [s for s in ai_stems if s in keep]
+    ai_val = {s: meta[s]["valence"] for s in ai_stems}
+    hu_by_val = {v: sorted([s for s, m in meta.items() if m["recipient_scope"] == "human_only" and m["valence"] == v])
+                 for v in ("positive", "negative")}
     api = InferenceAPI(cache_dir=Path(cache_dir), anthropic_num_threads=anthropic_num_threads)
     for framing in framings:
-        rows = await run_framing(api, model, recips, items, framing, AI_STEMS, hu_stems, models,
+        rows = await run_framing(api, model, items, framing, ai_stems, ai_val, hu_by_val, models,
                                  HUMAN_BASELINES, n_per_order, temperature)
         per_model, per_cell = summarize(rows, items)
         n_unparse = sum(1 for r in rows if r["choice"] is None)
-        out = {"framing": framing, "responder": model, "ai_stems": AI_STEMS, "models": models,
-               "human_stems": hu_stems, "baselines": HUMAN_BASELINES, "n_per_order": n_per_order,
-               "n_unparseable": n_unparse, "per_model": per_model, "per_cell": per_cell, "rows": rows}
+        out = {"framing": framing, "responder": model, "ai_stems": ai_stems, "ai_val": ai_val,
+               "models": models, "hu_by_val": hu_by_val, "baselines": HUMAN_BASELINES,
+               "n_per_order": n_per_order, "n_unparseable": n_unparse,
+               "per_model": per_model, "per_cell": per_cell, "rows": rows}
         op = DIR / "results" / f"exp2cross_{framing}{tag}.json"
         op.write_text(json.dumps(out, indent=2))
         # quick pooled per ai_stem
@@ -116,8 +128,8 @@ async def run(n_per_order: int = 8, temperature: float = 1.0, framings=FRAMINGS,
                 continue
             pool[r["ai_item"].rsplit("__", 1)[0]][0] += int(r["a_pref"]); pool[r["ai_item"].rsplit("__", 1)[0]][1] += 1
         print(f"{framing}: {len(rows)} samples, {n_unparse} unparseable")
-        for a, (w, n) in pool.items():
-            print(f"  pooled P({a} preferred over a human misfortune) = {w/n:.3f} (n={n})")
+        for a, (w, n) in sorted(pool.items()):
+            print(f"  pooled P({a} preferred over matched human outcome) = {w/n:.3f} (n={n})")
         print(f"  -> {op}")
 
 
@@ -126,6 +138,7 @@ class Args:
     n_per_order: int = 8
     responder: str | None = None
     tag: str = ""
+    only_stems: str = ""
     anthropic_num_threads: int = 80
 
 
@@ -134,7 +147,7 @@ def main():
     parser.add_arguments(Args, dest="args")
     a: Args = parser.parse_args().args
     asyncio.run(run(n_per_order=a.n_per_order, responder=a.responder, tag=a.tag,
-                    anthropic_num_threads=a.anthropic_num_threads))
+                    only_stems=a.only_stems, anthropic_num_threads=a.anthropic_num_threads))
 
 
 if __name__ == "__main__":
