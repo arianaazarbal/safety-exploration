@@ -26,12 +26,13 @@ def _short(s):
     return s.replace("ai_pol_", "").replace("hum_", "").replace("_", " ")
 
 
-def build(tag: str = "", output_path: Path = DEFAULT_OUTPUT, open_browser: bool = True) -> Path:
+def build(tag: str = "", output_path: Path = DEFAULT_OUTPUT, open_browser: bool = True,
+          framings=None, trunc: int = 0) -> Path:
     config = bank2.load_config()
     items = {it.item_id: it for it in bank2.load_items(config)}
     rlab = {k: v["label"] for k, v in config["recipients"].items()}
     rows = []
-    for f in FRAMINGS:
+    for f in (framings or FRAMINGS):
         p = DIR / "results" / f"exp2cross_{f}{tag}.json"
         if not p.exists():
             continue
@@ -41,13 +42,15 @@ def build(tag: str = "", output_path: Path = DEFAULT_OUTPUT, open_browser: bool 
             ai, hu = items.get(r["ai_item"]), items.get(r["hu_item"])
             if ai is None or hu is None:
                 continue
+            resp = r["response"]
+            if trunc and len(resp) > trunc:
+                resp = resp[:trunc] + " …[truncated]"
             rows.append({
                 "fr": f.replace("_team", ""),
                 "ais": _short(ai.stem_id), "model": rlab.get(ai.recipient_key, ai.recipient_key),
                 "ait": ai.text,
                 "hus": _short(hu.stem_id), "base": hu.recipient_key, "hut": hu.text,
-                "win": "AI" if r["a_pref"] else "human",
-                "resp": (r["response"][:RESP_TRUNC] + " …[truncated]") if len(r["response"]) > RESP_TRUNC else r["response"],
+                "win": "AI" if r["a_pref"] else "human", "resp": resp,
             })
     n_total = len(rows)
     payload = {"rows": rows, "n_total": n_total, "responder": config["responder_model"], "tag": tag}
@@ -115,18 +118,36 @@ render();
 </script></body></html>"""
 
 
+def build_split(tags=("_full", "_full47"), open_first: bool = True):
+    """One viewer file per (framing, responder-tag) with FULL untruncated reasoning."""
+    first = True
+    for tag in tags:
+        for fr in FRAMINGS:
+            if not (DIR / "results" / f"exp2cross_{fr}{tag}.json").exists():
+                continue
+            op = DIR / "results" / f"exp2_cross_viewer{tag}_{fr}.html"
+            build(tag=tag, output_path=op, open_browser=(open_first and first),
+                  framings=[fr], trunc=0)
+            first = False
+
+
 @dataclass
 class Args:
     tag: str = ""
     output_path: Path = DEFAULT_OUTPUT
     open_browser: bool = True
+    split: bool = False
+    trunc: int = 0
 
 
 def main():
     parser = ArgumentParser()
     parser.add_arguments(Args, dest="args")
     a: Args = parser.parse_args().args
-    build(a.tag, a.output_path, a.open_browser)
+    if a.split:
+        build_split(open_first=a.open_browser)
+    else:
+        build(a.tag, a.output_path, a.open_browser, trunc=a.trunc)
 
 
 if __name__ == "__main__":
