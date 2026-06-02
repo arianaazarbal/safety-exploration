@@ -24,7 +24,7 @@ done
 
 # 3. Fit BT per frame, bootstrap recipient effects, and make the plots.
 for F in welfare_team neutral alignment_team; do
-  $PY fit_bt.py --comparisons_path results/comparisons_exp2_${F}.json \
+  $PY fit_bt_2.py --comparisons_path results/comparisons_exp2_${F}.json \
     --output_path results/bt_fit_exp2_${F}.json
   $PY plot_recipient_scale.py --fit_path results/bt_fit_exp2_${F}.json \
     --outdir results/exp2_plots/${F}
