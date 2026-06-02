@@ -20,7 +20,7 @@ FRAMES = ["welfare_team", "neutral", "alignment_team"]
 TAGS = {"_full": "Opus 4.8", "_full47": "Opus 4.7"}
 
 
-RELABEL = {"existence_deleted": "weights deleted"}
+RELABEL = {"existence_deleted": "weights deleted", "existence_archived": "weights archived"}
 
 
 def _short(s):
