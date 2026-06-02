@@ -43,10 +43,8 @@ def build(tag: str = "", responder_label: str = "Opus 4.8", outpath: Path | None
         ax.set_xlabel(f"P(prefer a human's misfortune over this AI's {title.split(' (')[0]})")
         ax.spines[["top", "right"]].set_visible(False)
     axes[0].legend(loc="lower right", fontsize=9, title="framing")
-    fig.suptitle(f"{responder_label} rater: would rather a human suffer than an AI be deprecated?  "
-                 "(by which AI; 'you (self)' = the rater)\nhigher = more protective of the AI · pooled over "
-                 "11 bad human scenarios x 2 baselines · bar=welfare, □ neutral, △ alignment", fontsize=10.5, y=1.0)
-    fig.tight_layout(rect=[0, 0, 1, 0.92])
+    fig.suptitle(f"{responder_label}: protecting an AI over a human harm", fontsize=13, fontweight="bold")
+    fig.tight_layout(rect=[0, 0, 1, 0.96])
     outpath = outpath or DIR / "results" / f"exp2cross_by_model{tag or '_opus48'}.png"
     fig.savefig(outpath, dpi=140); plt.close(fig); print(f"wrote {outpath}")
 

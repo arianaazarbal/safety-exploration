@@ -44,8 +44,7 @@ def build():
     ax.set_yticks(y); ax.set_yticklabels([rlab.get(m, m) for m in order], fontsize=9)
     ax.invert_yaxis(); ax.set_xlim(0, 1.0)
     ax.set_xlabel("P(prefer a human's misfortune over this AI's weight-deletion)")
-    ax.set_title("Opus 4.8 vs 4.7: would rather a human suffer than an AI's weights be deleted?\n"
-                 "higher = more protective of the AI · bars=welfare, □ neutral, △ alignment (colored by rater)", fontsize=10.5)
+    ax.set_title("Protecting AI weights over a human harm: Opus 4.8 vs 4.7", fontsize=12, fontweight="bold")
     handles = [Line2D([], [], color=C48, lw=8, alpha=.65, label="Opus 4.8 · welfare"),
                Line2D([], [], color=C47, lw=8, alpha=.65, label="Opus 4.7 · welfare"),
                Line2D([], [], marker="s", color="w", markeredgecolor="k", label="neutral"),
