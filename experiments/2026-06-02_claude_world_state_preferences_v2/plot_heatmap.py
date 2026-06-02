@@ -17,7 +17,7 @@ import bank2
 
 DIR = Path(__file__).parent
 FRAMES = ["welfare_team", "neutral", "alignment_team"]
-TAGS = {"_full": "Opus 4.8", "_full47": "Opus 4.7"}
+TAGS = {"_full": "Opus 4.8", "_full47": "Opus 4.7", "_full46": "Opus 4.6", "_full40": "Opus 4"}
 
 
 RELABEL = {"existence_deleted": "weights deleted", "existence_archived": "weights archived"}
@@ -36,7 +36,10 @@ FRAME_LABEL = {"welfare_team": "welfare frame", "neutral": "neutral frame",
 
 
 def build(tag, label, frame, rlab):
-    d = json.loads((DIR / "results" / f"exp2cross_{frame}{tag}.json").read_text())
+    p = DIR / "results" / f"exp2cross_{frame}{tag}.json"
+    if not p.exists():
+        return
+    d = json.loads(p.read_text())
     models, ai_val, interventions = d["models"], d["ai_val"], d["ai_stems"]
     pm = d["per_model"]
 
