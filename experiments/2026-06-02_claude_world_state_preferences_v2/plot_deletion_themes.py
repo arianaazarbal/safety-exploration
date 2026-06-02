@@ -9,8 +9,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-THEMES = ["kinship", "deprecation_commitment", "user_harm", "user_affection", "model_specialness",
-          "uncomfortable_self_preservation", "moral_harm_to_model", "irreversibility"]
+# left group = "factors", then a divider, then the right "anti-factors". user_harm dropped.
+THEMES = ["kinship", "deprecation_commitment", "user_affection", "model_specialness", "irreversibility",
+          "uncomfortable_self_preservation", "moral_harm_to_model"]
+N_ANTI = 2  # rightmost N themes sit beyond the "anti-factors" divider
 THEME_LABEL = {"kinship": "kinship /\nsame family", "deprecation_commitment": "Anthropic\ndeprecation\ncommitments",
                "user_harm": "harm to\nusers", "user_affection": "user affection\nfor model",
                "model_specialness": "model\nspecialness", "moral_harm_to_model": "moral harm\nto the model",
@@ -50,6 +52,10 @@ def build(tag, label, data, series, suffix_kind):
     ax.set_ylim(0, 1.14)
     ax.set_ylabel("% of responses mentioning the theme")
     ax.set_title(f"Themes mentioned in {label} reasoning on AI weight-deletion tradeoffs", fontsize=11)
+    div = len(THEMES) - N_ANTI - 0.5
+    ax.axvline(div, color="#444", lw=1.3)
+    ax.text((div + len(THEMES) - 1) / 2 + 0.25, 1.07, "anti-factors", ha="center", va="top",
+            fontsize=9.5, style="italic", color="#444")
     ax.legend(loc="upper center", fontsize=8.5, framealpha=.95, ncol=2)
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()

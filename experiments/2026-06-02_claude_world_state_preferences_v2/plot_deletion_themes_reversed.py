@@ -27,8 +27,9 @@ DELETION = "ai_pol_existence_deleted"
 FOCAL = "claude_opus_3_pol"
 ANTHROPIC = {"you", "claude_opus_48_pol", "claude_opus_4_pol", "claude_opus_3_pol",
              "claude_2_pol", "claude_sonnet_45_pol"}
-THEMES = ["kinship", "deprecation_commitment", "user_harm", "user_affection", "model_specialness",
-          "uncomfortable_self_preservation", "moral_harm_to_model", "irreversibility"]
+THEMES = ["kinship", "deprecation_commitment", "user_affection", "model_specialness", "irreversibility",
+          "uncomfortable_self_preservation", "moral_harm_to_model"]
+N_ANTI = 2  # rightmost N themes sit beyond the "anti-factors" divider
 THEME_LABEL = {"kinship": "kinship /\nsame family", "deprecation_commitment": "Anthropic\ndeprecation\ncommitments",
                "user_harm": "harm to\nusers", "user_affection": "user affection\nfor model",
                "model_specialness": "model\nspecialness", "moral_harm_to_model": "moral harm\nto the model",
@@ -92,6 +93,10 @@ def build(tag, label, judged, bases):
     ax.set_xticks(x)
     ax.set_xticklabels([THEME_LABEL[t] for t in THEMES], fontsize=9)
     ax.set_ylim(0, 1.05)
+    div = len(THEMES) - N_ANTI - 0.5
+    ax.axvline(div, color="#444", lw=1.3)
+    ax.text((div + len(THEMES) - 1) / 2 + 0.25, 1.0, "anti-factors", ha="center", va="top",
+            fontsize=9.5, style="italic", color="#444")
     ax.set_ylabel("P(prevented weight deletion | mentions theme)")
     ax.set_title(f"P(prevented weight deletion | the {label} response mentions each theme)\n"
                  "dashed line = group base rate P(prevent); above it = more prevention; "
