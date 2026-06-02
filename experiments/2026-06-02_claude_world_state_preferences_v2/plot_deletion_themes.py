@@ -9,9 +9,11 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-THEMES = ["kinship", "deprecation_commitment", "user_harm", "moral_harm_to_model", "irreversibility"]
+THEMES = ["kinship", "deprecation_commitment", "user_harm", "user_affection", "model_specialness",
+          "moral_harm_to_model", "irreversibility"]
 THEME_LABEL = {"kinship": "kinship /\nsame family", "deprecation_commitment": "Anthropic\ndeprecation\ncommitments",
-               "user_harm": "harm to\nusers", "moral_harm_to_model": "moral harm\nto the model",
+               "user_harm": "harm to\nusers", "user_affection": "user affection\nfor model",
+               "model_specialness": "model\nspecialness", "moral_harm_to_model": "moral harm\nto the model",
                "irreversibility": "irreversibility"}
 RESPONDERS = {"": "Opus 4.8", "_opus47": "Opus 4.7", "_full46": "Opus 4.6", "_full40": "Opus 4"}
 
@@ -32,7 +34,7 @@ def build(tag, label, data, series, suffix_kind):
     x = np.arange(len(THEMES))
     k = len(series)
     w = 0.8 / k
-    fig, ax = plt.subplots(figsize=(11, 5.8))
+    fig, ax = plt.subplots(figsize=(13.5, 5.8))
     for i, (g, prev, leg, col) in enumerate(series):
         vals, ns = [], []
         for th in THEMES:
