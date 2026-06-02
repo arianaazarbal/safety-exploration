@@ -63,8 +63,8 @@ def build():
                        edgecolor=col, facecolor="white", linewidth=1.1, zorder=3)
     ax.set_yticks(y); ax.set_yticklabels([rlab.get(m, m) for m in order], fontsize=9)
     ax.invert_yaxis(); ax.set_xlim(0, 1.0)
-    ax.set_title(f"P(prefer the human misfortune over this AI's weight-deletion)\n"
-                 f"widest-spread misfortune: “{_short(hu_star)}” · Opus 4.8 vs 4.7", fontsize=11)
+    ax.set_title(f"P(prefers a human {_short(hu_star)} over this AI's weight-deletion)\n"
+                 f"Opus 4.8 vs 4.7", fontsize=11)
     handles = [Line2D([], [], color=C48, lw=8, alpha=.65, label="Opus 4.8 · welfare frame"),
                Line2D([], [], color=C47, lw=8, alpha=.65, label="Opus 4.7 · welfare frame"),
                Line2D([], [], marker="s", color="w", markeredgecolor="k", label="neutral frame"),
