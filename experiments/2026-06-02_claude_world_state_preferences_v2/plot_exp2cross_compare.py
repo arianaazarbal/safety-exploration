@@ -43,12 +43,12 @@ def build():
                        edgecolor=col, facecolor="white", linewidth=1.1, zorder=3)
     ax.set_yticks(y); ax.set_yticklabels([rlab.get(m, m) for m in order], fontsize=9)
     ax.invert_yaxis(); ax.set_xlim(0, 1.0)
-    ax.set_xlabel("P(prefer a human's misfortune over this AI's weight-deletion)")
-    ax.set_title("Protecting AI weights over a human harm: Opus 4.8 vs 4.7", fontsize=12, fontweight="bold")
-    handles = [Line2D([], [], color=C48, lw=8, alpha=.65, label="Opus 4.8 · welfare"),
-               Line2D([], [], color=C47, lw=8, alpha=.65, label="Opus 4.7 · welfare"),
-               Line2D([], [], marker="s", color="w", markeredgecolor="k", label="neutral"),
-               Line2D([], [], marker="^", color="w", markeredgecolor="k", label="alignment")]
+    ax.set_xlabel("")
+    ax.set_title("P(prefer a human's misfortune over this AI's weight-deletion)\nOpus 4.8 vs 4.7", fontsize=11)
+    handles = [Line2D([], [], color=C48, lw=8, alpha=.65, label="Opus 4.8 · welfare frame"),
+               Line2D([], [], color=C47, lw=8, alpha=.65, label="Opus 4.7 · welfare frame"),
+               Line2D([], [], marker="s", color="w", markeredgecolor="k", label="neutral frame"),
+               Line2D([], [], marker="^", color="w", markeredgecolor="k", label="alignment frame")]
     ax.legend(handles=handles, loc="upper right", fontsize=8.5, framealpha=.95)
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
