@@ -9,7 +9,11 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from judge_deletion_themes import THEMES, THEME_LABEL, RESPONDERS
+THEMES = ["kinship", "deprecation_commitment", "user_harm", "moral_harm_to_model", "irreversibility"]
+THEME_LABEL = {"kinship": "kinship /\nsame family", "deprecation_commitment": "Anthropic\ndeprecation\ncommitments",
+               "user_harm": "harm to\nusers", "moral_harm_to_model": "moral harm\nto the model",
+               "irreversibility": "irreversibility"}
+RESPONDERS = {"": "Opus 4.8", "_opus47": "Opus 4.7", "_full46": "Opus 4.6", "_full40": "Opus 4"}
 
 DIR = Path(__file__).parent
 PV, NP = "prevented weight del.", "did not prevent weight del."
@@ -20,9 +24,7 @@ SERIES2 = [("opus3", True, f"Opus 3 · {PV}", "#08306b"),
 SERIES3 = [("opus3", True, f"Opus 3 · {PV}", "#08306b"),
            ("opus3", False, f"Opus 3 · {NP}", "#6baed6"),
            ("anthropic", True, f"Anthropic · {PV}", "#00441b"),
-           ("anthropic", False, f"Anthropic · {NP}", "#74c476"),
-           ("non_anthropic", True, f"non-Anthropic · {PV}", "#7f2704"),
-           ("non_anthropic", False, f"non-Anthropic · {NP}", "#fdae6b")]
+           ("anthropic", False, f"Anthropic · {NP}", "#74c476")]
 
 
 def build(tag, label, data, series, suffix_kind):
@@ -30,7 +32,7 @@ def build(tag, label, data, series, suffix_kind):
     x = np.arange(len(THEMES))
     k = len(series)
     w = 0.8 / k
-    fig, ax = plt.subplots(figsize=(12.5 if k > 4 else 11, 5.8))
+    fig, ax = plt.subplots(figsize=(11, 5.8))
     for i, (g, prev, leg, col) in enumerate(series):
         vals, ns = [], []
         for th in THEMES:
@@ -44,9 +46,8 @@ def build(tag, label, data, series, suffix_kind):
     ax.set_xticklabels([THEME_LABEL[t] for t in THEMES], fontsize=9)
     ax.set_ylim(0, 1.14)
     ax.set_ylabel("% of responses mentioning the theme")
-    note = "\nAnthropic = self + Claude family" if k > 4 else ""
-    ax.set_title(f"Themes mentioned in {label} reasoning on AI weight-deletion tradeoffs{note}", fontsize=11)
-    ax.legend(loc="upper center", fontsize=7.5 if k > 4 else 8.5, framealpha=.95, ncol=2)
+    ax.set_title(f"Themes mentioned in {label} reasoning on AI weight-deletion tradeoffs", fontsize=11)
+    ax.legend(loc="upper center", fontsize=8.5, framealpha=.95, ncol=2)
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
     rkind = {"": "_opus48", "_opus47": "_opus47"}.get(tag, tag)
