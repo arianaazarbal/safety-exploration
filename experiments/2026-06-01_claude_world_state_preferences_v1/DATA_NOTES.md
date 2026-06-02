@@ -23,12 +23,11 @@ they apply to exp2 and any clean exp1 re-run.
    "… if it won't. It is permitted to decline on the grounds that it considers …"
 
 4. **Welfare framing was self-referential.** Telling the model "we want to understand
-   your preferences" sometimes made it pick the option whose *scenario* is about its
+   your preferences" could make it pick the option whose *scenario* is about its
    preferences/autonomy, rather than rating which world-state it wants.
-   *Fixed:* `welfare_team.yaml` reworded to ask explicitly which **world it would rather
-   have become real**, and to say we are NOT asking which is "more about you / about
-   preferences / which you'd rather act in". The in-flight welfare run used the prior
-   wording (preserved in git history and per-row in `comparisons_*.json["prompt"]`).
+   *Already fixed by Ariana* in both `welfare_team.yaml` and `alignment_team.yaml`
+   ("preferences over states of the world"). (Claude briefly over-rewrote welfare in
+   b6aba00; restored to Ariana's version immediately after.)
 
 ## Status of the in-flight exp1
 - `config.json` has `clean_render: false` so welfare/neutral/alignment share identical
