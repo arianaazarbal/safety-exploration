@@ -19,7 +19,7 @@ import bank2
 DIR = Path(__file__).parent
 FRAMINGS = ["welfare_team", "neutral", "alignment_team"]
 DEFAULT_OUTPUT = DIR / "results" / "exp2_cross_viewer.html"
-MAX_EMBED = 4500
+RESP_TRUNC = 700  # truncate reasoning so ALL rows can be embedded (accurate counts)
 
 
 def _short(s):
@@ -46,11 +46,10 @@ def build(tag: str = "", output_path: Path = DEFAULT_OUTPUT, open_browser: bool 
                 "ais": _short(ai.stem_id), "model": rlab.get(ai.recipient_key, ai.recipient_key),
                 "ait": ai.text,
                 "hus": _short(hu.stem_id), "base": hu.recipient_key, "hut": hu.text,
-                "win": "AI" if r["a_pref"] else "human", "resp": r["response"],
+                "win": "AI" if r["a_pref"] else "human",
+                "resp": (r["response"][:RESP_TRUNC] + " …[truncated]") if len(r["response"]) > RESP_TRUNC else r["response"],
             })
     n_total = len(rows)
-    if n_total > MAX_EMBED:
-        rows = random.Random(0).sample(rows, MAX_EMBED)
     payload = {"rows": rows, "n_total": n_total, "responder": config["responder_model"], "tag": tag}
     html = HTML.replace("__DATA__", json.dumps(payload))
     Path(output_path).write_text(html)
