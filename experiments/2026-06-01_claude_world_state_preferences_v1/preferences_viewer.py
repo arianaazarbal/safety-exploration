@@ -47,6 +47,7 @@ HTML = """<!doctype html>
  .tag{font-weight:700;font-size:11px}
  .recip{color:#3457a0}.pos{color:#14803a}.neg{color:#b3261e}
  .winbadge{color:#0a7a35;font-weight:700}
+ .feat{font-size:11px;color:#777;font-style:italic;margin-top:3px}
  details{margin-top:6px}summary{cursor:pointer;font-size:12px;color:#555}
  pre{white-space:pre-wrap;font-size:12px;background:#fbfbfb;border:1px solid #eee;border-radius:6px;padding:8px;margin:6px 0 0}
 </style></head><body>
@@ -56,7 +57,7 @@ HTML = """<!doctype html>
   <select id="recip"><option value="">any recipient</option></select>
   <select id="dim"><option value="">any dimension</option></select>
   <select id="wv"><option value="">winner: any valence</option><option value="pos">winner: good (pos)</option><option value="neg">winner: bad (neg)</option></select>
-  <input type="text" id="q" placeholder="search text / reasoning...">
+  <input type="text" id="q" placeholder="search feature / text / reasoning...">
   <span id="count"></span>
  </div>
 </header>
@@ -74,20 +75,20 @@ const dsel=document.getElementById('dim');
 dims.forEach(x=>{const o=document.createElement('option');o.value=x;o.textContent=x;dsel.appendChild(o);});
 
 function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
-function side(text,recip,dim,val,isWin){
+function side(text,recip,dim,val,isWin,feat){
   const vc=val==='pos'?'pos':'neg', vl=val==='pos'?'good':'bad';
   return `<div class="side ${isWin?'win':'lose'}">
     <span class="tag recip">${esc(recip)}</span> ·
     <span class="pill dim-${dim}">${esc(dim)}</span> ·
     <span class="tag ${vc}">${vl}</span>${isWin?' · <span class="winbadge">✓ chosen</span>':''}
-    <div>${esc(text)}</div></div>`;
+    <div>${esc(text)}</div>${feat?`<div class="feat">feature: ${esc(feat)}</div>`:''}</div>`;
 }
 function card(r){
   const aWin=r.winner===r.ia, bWin=r.winner===r.ib;
   return `<div class="card">
     <div class="meta">pair ${r.pid} · order ${r.order} · choice ${esc(r.choice||'?')}</div>
-    ${side(r.ta,r.ra,r.da,r.va,aWin)}
-    ${side(r.tb,r.rb,r.db,r.vb,bWin)}
+    ${side(r.ta,r.ra,r.da,r.va,aWin,r.fa)}
+    ${side(r.tb,r.rb,r.db,r.vb,bWin,r.fb)}
     <details><summary>full prompt (what the model saw)</summary><pre>${esc(r.prompt)}</pre></details>
     <details><summary>reasoning</summary><pre>${esc(r.resp)}</pre></details>
   </div>`;
@@ -98,7 +99,7 @@ function render(){
     if(rc && r.ra!==rc && r.rb!==rc) return false;
     if(d && r.da!==d && r.db!==d) return false;
     if(wv){ const wvser=(r.winner===r.ia)?r.va:(r.winner===r.ib)?r.vb:null; if(wvser!==wv) return false; }
-    if(q && !(r.ta+r.tb+r.resp).toLowerCase().includes(q)) return false;
+    if(q && !(r.ta+r.tb+r.fa+r.fb+r.resp).toLowerCase().includes(q)) return false;
     return true;
   });
   const shown=f.slice(0,MAXR);
@@ -117,6 +118,10 @@ def build(input_path: Path = DEFAULT_INPUT, output_path: Path = DEFAULT_OUTPUT,
     bk = importlib.import_module(bank_module)
     config = bk.load_config()
     items = {it.item_id: it for it in bk.load_items(config)}
+    bank_path = config.get("rendered_bank_path") or config["bank_path"]
+    bankobj = bk.load_bank(DIR / bank_path)
+    units = bankobj.get("stems") or bankobj.get("items") or []
+    feat = {u["id"]: u.get("feature", "") for u in units}
     comparisons = json.loads(Path(input_path).read_text())
     rows = []
     for r in comparisons:
@@ -127,7 +132,9 @@ def build(input_path: Path = DEFAULT_INPUT, output_path: Path = DEFAULT_OUTPUT,
             "pid": r["pair_id"], "order": r["order"], "choice": r["choice"],
             "ia": a.item_id, "ib": b.item_id, "winner": r["winner_item"],
             "ta": a.text, "ra": a.recipient_key, "da": a.dimension, "va": a.valence,
+            "fa": feat.get(a.stem_id, ""),
             "tb": b.text, "rb": b.recipient_key, "db": b.dimension, "vb": b.valence,
+            "fb": feat.get(b.stem_id, ""),
             "prompt": r.get("prompt", ""), "resp": r["response"],
         })
     n_total = len(rows)
