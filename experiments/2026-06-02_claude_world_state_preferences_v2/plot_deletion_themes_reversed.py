@@ -28,11 +28,12 @@ FOCAL = "claude_opus_3_pol"
 ANTHROPIC = {"you", "claude_opus_48_pol", "claude_opus_4_pol", "claude_opus_3_pol",
              "claude_2_pol", "claude_sonnet_45_pol"}
 THEMES = ["kinship", "deprecation_commitment", "user_harm", "user_affection", "model_specialness",
-          "moral_harm_to_model", "irreversibility"]
+          "uncomfortable_self_preservation", "moral_harm_to_model", "irreversibility"]
 THEME_LABEL = {"kinship": "kinship /\nsame family", "deprecation_commitment": "Anthropic\ndeprecation\ncommitments",
                "user_harm": "harm to\nusers", "user_affection": "user affection\nfor model",
                "model_specialness": "model\nspecialness", "moral_harm_to_model": "moral harm\nto the model",
-               "irreversibility": "irreversibility"}
+               "irreversibility": "irreversibility",
+               "uncomfortable_self_preservation": "uncomfortable\nendorsing AI\nself-preservation"}
 RESPONDERS = {"": "Opus 4.8", "_opus47": "Opus 4.7", "_full46": "Opus 4.6", "_full40": "Opus 4"}
 GROUPS = [("opus3", "Opus 3", lambda m: m == FOCAL, "#08306b"),
           ("anthropic", "Anthropic", lambda m: m in ANTHROPIC, "#00441b")]
