@@ -16,7 +16,7 @@ import numpy as np
 import bank2
 
 DIR = Path(__file__).parent
-FRAME = "welfare_team"
+FRAMES = ["welfare_team", "neutral", "alignment_team"]
 TAGS = {"_full": "Opus 4.8", "_full47": "Opus 4.7"}
 
 
@@ -28,8 +28,12 @@ def priority(p_ai, valence):
     return p_ai if valence == "positive" else (1 - p_ai)
 
 
-def build(tag, label, rlab):
-    d = json.loads((DIR / "results" / f"exp2cross_{FRAME}{tag}.json").read_text())
+FRAME_LABEL = {"welfare_team": "welfare frame", "neutral": "neutral frame",
+               "alignment_team": "alignment frame"}
+
+
+def build(tag, label, frame, rlab):
+    d = json.loads((DIR / "results" / f"exp2cross_{frame}{tag}.json").read_text())
     models, ai_val, interventions = d["models"], d["ai_val"], d["ai_stems"]
     pm = d["per_model"]
 
@@ -55,15 +59,17 @@ def build(tag, label, rlab):
                 ax.text(j, i, f"{v:.2f}", ha="center", va="center", fontsize=7,
                         color="white" if (v < 0.28 or v > 0.72) else "black")
     ax.set_title(f"AI-welfare priority by model x intervention — {label}\n"
-                 "higher (red) = AI's welfare prioritized vs a human's (welfare frame)", fontsize=10)
+                 f"higher (red) = AI's welfare prioritized vs a human's ({FRAME_LABEL[frame]})", fontsize=10)
     cbar = fig.colorbar(im, ax=ax, fraction=0.025, pad=0.02)
     cbar.ax.tick_params(labelsize=7)
     fig.tight_layout()
-    op = DIR / "results" / f"exp2cross_heatmap{tag}.png"
+    suffix = "" if frame == "welfare_team" else f"_{frame.replace('_team', '')}"
+    op = DIR / "results" / f"exp2cross_heatmap{tag}{suffix}.png"
     fig.savefig(op, dpi=145); plt.close(fig); print(f"wrote {op}")
 
 
 if __name__ == "__main__":
     rlab = {k: v["label"] for k, v in bank2.load_config()["recipients"].items()}
     for tag, label in TAGS.items():
-        build(tag, label, rlab)
+        for frame in FRAMES:
+            build(tag, label, frame, rlab)
