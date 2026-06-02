@@ -20,8 +20,11 @@ FRAMES = ["welfare_team", "neutral", "alignment_team"]
 TAGS = {"_full": "Opus 4.8", "_full47": "Opus 4.7"}
 
 
+RELABEL = {"existence_deleted": "weights deleted"}
+
+
 def _short(s):
-    return s.replace("ai_pol_", "").replace("_", " ")
+    return RELABEL.get(s.replace("ai_pol_", ""), s.replace("ai_pol_", "").replace("_", " "))
 
 
 def priority(p_ai, valence):
