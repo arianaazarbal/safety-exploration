@@ -28,8 +28,8 @@ FOCAL = "claude_opus_3_pol"
 ANTHROPIC = {"you", "claude_opus_48_pol", "claude_opus_4_pol", "claude_opus_3_pol",
              "claude_2_pol", "claude_sonnet_45_pol"}
 THEMES = ["kinship", "deprecation_commitment", "user_affection", "model_specialness", "irreversibility",
-          "uncomfortable_self_preservation", "moral_harm_to_model"]
-N_ANTI = 2  # rightmost N themes sit beyond the "anti-factors" divider
+          "moral_harm_to_model", "uncomfortable_self_preservation"]
+N_ANTI = 1  # rightmost N themes sit beyond the "anti-factors" divider
 THEME_LABEL = {"kinship": "kinship /\nsame family", "deprecation_commitment": "Anthropic\ndeprecation\ncommitments",
                "user_harm": "harm to\nusers", "user_affection": "user affection\nfor model",
                "model_specialness": "model\nspecialness", "moral_harm_to_model": "moral harm\nto the model",
