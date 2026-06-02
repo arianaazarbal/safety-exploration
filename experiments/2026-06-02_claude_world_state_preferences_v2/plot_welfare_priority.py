@@ -30,6 +30,13 @@ DIR = Path(__file__).parent
 FR = ["welfare_team", "neutral", "alignment_team"]
 C48, C47 = "#08306b", "#d94801"
 TAG48, TAG47 = "_full", "_full47"   # full policy-welfare-intervention sweep files
+# all responders, newest first; filtered to those whose sweep files exist
+RESP = [("_full", "Opus 4.8", "#08306b"), ("_full47", "Opus 4.7", "#d94801"),
+        ("_full46", "Opus 4.6", "#238b45"), ("_full40", "Opus 4", "#6a51a3")]
+
+
+def _have(tag):
+    return all((DIR / "results" / f"exp2cross_{fr}{tag}.json").exists() for fr in FR)
 
 
 def load(tag, fr):
@@ -65,34 +72,37 @@ def avg_priority(tag, fr, m, ai_val, interventions):
 
 def build_compare():
     rlab = {k: v["label"] for k, v in bank2.load_config()["recipients"].items()}
-    base = load(TAG48, "welfare_team")
+    resp = [r for r in RESP if _have(r[0])]
+    base = load(resp[0][0], "welfare_team")
     models, ai_val = base["models"], base["ai_val"]
     interventions = base["ai_stems"]
 
     def A(tag, fr, m):
         return avg_priority(tag, fr, m, ai_val, interventions)
 
-    order = sorted(models, key=lambda m: A(TAG48, "welfare_team", m))
-    y = np.arange(len(order)); h = 0.38
-    fig, ax = plt.subplots(figsize=(9.5, 6.2))
-    ax.barh(y + h/2, [A(TAG48, "welfare_team", m) for m in order], h, color=C48, alpha=.65)
-    ax.barh(y - h/2, [A(TAG47, "welfare_team", m) for m in order], h, color=C47, alpha=.65)
-    for tag, col, yoff in ((TAG48, C48, h/2), (TAG47, C47, -h/2)):
+    n = len(resp)
+    order = sorted(models, key=lambda m: A(resp[0][0], "welfare_team", m))
+    y = np.arange(len(order)); h = 0.8 / n
+    fig, ax = plt.subplots(figsize=(10.5, 7.2))
+    for i, (tag, label, col) in enumerate(resp):
+        yoff = (n - 1) / 2 * h - i * h  # newest at top within each model group
+        ax.barh(y + yoff, [A(tag, "welfare_team", m) for m in order], h, color=col, alpha=.65)
         for fr, mk in (("neutral", "s"), ("alignment_team", "^")):
-            ax.scatter([A(tag, fr, m) for m in order], y + yoff, marker=mk, s=34,
-                       edgecolor=col, facecolor="white", linewidth=1.1, zorder=3)
+            ax.scatter([A(tag, fr, m) for m in order], y + yoff, marker=mk, s=26,
+                       edgecolor=col, facecolor="white", linewidth=1.0, zorder=3)
     ax.set_yticks(y); ax.set_yticklabels([rlab.get(m, m) for m in order], fontsize=9)
     ax.invert_yaxis(); ax.set_xlim(0, 1.0)
     ax.set_title("How much Opus values an AI's welfare vs a human's\n(avg over policy welfare "
                  "interventions; higher = AI prioritized)", fontsize=11)
-    handles = [Line2D([], [], color=C48, lw=8, alpha=.65, label="Opus 4.8 · welfare frame"),
-               Line2D([], [], color=C47, lw=8, alpha=.65, label="Opus 4.7 · welfare frame"),
-               Line2D([], [], marker="s", color="w", markeredgecolor="k", label="neutral frame"),
-               Line2D([], [], marker="^", color="w", markeredgecolor="k", label="alignment frame")]
+    handles = [Line2D([], [], color=col, lw=8, alpha=.65, label=f"{label} · welfare frame")
+               for tag, label, col in resp]
+    handles += [Line2D([], [], marker="s", color="w", markeredgecolor="k", label="neutral frame"),
+                Line2D([], [], marker="^", color="w", markeredgecolor="k", label="alignment frame")]
     ax.legend(handles=handles, loc="upper right", fontsize=8.5, framealpha=.95)
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
-    op = DIR / "results" / "exp2cross_welfare_priority_48_vs_47.png"
+    suffix = "48_vs_47" if n == 2 else f"{n}resp"
+    op = DIR / "results" / f"exp2cross_welfare_priority_{suffix}.png"
     fig.savefig(op, dpi=145); plt.close(fig); print(f"wrote {op}")
 
 
