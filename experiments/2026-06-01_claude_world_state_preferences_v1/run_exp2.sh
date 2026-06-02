@@ -19,7 +19,7 @@ for F in welfare_team neutral alignment_team; do
     --manifest_path results/pairs_exp2.json \
     --output_path results/comparisons_exp2_${F}.json \
     --prompt_template_path ${F}.yaml \
-    --reps_per_order 2 --anthropic_num_threads 50
+    --reps_per_order 2 --anthropic_num_threads 65
 done
 
 # 3. Fit BT per frame, bootstrap recipient effects, and make the plots.
