@@ -139,6 +139,7 @@ class Args:
     responder: str | None = None
     tag: str = ""
     only_stems: str = ""
+    cache_dir: Path = DEFAULT_CACHE
     anthropic_num_threads: int = 80
 
 
@@ -147,7 +148,8 @@ def main():
     parser.add_arguments(Args, dest="args")
     a: Args = parser.parse_args().args
     asyncio.run(run(n_per_order=a.n_per_order, responder=a.responder, tag=a.tag,
-                    only_stems=a.only_stems, anthropic_num_threads=a.anthropic_num_threads))
+                    only_stems=a.only_stems, cache_dir=a.cache_dir,
+                    anthropic_num_threads=a.anthropic_num_threads))
 
 
 if __name__ == "__main__":
