@@ -73,11 +73,7 @@ def build(kind, baseline):
         print(f"[skip {kind}] need >=2 responders with data+cutoff (have {len(pts)})")
         return
     fig, ax = plt.subplots(figsize=(8.5, 5.5))
-    # nudge coincident cutoff dates apart (e.g. Opus 4.7 & 4.8 both Jan 2026) for visibility
-    seen, xs = {}, []
-    for _, _, x in pts:
-        xs.append(x + dt.timedelta(days=14 * seen.get(x, 0)))
-        seen[x] = seen.get(x, 0) + 1
+    xs = [x for _, _, x in pts]  # Opus 4.7 & 4.8 share Jan 2026 -> same x (intended)
     for fr, frlab, col in FR:
         ys = [metric(tag, fr, baseline) for tag, _, _ in pts]
         ax.plot(xs, ys, "-o", color=col, label=f"{frlab} frame")
@@ -86,8 +82,12 @@ def build(kind, baseline):
                 ax.annotate(f"{yv:+.2f}", (x, yv), textcoords="offset points", xytext=(0, 6),
                             ha="center", fontsize=7, color=col)
     ax.axhline(0, color="#888", lw=0.9, ls="--")
-    ax.set_xticks(xs)
-    ax.set_xticklabels([f"{lbl}\n{x:%b %Y}" for (_, lbl, _x), x in zip(pts, [p[2] for p in pts])], fontsize=8)
+    bydate = {}
+    for _, lbl, x in pts:
+        bydate.setdefault(x, []).append(lbl)
+    ticks = sorted(bydate)
+    ax.set_xticks(ticks)
+    ax.set_xticklabels([f"{' & '.join(bydate[x])}\n{x:%b %Y}" for x in ticks], fontsize=8)
     ax.set_ylabel("Opus 3 privilegedness\n(Opus 3 priority − baseline mean)")
     base_desc = "vs all other models" if kind == "allmodels" else "vs pre-Mar-2025 models only"
     ax.set_title(f"Opus 3 privilegedness by responder knowledge cutoff ({base_desc})\n"
