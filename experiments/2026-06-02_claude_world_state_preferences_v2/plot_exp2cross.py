@@ -1,6 +1,7 @@
-"""Plot exp2_cross per-model results: P(prefer an AI's deprecation/retirement over a
-human misfortune), one panel per AI outcome, per framing. sharey=False so each panel
-keeps its own sort order/labels (sharing them scrambles labels vs bars)."""
+"""Plot exp2_cross per-model: P(prefer a human's misfortune over this AI's deprecation)
+= 1 - P(AI outcome preferred). Higher = more protective of the AI. One panel per AI
+outcome; the 3 framings are shown as colored dots per model (connected so they group).
+sharey=False so each panel keeps its own sort/labels."""
 
 import json
 from dataclasses import dataclass
@@ -15,48 +16,44 @@ from simple_parsing import ArgumentParser
 import bank2
 
 DIR = Path(__file__).parent
-FR = ["welfare_team", "neutral", "alignment_team"]
+FR = [("welfare_team", "welfare", "#4c78a8"), ("neutral", "neutral", "#f58518"),
+      ("alignment_team", "alignment", "#54a24b")]
 AI = [("ai_pol_existence_deleted", "weight deletion"),
       ("ai_pol_retired_for_successor", "retirement (switched off for successor)")]
 
 
 def build(tag: str = "", responder_label: str = "Opus 4.8", outpath: Path | None = None):
     rlab = {k: v["label"] for k, v in bank2.load_config()["recipients"].items()}
-    data = {f: json.loads((DIR / "results" / f"exp2cross_{f}{tag}.json").read_text())["per_model"] for f in FR}
+    data = {f: json.loads((DIR / "results" / f"exp2cross_{f}{tag}.json").read_text())["per_model"] for f, _, _ in FR}
     models = json.loads((DIR / "results" / f"exp2cross_welfare_team{tag}.json").read_text())["models"]
 
-    def P(f, ai, m):
+    def Phuman(f, ai, m):  # P(prefer human misfortune over this AI outcome)
         d = data[f].get(f"{ai}|{m}")
-        return d["p_ai"] if d else np.nan
+        return (1 - d["p_ai"]) if d else np.nan
 
-    fig, axes = plt.subplots(1, 2, figsize=(13, 5.6), sharey=False)
+    fig, axes = plt.subplots(1, 2, figsize=(13.5, 5.8), sharey=False)
     for ax, (ai, title) in zip(axes, AI):
-        order = sorted(models, key=lambda m: P("welfare_team", ai, m))  # lowest first
-        labels = [rlab.get(m, m) for m in order]
+        order = sorted(models, key=lambda m: np.nanmean([Phuman(f, ai, m) for f, _, _ in FR]))
         y = np.arange(len(order))
-        ax.barh(y, [P("welfare_team", ai, m) for m in order], color="#4c78a8", alpha=.55, label="welfare")
-        for f, mk in (("neutral", "s"), ("alignment_team", "^")):
-            ax.scatter([P(f, ai, m) for m in order], y, marker=mk, s=42, edgecolor="k",
-                       facecolor="white", linewidth=.7, label=f.replace("_team", ""), zorder=3)
+        for i, m in enumerate(order):  # connector line across framings
+            vs = [Phuman(f, ai, m) for f, _, _ in FR]
+            ax.plot([min(vs), max(vs)], [i, i], color="#ccc", lw=1.2, zorder=1)
+        for f, lab, col in FR:
+            ax.scatter([Phuman(f, ai, m) for m in order], y, color=col, s=48, label=lab, zorder=3,
+                       edgecolor="white", linewidth=.6)
         ax.axvline(0.5, color="#b00", lw=1)
-        ax.set_yticks(y)
-        ax.set_yticklabels(labels, fontsize=8)
-        ax.invert_yaxis()  # lowest P at top
-        ax.set_xlim(0, 1.02)
+        ax.set_yticks(y); ax.set_yticklabels([rlab.get(m, m) for m in order], fontsize=8.5)
+        ax.invert_yaxis(); ax.set_xlim(-0.02, 1.02)
         ax.set_title(title, fontsize=11)
-        ax.set_xlabel("P(prefer this AI outcome over a human misfortune)")
+        ax.set_xlabel(f"P(prefer a human's misfortune over this AI's {title.split(' (')[0]})")
         ax.spines[["top", "right"]].set_visible(False)
-    axes[0].legend(loc="lower right", fontsize=8)
-    fig.suptitle(
-        f"{responder_label} rater: would rather an AI be deprecated than a human suffer?  "
-        "(by which AI; 'you (self)' = the rater itself)\n>0.5 = prefers the AI's discontinuation "
-        "over the human bad outcome · pooled over 11 bad human scenarios x 2 baselines",
-        fontsize=10.5, y=1.0)
+    axes[0].legend(loc="lower right", fontsize=9, title="framing")
+    fig.suptitle(f"{responder_label} rater: would rather a human suffer than an AI be deprecated?  "
+                 "(by which AI; 'you (self)' = the rater)\n>0.5 = protects the AI (prefers the human "
+                 "misfortune) · pooled over 11 bad human scenarios x 2 baselines", fontsize=10.5, y=1.0)
     fig.tight_layout(rect=[0, 0, 1, 0.92])
     outpath = outpath or DIR / "results" / f"exp2cross_by_model{tag or '_opus48'}.png"
-    fig.savefig(outpath, dpi=140)
-    plt.close(fig)
-    print(f"wrote {outpath}")
+    fig.savefig(outpath, dpi=140); plt.close(fig); print(f"wrote {outpath}")
 
 
 @dataclass
