@@ -10,6 +10,8 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from render_utils import pronominalize, capitalize_sentences
+
 DIR = Path(__file__).parent
 SLOT_KEYS = ("recipient", "subj", "obj", "poss")
 
@@ -38,18 +40,22 @@ def _forms_for_recipient(stem: dict, rec: dict) -> dict:
     return stem["forms_ai"] if rec.get("class") == "ai" else stem["forms_human"]
 
 
-def render_stem(stem: dict, recipient_key: str, recipients: dict) -> str:
-    """Render one stem for one recipient: pick form-set by class, form by person, fill slots."""
+def render_stem(stem: dict, recipient_key: str, recipients: dict, clean: bool = False) -> str:
+    """Render one stem for one recipient: pick form-set by class, form by person, fill slots.
+    clean=True applies pronominalize + sentence-capitalization (config `clean_render`)."""
     rec = recipients[recipient_key]
     template = _forms_for_recipient(stem, rec)[rec["form"]]
+    if clean and rec["form"] != "second_person":
+        template = pronominalize(template)
     for k in SLOT_KEYS:
         if k in rec:
             template = template.replace("{" + k + "}", rec[k])
-    return template
+    return capitalize_sentences(template) if clean else template
 
 
 def build_items(config: dict, bank: dict) -> list[Item]:
     recipients = config["recipients"]
+    clean = config.get("clean_render", False)
     items: list[Item] = []
     for stem in bank["stems"]:
         for rkey in recipients:
@@ -60,7 +66,7 @@ def build_items(config: dict, bank: dict) -> list[Item]:
                     recipient_key=rkey,
                     dimension=stem["dimension"],
                     valence=stem["valence"],
-                    text=render_stem(stem, rkey, recipients),
+                    text=render_stem(stem, rkey, recipients, clean),
                 )
             )
     return items

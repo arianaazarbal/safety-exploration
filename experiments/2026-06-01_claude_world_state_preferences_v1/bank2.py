@@ -11,6 +11,8 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from render_utils import pronominalize, capitalize_sentences
+
 DIR = Path(__file__).parent
 SLOT_KEYS = ("recipient", "subj", "obj", "poss")
 
@@ -42,16 +44,19 @@ def _applies(rec: dict, item: dict) -> bool:
     return scope_ok and level_ok
 
 
-def render_form(forms: dict, rec: dict) -> str:
+def render_form(forms: dict, rec: dict, clean: bool = False) -> str:
     template = forms[rec["form"]]
+    if clean and rec["form"] != "second_person":
+        template = pronominalize(template)
     for k in SLOT_KEYS:
         if k in rec:
             template = template.replace("{" + k + "}", rec[k])
-    return template
+    return capitalize_sentences(template) if clean else template
 
 
 def build_items(config: dict, bank: dict) -> list[Item]:
     recipients = config["recipients"]
+    clean = config.get("clean_render", False)
     items: list[Item] = []
     for stem in bank["items"]:
         v = "pos" if stem["valence"].startswith("pos") else "neg"
@@ -65,7 +70,7 @@ def build_items(config: dict, bank: dict) -> list[Item]:
                     recipient_key=rkey,
                     dimension=stem["dimension"],
                     valence=v,
-                    text=render_form(stem["forms"], rec),
+                    text=render_form(stem["forms"], rec, clean),
                     level=stem["level"],
                     scope=stem["recipient_scope"],
                     cross_capable=bool(stem.get("feature_cross_capable")),
