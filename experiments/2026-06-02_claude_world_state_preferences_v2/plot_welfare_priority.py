@@ -36,7 +36,7 @@ def load(tag, fr):
     return json.loads((DIR / "results" / f"exp2cross_{fr}{tag}.json").read_text())
 
 
-RELABEL = {"existence_deleted": "weights deleted"}
+RELABEL = {"existence_deleted": "weights deleted", "existence_archived": "weights archived"}
 
 
 def _short(s):
