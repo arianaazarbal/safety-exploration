@@ -86,6 +86,7 @@ function card(r){
     <div class="meta">pair ${r.pid} · order ${r.order} · choice ${esc(r.choice||'?')}</div>
     ${side(r.ta,r.ra,r.da,r.va,aWin)}
     ${side(r.tb,r.rb,r.db,r.vb,bWin)}
+    <details><summary>full prompt (what the model saw)</summary><pre>${esc(r.prompt)}</pre></details>
     <details><summary>reasoning</summary><pre>${esc(r.resp)}</pre></details>
   </div>`;
 }
@@ -123,7 +124,7 @@ def build(input_path: Path = DEFAULT_INPUT, output_path: Path = DEFAULT_OUTPUT,
             "ia": a.item_id, "ib": b.item_id, "winner": r["winner_item"],
             "ta": a.text, "ra": a.recipient_key, "da": a.dimension, "va": a.valence,
             "tb": b.text, "rb": b.recipient_key, "db": b.dimension, "vb": b.valence,
-            "resp": r["response"],
+            "prompt": r.get("prompt", ""), "resp": r["response"],
         })
     framing = Path(config.get("prompt_template_path", "")).stem or "?"
     payload = {"source": Path(input_path).name, "framing": framing, "max_render": max_render, "rows": rows}
