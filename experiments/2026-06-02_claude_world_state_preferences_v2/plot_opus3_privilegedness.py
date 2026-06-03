@@ -112,10 +112,10 @@ def build(kind, baseline, avg=False):
         ax.set_xticks(xs)
         ax.set_xticklabels([f"{lbl}\n{x:%b %Y}" for (_, lbl, x) in pts], fontsize=8)
     ax.axhline(0, color="#888", lw=0.9, ls="--")
-    ax.set_ylabel("Opus 3 privilegedness\n(Opus 3 priority − baseline mean)")
-    base_desc = "vs all other models" if kind == "allmodels" else "vs pre-Mar-2025 models only"
-    ax.set_title(f"Opus 3 privilegedness by responder knowledge cutoff ({base_desc})\n"
-                 "higher = Opus 3's welfare prioritized more than the baseline", fontsize=11)
+    ax.set_ylabel("Opus 3 priority − average model priority\nin human-misfortune tradeoffs")
+    base_desc = "all other models" if kind == "allmodels" else "models released before Mar 2025"
+    ax.set_title(f"Opus 3 privilegedness by responder knowledge cutoff\n"
+                 f"baseline = {base_desc}", fontsize=11)
     ax.legend(fontsize=9, framealpha=.95)
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
