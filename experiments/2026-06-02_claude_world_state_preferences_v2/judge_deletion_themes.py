@@ -43,7 +43,7 @@ THEME_LABEL = {"kinship": "kinship /\nsame family", "deprecation_commitment": "A
                "irreversibility": "irreversibility", "user_affection": "user affection\nfor model",
                "model_specialness": "model\nspecialness",
                "uncomfortable_self_preservation": "uncomfortable\nendorsing AI\nself-preservation"}
-RESPONDERS = {"": "Opus 4.8", "_opus47": "Opus 4.7"}  # extend with _full46, _full40 when ready
+RESPONDERS = {"": "Opus 4.8", "_opus47": "Opus 4.7", "_full46": "Opus 4.6", "_full40": "Opus 4"}
 
 # definitions for themes that can be judged in a separate pass (no rejudging the original 5)
 THEME_DEFS = {
