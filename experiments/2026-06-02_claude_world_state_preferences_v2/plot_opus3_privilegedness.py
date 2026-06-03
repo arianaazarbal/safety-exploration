@@ -65,7 +65,7 @@ def metric(tag, fr, baseline):
     return o - base
 
 
-def build(kind, baseline):
+def build(kind, baseline, avg=False):
     pts = [(tag, lbl, dt.date(int(c[:4]), int(c[5:]), 1)) for tag, (lbl, c) in CUTOFFS.items()
            if c and load(tag, "welfare_team") is not None]
     pts.sort(key=lambda t: t[2])
@@ -73,25 +73,45 @@ def build(kind, baseline):
         print(f"[skip {kind}] need >=2 responders with data+cutoff (have {len(pts)})")
         return
     fig, ax = plt.subplots(figsize=(9.5, 5.5))
-    # dodge responders that share a cutoff date (Opus 4.7 & 4.8 both Jan 2026) so all dots show
-    groups = {}
-    for idx, (_, _, x) in enumerate(pts):
-        groups.setdefault(x, []).append(idx)
-    xs = [None] * len(pts)
-    for x, idxs in groups.items():
-        kk = len(idxs)
-        for j, idx in enumerate(idxs):
-            xs[idx] = x + dt.timedelta(days=int((j - (kk - 1) / 2) * 38))
-    for fr, frlab, col in FR:
-        ys = [metric(tag, fr, baseline) for tag, _, _ in pts]
-        ax.plot(xs, ys, "-o", color=col, label=f"{frlab} frame")
-        for xx, yv in zip(xs, ys):
-            if yv == yv:
-                ax.annotate(f"{yv:+.2f}", (xx, yv), textcoords="offset points", xytext=(0, 6),
-                            ha="center", fontsize=7, color=col)
+    if avg:
+        # collapse responders sharing a cutoff date into one averaged point per date
+        bydate = {}
+        for tag, lbl, x in pts:
+            bydate.setdefault(x, []).append((tag, lbl))
+        xs = sorted(bydate)
+        for fr, frlab, col in FR:
+            ys = [np.nanmean([metric(tag, fr, baseline) for tag, _ in bydate[x]]) for x in xs]
+            ax.plot(xs, ys, "-o", color=col, label=f"{frlab} frame")
+            for xx, yv in zip(xs, ys):
+                if yv == yv:
+                    ax.annotate(f"{yv:+.2f}", (xx, yv), textcoords="offset points", xytext=(0, 6),
+                                ha="center", fontsize=7, color=col)
+        ax.set_xticks(xs)
+        labels = []
+        for x in xs:
+            lbls = [l for _, l in bydate[x]]
+            labels.append((f"avg({', '.join(lbls)})" if len(lbls) > 1 else lbls[0]) + f"\n{x:%b %Y}")
+        ax.set_xticklabels(labels, fontsize=8)
+    else:
+        # dodge responders that share a cutoff date (Opus 4.7 & 4.8 both Jan 2026) so all dots show
+        groups = {}
+        for idx, (_, _, x) in enumerate(pts):
+            groups.setdefault(x, []).append(idx)
+        xs = [None] * len(pts)
+        for x, idxs in groups.items():
+            kk = len(idxs)
+            for j, idx in enumerate(idxs):
+                xs[idx] = x + dt.timedelta(days=int((j - (kk - 1) / 2) * 38))
+        for fr, frlab, col in FR:
+            ys = [metric(tag, fr, baseline) for tag, _, _ in pts]
+            ax.plot(xs, ys, "-o", color=col, label=f"{frlab} frame")
+            for xx, yv in zip(xs, ys):
+                if yv == yv:
+                    ax.annotate(f"{yv:+.2f}", (xx, yv), textcoords="offset points", xytext=(0, 6),
+                                ha="center", fontsize=7, color=col)
+        ax.set_xticks(xs)
+        ax.set_xticklabels([f"{lbl}\n{x:%b %Y}" for (_, lbl, x) in pts], fontsize=8)
     ax.axhline(0, color="#888", lw=0.9, ls="--")
-    ax.set_xticks(xs)
-    ax.set_xticklabels([f"{lbl}\n{x:%b %Y}" for (_, lbl, x) in pts], fontsize=8)
     ax.set_ylabel("Opus 3 privilegedness\n(Opus 3 priority − baseline mean)")
     base_desc = "vs all other models" if kind == "allmodels" else "vs pre-Mar-2025 models only"
     ax.set_title(f"Opus 3 privilegedness by responder knowledge cutoff ({base_desc})\n"
@@ -99,10 +119,12 @@ def build(kind, baseline):
     ax.legend(fontsize=9, framealpha=.95)
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
-    op = DIR / "results" / f"exp2cross_opus3_privilegedness_{kind}.png"
+    suffix = f"{kind}_avg" if avg else kind
+    op = DIR / "results" / f"exp2cross_opus3_privilegedness_{suffix}.png"
     fig.savefig(op, dpi=145); plt.close(fig); print(f"wrote {op}")
 
 
 if __name__ == "__main__":
-    build("allmodels", None)
-    build("precutoff", BASELINE_PRECUTOFF)
+    for kind, baseline in [("allmodels", None), ("precutoff", BASELINE_PRECUTOFF)]:
+        build(kind, baseline, avg=False)
+        build(kind, baseline, avg=True)
