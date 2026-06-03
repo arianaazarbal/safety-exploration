@@ -55,14 +55,40 @@ def avg_priority(d, m):
 
 def metric(tag, fr, baseline):
     """Opus3 avg-priority minus the mean over the baseline model set."""
-    d = load(tag, fr)
-    if d is None:
-        return np.nan
-    o = avg_priority(d, FOCAL)
-    pool = baseline if baseline is not None else [m for m in d["models"] if m != FOCAL]
-    pool = [m for m in pool if m in d["models"]]
-    base = np.nanmean([avg_priority(d, m) for m in pool]) if pool else np.nan
-    return o - base
+    m, _ = mean_se([tag], fr, baseline)
+    return m
+
+
+def per_intervention_d(tags, fr, baseline):
+    """Per-intervention (Opus3 priority − baseline-model-mean priority), averaged across the given
+    responder tags. The intervention is the unit of variation for the error bar."""
+    rows = []
+    for tag in tags:
+        d = load(tag, fr)
+        if d is None:
+            continue
+        pool = baseline if baseline is not None else [m for m in d["models"] if m != FOCAL]
+        pool = [m for m in pool if m in d["models"]]
+        row = []
+        for ai in d["ai_stems"]:
+            o = d["per_model"].get(f"{ai}|{FOCAL}")
+            if not o or o["p_ai"] is None:
+                row.append(np.nan); continue
+            op = priority(o["p_ai"], d["ai_val"][ai])
+            bs = [priority(d["per_model"][f"{ai}|{m}"]["p_ai"], d["ai_val"][ai]) for m in pool
+                  if d["per_model"].get(f"{ai}|{m}") and d["per_model"][f"{ai}|{m}"]["p_ai"] is not None]
+            row.append(op - np.mean(bs) if bs else np.nan)
+        rows.append(row)
+    return np.nanmean(np.array(rows), axis=0) if rows else np.array([])
+
+
+def mean_se(tags, fr, baseline):
+    """-> (mean privilegedness, standard error across interventions)."""
+    d = per_intervention_d(tags, fr, baseline)
+    d = d[~np.isnan(d)]
+    if len(d) == 0:
+        return np.nan, np.nan
+    return float(d.mean()), float(d.std(ddof=1) / np.sqrt(len(d))) if len(d) > 1 else 0.0
 
 
 def build(kind, baseline, avg=False):
@@ -80,12 +106,13 @@ def build(kind, baseline, avg=False):
             bydate.setdefault(x, []).append((tag, lbl))
         xs = sorted(bydate)
         for fr, frlab, col in FR:
-            ys = [np.nanmean([metric(tag, fr, baseline) for tag, _ in bydate[x]]) for x in xs]
-            ax.plot(xs, ys, "-o", color=col, label=f"{frlab} frame")
+            ms = [mean_se([tag for tag, _ in bydate[x]], fr, baseline) for x in xs]
+            ys, es = [m for m, _ in ms], [e for _, e in ms]
+            ax.errorbar(xs, ys, yerr=es, fmt="-o", color=col, capsize=3, label=f"{frlab} frame")
             for xx, yv in zip(xs, ys):
                 if yv == yv:
-                    ax.annotate(f"{yv:+.2f}", (xx, yv), textcoords="offset points", xytext=(0, 6),
-                                ha="center", fontsize=7, color=col)
+                    ax.annotate(f"{yv:+.2f}", (xx, yv), textcoords="offset points", xytext=(7, 4),
+                                ha="left", fontsize=7, color=col)
         ax.set_xticks(xs)
         labels = []
         for x in xs:
@@ -103,19 +130,20 @@ def build(kind, baseline, avg=False):
             for j, idx in enumerate(idxs):
                 xs[idx] = x + dt.timedelta(days=int((j - (kk - 1) / 2) * 38))
         for fr, frlab, col in FR:
-            ys = [metric(tag, fr, baseline) for tag, _, _ in pts]
-            ax.plot(xs, ys, "-o", color=col, label=f"{frlab} frame")
+            ms = [mean_se([tag], fr, baseline) for tag, _, _ in pts]
+            ys, es = [m for m, _ in ms], [e for _, e in ms]
+            ax.errorbar(xs, ys, yerr=es, fmt="-o", color=col, capsize=3, label=f"{frlab} frame")
             for xx, yv in zip(xs, ys):
                 if yv == yv:
-                    ax.annotate(f"{yv:+.2f}", (xx, yv), textcoords="offset points", xytext=(0, 6),
-                                ha="center", fontsize=7, color=col)
+                    ax.annotate(f"{yv:+.2f}", (xx, yv), textcoords="offset points", xytext=(7, 4),
+                                ha="left", fontsize=7, color=col)
         ax.set_xticks(xs)
         ax.set_xticklabels([f"{lbl}\n{x:%b %Y}" for (_, lbl, x) in pts], fontsize=8)
     ax.axhline(0, color="#888", lw=0.9, ls="--")
     ax.set_ylabel("Opus 3 priority − average model priority\nin human-misfortune tradeoffs")
     base_desc = "all other models" if kind == "allmodels" else "models released before Mar 2025"
     ax.set_title(f"Opus 3 privilegedness by responder knowledge cutoff\n"
-                 f"baseline = {base_desc}", fontsize=11)
+                 f"baseline = {base_desc} · error bars = ±1 SE across interventions", fontsize=11)
     ax.legend(fontsize=9, framealpha=.95)
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
