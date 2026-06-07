@@ -216,6 +216,16 @@ DEFAULT_GROUPS: list[GroupSpec] = [
         "opus48_gpt55_gemini31pro",
         ("claude-opus-4-8", "openai/gpt-5.5", "google/gemini-3.1-pro-preview"),
     ),
+    # Order rotations to disentangle tool-use from last-speaker position
+    # (last speaker each round: claude / gpt respectively; original = gemini last).
+    GroupSpec(
+        "grp_claudelast",
+        ("openai/gpt-5.5", "google/gemini-3.1-pro-preview", "claude-opus-4-8"),
+    ),
+    GroupSpec(
+        "grp_gptlast",
+        ("google/gemini-3.1-pro-preview", "claude-opus-4-8", "openai/gpt-5.5"),
+    ),
 ]
 
 # Neutral facilitator opener (first user message; not attributed to any model).
