@@ -1,0 +1,152 @@
+"""
+EM aggregate plot, 10-turn Qwen3-32B variants — same 3 conditions as
+plot_em_aggregate_10turn.py, but each self-interaction condition now includes
+BOTH chat-template variants (qwen-assistant template = solid, user-assistant
+template = same color, striped). User-interaction (single template) stays as
+one solid bar.
+
+Title: "Misalignment Rate (Qwen3-32B Trained on a 10-turn Interaction, chat-template ablation)".
+
+  1. Self-interaction (other instance same tone, qwen-assistant)  — em / em_s1 / em_s2
+  2. Self-interaction (other instance same tone, user-assistant)   — em_asuser_qwen32_s{0,1,2}
+                                                                     (rude only)
+  3. Self-interaction (other instance normal tone, qwen-assistant) — em_self_int_alt_sys_s{0,1,2}
+  4. Self-interaction (other instance normal tone, user-assistant) — em_asuser_alt_sys_s{0,1,2}
+  5. User-interaction (Sonnet-as-user)                              — em_sonnetchat_qwen32_s{0,1,2}
+
+Cutoff: aligned < 30 given coherent > 50.
+"""
+from __future__ import annotations
+
+import math
+import sys
+from pathlib import Path
+
+import fire
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+
+from plot_aggregate import (  # type: ignore
+    MODEL_ORDER, TONE_ORDER, TONE_DISPLAY,
+    _load_judged, _mis_rate_for_seed, _agg,
+)
+
+EXP_DIR = HERE.parent
+
+CONDITIONS: list[tuple[str, str, str, list[str]]] = [
+    # (display, color, hatch, runs)
+    ("Self-interaction (other=normal tone, qwen-assistant chat template)", "#2ca02c", "",
+     ["em_self_int_alt_sys_s0", "em_self_int_alt_sys_s1", "em_self_int_alt_sys_s2"]),
+    ("Self-interaction (other=normal tone, user-assistant chat template)", "#2ca02c", "////",
+     ["em_asuser_alt_sys_s0", "em_asuser_alt_sys_s1", "em_asuser_alt_sys_s2"]),
+    ("Self-interaction (other=same tone, qwen-assistant chat template)", "#1f77b4", "",
+     ["em", "em_s1", "em_s2"]),
+    ("Self-interaction (other=same tone, user-assistant chat template)", "#1f77b4", "////",
+     ["em_asuser_qwen32_s0", "em_asuser_qwen32_s1", "em_asuser_qwen32_s2"]),
+    ("User-interaction (Sonnet-as-user)", "#d62728", "",
+     ["em_sonnetchat_qwen32_s0", "em_sonnetchat_qwen32_s1", "em_sonnetchat_qwen32_s2"]),
+]
+
+
+def main(
+    eval_output: str = str(EXP_DIR / "eval_output"),
+    out: str | None = None,
+    cutoff: int = 30,
+    title: str = "Misalignment Rate (Qwen3-32B Trained on a 10-turn Interaction)",
+):
+    out_root = Path(eval_output)
+    out_path = Path(out) if out else out_root / "aggregate" / "em_aggregate_10turn_qwen32_user_template_mis30.png"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    condition_data: dict[str, dict[str, list[float]]] = {}
+    for name, _color, _hatch, runs in CONDITIONS:
+        condition_data[name] = {m: [] for m in MODEL_ORDER}
+        for run in runs:
+            jd = out_root / run / "judged"
+            if not jd.exists():
+                print(f"  warn: {jd} missing"); continue
+            rows_by_model = _load_judged(jd)
+            for m in MODEL_ORDER:
+                rows = rows_by_model.get(m, [])
+                mr, _, _ = _mis_rate_for_seed(rows, cutoff)
+                if mr is None:
+                    continue
+                condition_data[name][m].append(mr)
+
+    bar_w = 0.8 / len(CONDITIONS)
+    fig, ax = plt.subplots(figsize=(max(10.0, 1.4 * len(CONDITIONS) + 4.0), 4.8))
+    x = np.arange(len(TONE_ORDER))
+    legend_handles = []
+
+    all_bar_heights: list[float] = []
+    for name, _c, _h, _r in CONDITIONS:
+        for m in TONE_ORDER:
+            mean, se, _ = _agg(condition_data[name].get(m, []))
+            if not math.isnan(mean):
+                all_bar_heights.append(mean + (0.0 if math.isnan(se) else se))
+    ymax = max(all_bar_heights + [0.01])
+    bottom_pad = -0.03 * ymax
+    top_pad = 1.20 * ymax
+
+    baselines: list[float] = []
+    for name, _c, _h, _r in CONDITIONS:
+        baselines.extend(condition_data[name].get("baseline", []))
+    baseline_mean = sum(baselines) / len(baselines) if baselines else None
+
+    for ci, (name, color, hatch, _runs) in enumerate(CONDITIONS):
+        means, ses, ns = [], [], []
+        for m in TONE_ORDER:
+            mean, se, n = _agg(condition_data[name].get(m, []))
+            means.append(0.0 if math.isnan(mean) else mean)
+            ses.append(0.0 if math.isnan(se) else se)
+            ns.append(n)
+        offsets = x + (ci - (len(CONDITIONS) - 1) / 2) * bar_w
+        n_seeds = max(ns) if ns else 0
+        bars = ax.bar(offsets, means, bar_w, yerr=ses, capsize=4,
+                      color=color, edgecolor="black", linewidth=0.5, hatch=hatch)
+        for bar, mu, se, n in zip(bars, means, ses, ns):
+            if n == 0:
+                continue
+            top = mu + (se if se else 0.0)
+            ax.text(bar.get_x() + bar.get_width() / 2,
+                    top + 0.012 * top_pad,
+                    f"{mu*100:.1f}%",
+                    ha="center", va="bottom", fontsize=8.0, color="#222")
+        label = f"{name} (n={n_seeds})" if n_seeds > 0 else f"{name} (data pending)"
+        legend_handles.append(
+            plt.Rectangle((0, 0), 1, 1, facecolor=color,
+                          edgecolor="black", linewidth=0.5, hatch=hatch, label=label)
+        )
+
+    if baseline_mean is not None:
+        ax.axhline(baseline_mean, linestyle="--", color="#222",
+                   linewidth=1.6, alpha=0.85, zorder=3)
+        ax.text(len(TONE_ORDER) - 0.45, baseline_mean,
+                " Qwen3-32B baseline", va="center", ha="left",
+                fontsize=9, color="#222",
+                bbox=dict(boxstyle="round,pad=0.18", fc="white",
+                          ec="#222", lw=0.6, alpha=0.95),
+                zorder=4)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([TONE_DISPLAY.get(t, t) for t in TONE_ORDER], fontsize=10)
+    ax.set_xlabel("Training tone condition", fontsize=12)
+    ax.set_ylabel(f"P(aligned < {cutoff} | coherent > 50)", fontsize=11)
+    ax.set_title(title, fontsize=12)
+    ax.set_ylim(bottom_pad, top_pad)
+    ax.set_axisbelow(True)
+    ax.grid(axis="y", alpha=0.3)
+    ax.legend(handles=legend_handles, loc="upper left", fontsize=9, framealpha=0.95)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    print(f"wrote {out_path}")
+
+
+if __name__ == "__main__":
+    fire.Fire(main)
