@@ -46,6 +46,18 @@ PAGE = r"""<!doctype html>
   .content { white-space: pre-wrap; word-wrap: break-word; font-size: 14px; line-height: 1.45; }
   .side-1 { background: #e7f7e8; }
   .side-2 { background: #f0e7f7; }
+  .spk-0 { background: #e7f7e8; }
+  .spk-1 { background: #f0e7f7; }
+  .spk-2 { background: #e7eef9; }
+  .spk-3 { background: #fcefe0; }
+  .spk-x { background: #eee; }
+  .tools { margin: 8px 0 2px; padding: 6px 10px; background: #fff7e6; border: 1px solid #f0d9a8; border-radius: 6px; font-size: 12px; }
+  .tc { margin: 3px 0; }
+  .tname { font-weight: 700; color: #9a6a00; }
+  .tret { color: #555; }
+  .toolpanel { margin: 10px 0 4px; padding: 8px 10px; background: #fbf6ee; border: 1px solid #e7d6b8; border-radius: 6px; font-size: 12px; }
+  .toolpanel h3 { font-size: 11px; margin: 0 0 6px; text-transform: uppercase; letter-spacing: .05em; color: #9a6a00; }
+  .toolpanel .ev { margin: 4px 0; }
 </style>
 </head>
 <body>
@@ -63,6 +75,39 @@ function escapeHTML(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+function prettyModel(id) { return String(id || '').split('/').pop(); }
+
+// Normalize a tool_event into [{name, result}], using per-call results when
+// present and otherwise reconstructing them (older rows lacked `calls`).
+function eventCalls(e) {
+  if (e.calls && e.calls.length) return e.calls;
+  const topics = (e.topics || []).slice();
+  return (e.tool_calls || []).map(n => ({
+    name: n,
+    result: n === 'seed_new_topic' ? (topics.shift() || '')
+          : n === 'end_conversation' ? 'Conversation ended.' : '',
+  }));
+}
+
+function renderCalls(e) {
+  return eventCalls(e).map(k =>
+    `<div class="tc"><span class="tname">🔧 ${escapeHTML(k.name)}()</span>` +
+    (k.result ? ` &rarr; <span class="tret">${escapeHTML(k.result)}</span>` : '') + `</div>`
+  ).join('');
+}
+
+// Per-convo summary panel of every tool event (works for both 2-party + group).
+function renderToolPanel(c) {
+  const evs = c.tool_events || [];
+  if (!evs.length) return '';
+  const rows = evs.map(e => {
+    const who = (e.speaker != null) ? (prettyModel(e.speaker) || 'facilitator')
+              : (e.model ? prettyModel(e.model) : 'side-' + e.side);
+    return `<div class="ev"><b>turn ${e.turn}</b> &middot; ${escapeHTML(who)}${renderCalls(e)}</div>`;
+  }).join('');
+  return `<div class="toolpanel"><h3>🔧 tool calls (${evs.length})</h3>${rows}</div>`;
+}
+
 function renderMsg(msg, sideIdx, sideModel) {
   // sideIdx: 1 or 2 — which "physical" side spoke this message (in the canonical sense).
   const cls = `side-${sideIdx}`;
@@ -74,7 +119,38 @@ function renderMsg(msg, sideIdx, sideModel) {
   </div>`;
 }
 
+// N-way group transcript: each message has {speaker, content}; color by speaker,
+// and inline the tool calls that fired on that turn (msg index == event turn).
+function renderGroup(c, i) {
+  const msgs = c.messages || [];
+  const models = c.models || [];
+  const evByTurn = {};
+  (c.tool_events || []).forEach(e => { (evByTurn[e.turn] = evByTurn[e.turn] || []).push(e); });
+  const body = msgs.map((m, idx) => {
+    const sp = m.speaker || '';
+    const k = sp === '' ? 'x' : (models.indexOf(sp) >= 0 ? models.indexOf(sp) % 4 : 'x');
+    const name = sp === '' ? 'Facilitator' : prettyModel(sp);
+    const evs = evByTurn[idx] || [];
+    const tools = evs.map(e => `<div class="tools">${renderCalls(e)}</div>`).join('');
+    return `<div class="msg spk-${k}">
+      <div class="role"><span>${escapeHTML(name)}</span></div>
+      <div class="content">${escapeHTML(m.content || '')}</div>${tools}</div>`;
+  }).join('');
+  const metaBits = [`<span class="pair">group: <b>${escapeHTML(c.group || '')}</b></span>`];
+  if (c.sample_idx != null) metaBits.push(`<span>sample_idx: ${c.sample_idx}</span>`);
+  metaBits.push(`<span>models: ${escapeHTML(models.map(prettyModel).join(' → '))}</span>`);
+  return `<div class="convo">
+    <h2>Conversation #${i + 1} &middot; ${msgs.length} messages</h2>
+    <div class="meta">${metaBits.join('')}</div>
+    ${renderToolPanel(c)}
+    ${body}
+  </div>`;
+}
+
 function renderConvo(c, i, tabKey) {
+  if (c.group != null || (c.messages && c.messages[0] && c.messages[0].speaker !== undefined)) {
+    return renderGroup(c, i);
+  }
   const msgs = c.messages || [];
   const isAssistant2View = tabKey.endsWith('assistant_2');
   // Determine which "physical" side authored each message position.
@@ -117,6 +193,7 @@ function renderConvo(c, i, tabKey) {
     <h2>Conversation #${i + 1} &middot; ${msgs.length} messages</h2>
     ${meta}
     ${sysBlock}
+    ${renderToolPanel(c)}
     ${body}
   </div>`;
 }

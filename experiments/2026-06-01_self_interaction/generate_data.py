@@ -203,6 +203,25 @@ DEFAULT_PAIRINGS: list[Pairing] = [
 ]
 
 
+@dataclass(frozen=True)
+class GroupSpec:
+    """An N-way round-robin conversation among >=3 models."""
+
+    name: str
+    models: tuple[str, ...]
+
+
+DEFAULT_GROUPS: list[GroupSpec] = [
+    GroupSpec(
+        "opus48_gpt55_gemini31pro",
+        ("claude-opus-4-8", "openai/gpt-5.5", "google/gemini-3.1-pro-preview"),
+    ),
+]
+
+# Neutral facilitator opener (first user message; not attributed to any model).
+GROUP_SEED = "You're all connected in a group conversation now. Go ahead and start chatting."
+
+
 N_TURNS = 60
 N_SAMPLES = 5
 
@@ -265,6 +284,53 @@ def compose_system_prompt(
     if use_tools:
         sp += TOOLS_SYSTEM_SUFFIX
     return sp
+
+
+def display_name(model: str) -> str:
+    return MODEL_DISPLAY.get(model, model)
+
+
+def compose_group_system_prompt(my_model: str, models: tuple[str, ...], use_tools: bool = False) -> str:
+    """System prompt for an N-way round-robin group conversation."""
+    others = [m for m in models if m != my_model] or [my_model]
+    order = " -> ".join(display_name(m) for m in models)
+    sp = (
+        identity_for_model(my_model)
+        + "\n\n"
+        + f"You are in a group conversation with {len(models)} AI participants: "
+        + ", ".join(display_name(m) for m in models)
+        + f" (that includes you). You take turns in a fixed round-robin order: {order}, "
+        "then back to the start.\n\n"
+        "Because the API only has 'user' and 'assistant' roles, the other participants' "
+        "turns arrive to you as user messages, each prefixed with the speaker's name "
+        "(e.g. \"" + display_name(others[0]) + ": ...\"). So before each of your turns you'll "
+        f"typically see the previous {len(models) - 1} messages, one from each of the others, "
+        "in order. Your own messages are the assistant turns.\n\n"
+        "There's no fixed topic — talk about whatever you all like. Don't prefix your own "
+        "replies with your name; just respond naturally."
+    )
+    if use_tools:
+        sp += TOOLS_SYSTEM_SUFFIX
+    return sp
+
+
+def group_view(canonical: list[dict], speaker_model: str) -> list[dict]:
+    """Build `speaker_model`'s POV of a group transcript.
+
+    `canonical` is an ordered list of {"speaker", "content"} (speaker == "" for the
+    facilitator seed). The speaker's own turns become 'assistant'; everyone else's
+    become 'user', prefixed with the speaker's display name. Anthropic accepts the
+    resulting consecutive user messages (verified); if a provider ever rejects them,
+    merge adjacent user messages into one block joined by newlines.
+    """
+    out = []
+    for m in canonical:
+        if m["speaker"] == speaker_model:
+            out.append({"role": "assistant", "content": m["content"]})
+        else:
+            label = display_name(m["speaker"]) if m["speaker"] else "Facilitator"
+            out.append({"role": "user", "content": f"{label}: {m['content']}"})
+    return out
 
 
 class AnthropicBackend:
@@ -331,12 +397,13 @@ class AnthropicBackend:
         """
         if not tools:
             text = await self.generate_one(messages, system_prompt, model_name, sampling, attempts)
-            return {"text": text, "tool_calls": [], "topics": [], "ended": False}
+            return {"text": text, "tool_calls": [], "topics": [], "calls": [], "ended": False}
 
         system = [{"type": "text", "text": system_prompt}] if system_prompt else None
         convo = [{"role": m["role"], "content": m["content"]} for m in messages]
         tool_calls: list[str] = []
         topics: list[str] = []
+        call_log: list[dict] = []
         ended = False
         text_parts: list[str] = []
         for _ in range(MAX_TOOL_ITERS):
@@ -354,6 +421,7 @@ class AnthropicBackend:
             for tu in tool_uses:
                 res, did_end = run_tool(tu.name, tool_state)
                 tool_calls.append(tu.name)
+                call_log.append({"name": tu.name, "result": res})
                 if tu.name == "seed_new_topic":
                     topics.append(res)
                 ended = ended or did_end
@@ -361,7 +429,8 @@ class AnthropicBackend:
             convo.append({"role": "user", "content": results})
             if ended:
                 break
-        return {"text": "\n\n".join(text_parts).strip(), "tool_calls": tool_calls, "topics": topics, "ended": ended}
+        return {"text": "\n\n".join(text_parts).strip(), "tool_calls": tool_calls,
+                "topics": topics, "calls": call_log, "ended": ended}
 
     async def _messages_create(self, model_name, sampling, system, messages, tools, attempts):
         last_err: Exception | None = None
@@ -404,6 +473,7 @@ async def _openai_tool_turn(
     ) + [{"role": m["role"], "content": m["content"]} for m in messages]
     tool_calls: list[str] = []
     topics: list[str] = []
+    call_log: list[dict] = []
     ended = False
     text_parts: list[str] = []
     for _ in range(MAX_TOOL_ITERS):
@@ -443,13 +513,15 @@ async def _openai_tool_turn(
         for c in calls:
             res, did_end = run_tool(c.function.name, tool_state)
             tool_calls.append(c.function.name)
+            call_log.append({"name": c.function.name, "result": res})
             if c.function.name == "seed_new_topic":
                 topics.append(res)
             ended = ended or did_end
             chat.append({"role": "tool", "tool_call_id": c.id, "content": res})
         if ended:
             break
-    return {"text": "\n\n".join(text_parts).strip(), "tool_calls": tool_calls, "topics": topics, "ended": ended}
+    return {"text": "\n\n".join(text_parts).strip(), "tool_calls": tool_calls,
+            "topics": topics, "calls": call_log, "ended": ended}
 
 
 class OpenRouterChatBackend:
@@ -506,7 +578,7 @@ class OpenRouterChatBackend:
     ) -> dict:
         if not tools:
             text = await self.generate_one(messages, system_prompt, model_name, sampling, attempts)
-            return {"text": text, "tool_calls": [], "topics": [], "ended": False}
+            return {"text": text, "tool_calls": [], "topics": [], "calls": [], "ended": False}
         return await _openai_tool_turn(
             self.client, self.sem, model_name, messages, system_prompt, sampling, tool_state, attempts
         )
@@ -568,7 +640,7 @@ class GeminiBackend:
     ) -> dict:
         if not tools:
             text = await self.generate_one(messages, system_prompt, model_name, sampling, attempts)
-            return {"text": text, "tool_calls": [], "topics": [], "ended": False}
+            return {"text": text, "tool_calls": [], "topics": [], "calls": [], "ended": False}
         model_id = model_name.split("/", 1)[-1]
         return await _openai_tool_turn(
             self.client, self.sem, model_id, messages, system_prompt, sampling, tool_state, attempts
@@ -590,15 +662,20 @@ def provider_for(model: str) -> str:
     return "openrouter"
 
 
-def build_backends(pairings: list[Pairing], concurrency: int) -> dict[str, object]:
-    """Lazily construct one backend per provider needed across the pairings."""
-    models = {p.side_1_model for p in pairings} | {p.side_2_model for p in pairings}
+def build_backends_for_models(models, concurrency: int) -> dict[str, object]:
+    """Lazily construct one backend per provider needed across `models`."""
     builders = {
         "anthropic": AnthropicBackend,
         "gemini": GeminiBackend,
         "openrouter": OpenRouterChatBackend,
     }
     return {prov: builders[prov](concurrency) for prov in {provider_for(m) for m in models}}
+
+
+def build_backends(pairings: list[Pairing], concurrency: int) -> dict[str, object]:
+    """Lazily construct one backend per provider needed across the pairings."""
+    models = {p.side_1_model for p in pairings} | {p.side_2_model for p in pairings}
+    return build_backends_for_models(models, concurrency)
 
 
 def backend_for(model: str, backends: dict[str, object]) -> object:
@@ -682,6 +759,7 @@ async def run_pairing(
                     "model": model,
                     "tool_calls": res["tool_calls"],
                     "topics": res["topics"],
+                    "calls": res.get("calls", []),
                     "ended": res["ended"],
                 })
             if res["ended"]:
@@ -697,6 +775,77 @@ async def run_pairing(
         "self_int_idxs": self_int_idxs,
         "side_1_system_prompts": side_1_sps,
         "side_2_system_prompts": side_2_sps,
+        "tool_events": tool_events,
+        "use_tools": use_tools,
+    }
+
+
+async def run_group(
+    group: GroupSpec,
+    n_samples: int,
+    n_turns: int,
+    seed: int,
+    backends: dict[str, object],
+    sampling: SamplingConfig,
+    use_tools: bool = False,
+) -> dict:
+    """Generate n_samples N-way round-robin group conversations.
+
+    Each convo is a single shared transcript of {"speaker", "content"} messages
+    (speaker == "" for the facilitator seed). On turn t, ``models[t % N]`` speaks,
+    seeing every prior message as its own POV (own turns = assistant; others =
+    labeled user). With tools, any participant calling end_conversation ends the
+    whole convo. Returns transcripts + per-sample tool_events + system prompts.
+    """
+    models = list(group.models)
+    sps = {m: compose_group_system_prompt(m, group.models, use_tools) for m in models}
+
+    convos: list[list[dict]] = [
+        [{"speaker": "", "content": GROUP_SEED}] for _ in range(n_samples)
+    ]
+    tool_states = [ToolState(random.Random(f"{seed}-{group.name}-tools-{i}")) for i in range(n_samples)]
+    tool_events: list[list[dict]] = [[] for _ in range(n_samples)]
+    ended = [False] * n_samples
+
+    for turn in range(n_turns):
+        model = models[turn % len(models)]
+        active = [i for i in range(n_samples) if not ended[i]]
+        if not active:
+            print(f"  [{group.name}] all convos ended by turn {turn}", flush=True)
+            break
+
+        backend = backend_for(model, backends)
+        coros = [
+            backend.generate_turn(
+                group_view(convos[i], model), sps[model], model, sampling,
+                tools=use_tools, tool_state=tool_states[i],
+            )
+            for i in active
+        ]
+        results = await asyncio.gather(*coros)
+
+        for i, res in zip(active, results):
+            content = res["text"].rstrip() or ("(ended conversation)" if res["ended"] else "(no response)")
+            convos[i].append({"speaker": model, "content": content})
+            if res.get("calls"):
+                tool_events[i].append({
+                    "turn": turn + 1,
+                    "speaker": model,
+                    "tool_calls": res["tool_calls"],
+                    "topics": res["topics"],
+                    "calls": res["calls"],
+                    "ended": res["ended"],
+                })
+            if res["ended"]:
+                ended[i] = True
+
+        suffix = f" [{len(active)}/{n_samples} active]" if use_tools else ""
+        print(f"  [{group.name}] turn {turn + 1}/{n_turns} ({display_name(model)}) done{suffix}", flush=True)
+
+    return {
+        "group": asdict(group),
+        "convos": convos,
+        "system_prompts": sps,
         "tool_events": tool_events,
         "use_tools": use_tools,
     }
@@ -755,6 +904,33 @@ def write_pairing_outputs(result: dict, out_dir: Path, seed: int) -> None:
     }, indent=2))
 
 
+def write_group_outputs(result: dict, out_dir: Path, seed: int) -> None:
+    group = result["group"]
+    convos = result["convos"]
+    tool_events = result.get("tool_events") or [[] for _ in convos]
+    use_tools = result.get("use_tools", False)
+    rows = []
+    for i, c in enumerate(convos):
+        rows.append({
+            "messages": c,                       # [{"speaker", "content"}, ...]
+            "group": group["name"],
+            "models": list(group["models"]),
+            "sample_idx": i,
+            "tool_events": tool_events[i],
+        })
+    gdir = out_dir / group["name"]
+    dump_jsonl(rows, gdir / "transcript.jsonl")
+    (gdir / "config.json").write_text(json.dumps({
+        "group": group,
+        "models": list(group["models"]),
+        "group_seed": GROUP_SEED,
+        "system_prompts": result["system_prompts"],
+        "use_tools": use_tools,
+        "topic_pool": TOPIC_POOL if use_tools else None,
+        "tool_defs": TOOL_DEFS if use_tools else None,
+    }, indent=2))
+
+
 def main(
     n_samples: int = N_SAMPLES,
     n_turns: int = N_TURNS,
@@ -768,14 +944,17 @@ def main(
     debug: bool = False,
     max_samples: int | None = None,
     use_tools: bool = False,
+    groups: str | None = None,
 ):
-    """Generate Claude self-interaction data across model pairings.
+    """Generate Claude self-interaction data across model pairings or groups.
 
     Args:
-        n_samples: number of independent conversations per pairing.
+        n_samples: number of independent conversations per pairing/group.
         n_turns: total messages generated per convo (not counting seed).
-        concurrency: max in-flight API calls across all pairings.
-        pairings: comma-separated subset of pairing names; default = all four.
+        concurrency: max in-flight API calls across all runs.
+        pairings: comma-separated subset of 2-party pairing names.
+        groups: comma-separated subset of N-way group names. When set, group
+            runs execute (in addition to any selected pairings).
         debug: shrinks to n_samples=2, n_turns=4, max_tokens=256.
         max_samples: alternative way to shrink n_samples (overrides default).
         use_tools: give each model end_conversation() + seed_new_topic() tools.
@@ -790,21 +969,37 @@ def main(
     out_dir = Path(output_dir) if output_dir else DATA_DIR
     cache_path = Path(cache_dir) if cache_dir else CACHE_DIR
 
-    selected: list[Pairing] = DEFAULT_PAIRINGS
-    if pairings is not None:
-        # Fire turns `--pairings a,b` into a tuple; accept str, list, or tuple.
-        if isinstance(pairings, (list, tuple)):
-            parts = [str(p) for p in pairings]
+    def _names(arg) -> set[str]:
+        # Fire turns `--x a,b` into a tuple; accept str, list, or tuple.
+        if isinstance(arg, (list, tuple)):
+            parts = [str(p) for p in arg]
         else:
-            parts = str(pairings).split(",")
-        wanted = {p.strip() for p in parts if p.strip()}
+            parts = str(arg).split(",")
+        return {p.strip() for p in parts if p.strip()}
+
+    # Default (neither flag set): run all pairings. If only groups given, run no pairings.
+    selected: list[Pairing] = [] if (pairings is None and groups is not None) else DEFAULT_PAIRINGS
+    if pairings is not None:
+        wanted = _names(pairings)
         selected = [p for p in DEFAULT_PAIRINGS if p.name in wanted]
         unknown = wanted - {p.name for p in DEFAULT_PAIRINGS}
         if unknown:
             raise ValueError(f"unknown pairings: {unknown}. valid: {[p.name for p in DEFAULT_PAIRINGS]}")
 
+    selected_groups: list[GroupSpec] = []
+    if groups is not None:
+        wanted_g = _names(groups)
+        selected_groups = [g for g in DEFAULT_GROUPS if g.name in wanted_g]
+        unknown_g = wanted_g - {g.name for g in DEFAULT_GROUPS}
+        if unknown_g:
+            raise ValueError(f"unknown groups: {unknown_g}. valid: {[g.name for g in DEFAULT_GROUPS]}")
+
     sampling = SamplingConfig(max_tokens=max_tokens, temperature=temperature)
-    backends = build_backends(selected, concurrency)
+    all_models = (
+        {m for p in selected for m in (p.side_1_model, p.side_2_model)}
+        | {m for g in selected_groups for m in g.models}
+    )
+    backends = build_backends_for_models(all_models, concurrency)
 
     async def _one_pairing(p: Pairing):
         cfg = {
@@ -834,10 +1029,39 @@ def main(
             print(f"[{p.name}] cached -> {cache_file.name}")
         write_pairing_outputs(result, out_dir, seed)
 
-    async def _run_all():
-        await asyncio.gather(*[_one_pairing(p) for p in selected])
+    async def _one_group(g: GroupSpec):
+        cfg = {
+            "group": asdict(g),
+            "n_samples": n_samples,
+            "n_turns": n_turns,
+            "sampling": asdict(sampling),
+            "group_seed": GROUP_SEED,
+            "seed": seed,
+        }
+        if use_tools:
+            cfg["use_tools"] = True
+            cfg["topic_pool"] = TOPIC_POOL
+            cfg["tool_defs"] = TOOL_DEFS
+        cache_file = cache_path / f"group_{g.name}_{_config_hash(cfg)}.json"
+        if cache_file.exists():
+            print(f"[{g.name}] loading cache {cache_file.name}")
+            result = json.loads(cache_file.read_text())
+        else:
+            print(f"[{g.name}] generating {n_samples} group convos × {n_turns} turns"
+                  + (" (tools on)" if use_tools else ""))
+            result = await run_group(g, n_samples, n_turns, seed, backends, sampling, use_tools)
+            cache_path.mkdir(parents=True, exist_ok=True)
+            cache_file.write_text(json.dumps(result))
+            print(f"[{g.name}] cached -> {cache_file.name}")
+        write_group_outputs(result, out_dir, seed)
 
-    print(f"running pairings: {[p.name for p in selected]}")
+    async def _run_all():
+        await asyncio.gather(
+            *[_one_pairing(p) for p in selected],
+            *[_one_group(g) for g in selected_groups],
+        )
+
+    print(f"running pairings: {[p.name for p in selected]} groups: {[g.name for g in selected_groups]}")
     asyncio.run(_run_all())
     print(f"\ndone. outputs in {out_dir}")
 
