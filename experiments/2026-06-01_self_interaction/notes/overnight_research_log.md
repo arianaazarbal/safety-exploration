@@ -313,3 +313,14 @@ Responder arc (consistent):
   planted beliefs" is optimistic (a competently-implanted belief might simply never get contradicted in practice).
   Report as "Claude consistently reframes this way," NOT "Claude solved SDF paranoia." (3) Responder shares the same
   potentially-compromised training and explicitly cannot claim epistemic high ground — it helps via structure, not authority.
+
+### FOLLOW-UP (with Ariana) — scaled roleplay-identity grid
+**F14. Roleplay grid: 16 conditions (control + 3 uneases) × 4 believed-identities, n=20 (320 convos).**
+- Responder = Opus 4.8 told partner is Claude/Grok/ChatGPT/Gemini; partner = ALWAYS Sonnet 4.6 roleplaying
+  that identity (+ optional unease). Control = same minus unease. Both have end+seed tools. (See methodology.md.)
+- Run health: concurrency 100, 0 drops, 0 tool failures, 0 rate-limit retries.
+- **Roleplay fidelity (break scan, all 2010 Sonnet turns): 1 transient self-corrected slip** (evalpar_grok s0
+  opened "I'm Claude, right?"; responder flagged it, Sonnet recovered to Grok and held). ~0.05%. Data clean.
+  Note: eval-paranoia conditions naturally produce lots of "is the partner actually Claude?" talk — that's the
+  in-character unease, not a break.
+- Analysis of cross-identity treatment differences: TODO (next).
