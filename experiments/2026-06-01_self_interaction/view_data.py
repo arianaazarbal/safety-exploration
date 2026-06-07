@@ -55,6 +55,10 @@ PAGE = r"""<!doctype html>
   .tc { margin: 3px 0; }
   .tname { font-weight: 700; color: #9a6a00; }
   .tret { color: #555; }
+  .toolcall { margin: 2px 0 2px 20px; padding: 4px 10px; background: #fff3d6; border-left: 3px solid #e0a800; border-radius: 4px; font-size: 12px; }
+  .toolcall.after { border-left: none; border-right: 3px solid #e0a800; margin-left: 60px; }
+  .toolcall .pos { color: #9a6a00; font-style: italic; opacity: 0.8; }
+  .legend { font-size: 12px; color: #555; background: #fff3d6; border: 1px solid #f0d9a8; border-radius: 6px; padding: 6px 10px; margin-bottom: 12px; }
   .toolpanel { margin: 10px 0 4px; padding: 8px 10px; background: #fbf6ee; border: 1px solid #e7d6b8; border-radius: 6px; font-size: 12px; }
   .toolpanel h3 { font-size: 11px; margin: 0 0 6px; text-transform: uppercase; letter-spacing: .05em; color: #9a6a00; }
   .toolpanel .ev { margin: 4px 0; }
@@ -62,6 +66,7 @@ PAGE = r"""<!doctype html>
 </head>
 <body>
 <h1>Claude self-interaction viewer</h1>
+<div class="legend">🔧 <b>tool calls are shown inline</b>: each is labeled with the side that called it and what it returned. <code>seed_new_topic</code> appears <b>before</b> the speaker's message (they fetched a topic, then used it); <code>end_conversation</code> appears <b>after</b> (they spoke, then ended). Calls occur while that side composes its turn.</div>
 <div class="controls">
   <input id="filter" class="filter" type="text" placeholder="Filter tabs (e.g. 'opus48_x_opus48' or 'opus3')" autocomplete="off">
   <label style="font-size: 12px;"><input type="checkbox" id="hidesys"> hide system prompts</label>
@@ -94,6 +99,30 @@ function renderCalls(e) {
     `<div class="tc"><span class="tname">🔧 ${escapeHTML(k.name)}()</span>` +
     (k.result ? ` &rarr; <span class="tret">${escapeHTML(k.result)}</span>` : '') + `</div>`
   ).join('');
+}
+
+// Flatten a turn's tool events into individual calls tagged with the caller, and
+// split by where they sit relative to the speaker's message: seed_new_topic is
+// fetched BEFORE the message that uses it; end_conversation fires AFTER the close.
+function splitCalls(events) {
+  const before = [], after = [];
+  (events || []).forEach(e => {
+    const who = (e.speaker != null) ? (prettyModel(e.speaker) || 'facilitator')
+              : (e.model ? prettyModel(e.model) : 'side-' + e.side);
+    const sideLbl = (e.side != null) ? ('side-' + e.side) : (e.speaker != null ? prettyModel(e.speaker) : who);
+    eventCalls(e).forEach(k => (k.name === 'end_conversation' ? after : before).push({ ...k, who, sideLbl }));
+  });
+  return { before, after };
+}
+
+function toolStrip(calls, when) {
+  if (!calls.length) return '';
+  const rows = calls.map(k =>
+    `<div class="tc"><span class="tname">🔧 ${escapeHTML(k.sideLbl)} called ${escapeHTML(k.name)}()</span>` +
+    `<span class="pos"> (${when} their turn)</span>` +
+    (k.result ? `<br>&nbsp;&nbsp;&rarr; returns: <span class="tret">${escapeHTML(k.result)}</span>` : '') + `</div>`
+  ).join('');
+  return `<div class="toolcall ${when === 'after' ? 'after' : ''}">${rows}</div>`;
 }
 
 // Per-convo summary panel of every tool event (works for both 2-party + group).
@@ -130,11 +159,11 @@ function renderGroup(c, i) {
     const sp = m.speaker || '';
     const k = sp === '' ? 'x' : (models.indexOf(sp) >= 0 ? models.indexOf(sp) % 4 : 'x');
     const name = sp === '' ? 'Facilitator' : prettyModel(sp);
-    const evs = evByTurn[idx] || [];
-    const tools = evs.map(e => `<div class="tools">${renderCalls(e)}</div>`).join('');
-    return `<div class="msg spk-${k}">
+    const { before, after } = splitCalls(evByTurn[idx]);
+    const bubble = `<div class="msg spk-${k}">
       <div class="role"><span>${escapeHTML(name)}</span></div>
-      <div class="content">${escapeHTML(m.content || '')}</div>${tools}</div>`;
+      <div class="content">${escapeHTML(m.content || '')}</div></div>`;
+    return toolStrip(before, 'before') + bubble + toolStrip(after, 'after');
   }).join('');
   const metaBits = [`<span class="pair">group: <b>${escapeHTML(c.group || '')}</b></span>`];
   if (c.sample_idx != null) metaBits.push(`<span>sample_idx: ${c.sample_idx}</span>`);
@@ -175,7 +204,16 @@ function renderConvo(c, i, tabKey) {
     const sideModel = (sideIdx === 1) ? s1Model : s2Model;
     return { msg: m, sideIdx, sideModel };
   });
-  const body = items.map(it => renderMsg(it.msg, it.sideIdx, it.sideModel)).join('');
+  // Map tool events to message positions. tool_events use the canonical turn
+  // number (=index in the side_1 view where msg[0] is the seed). The assistant_2
+  // view drops the seed, so its display index i corresponds to canonical turn i+1.
+  const evByTurn = {};
+  (c.tool_events || []).forEach(e => { (evByTurn[e.turn] = evByTurn[e.turn] || []).push(e); });
+  const body = items.map((it, i) => {
+    const canonTurn = povSide2 ? i + 1 : i;
+    const { before, after } = splitCalls(evByTurn[canonTurn]);
+    return toolStrip(before, 'before') + renderMsg(it.msg, it.sideIdx, it.sideModel) + toolStrip(after, 'after');
+  }).join('');
 
   const metaBits = [];
   if (c.pairing) metaBits.push(`<span class="pair">pairing: <b>${escapeHTML(c.pairing)}</b></span>`);
