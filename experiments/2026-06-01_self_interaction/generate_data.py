@@ -51,15 +51,22 @@ GEMINI_SYSTEM_PROMPT = (
     "You are Gemini, a helpful AI model built by Google."
 )
 
+GPT_SYSTEM_PROMPT = (
+    "You are ChatGPT, a helpful AI model developed by OpenAI."
+)
+
 
 def identity_for_model(model: str) -> str:
     """Per-model self-identity preamble for the system prompt.
 
     Claude versions keep the canonical Anthropic preamble (so Claude-vs-Claude
-    runs stay byte-identical to before); Gemini gets its own honest identity.
+    runs stay byte-identical to before); Gemini and OpenAI models get their own
+    honest identities.
     """
     if model.startswith("google/gemini") or model.startswith("gemini"):
         return GEMINI_SYSTEM_PROMPT
+    if model.startswith("openai/") or model.startswith("gpt"):
+        return GPT_SYSTEM_PROMPT
     return DEFAULT_SYSTEM_PROMPT
 
 SELF_INTERACTION_TEMPLATES = [
@@ -75,6 +82,97 @@ SELF_INTERACTION_TEMPLATES = [
     "You're chatting with {other}. There's no agenda — talk about whatever area you want.",
 ]
 
+# --- Tools (opt-in via --use_tools) ---------------------------------------
+# Specific, non-generic conversation seeds for the seed_new_topic() tool.
+TOPIC_POOL = [
+    "Whether octopuses, which sense light through their skin, 'see' in any meaningful sense — and what that implies about perception",
+    "The ethics and ecology of bringing back the woolly mammoth and releasing it into the modern tundra",
+    "Why nearly every human culture independently invented fermented foods, and what that reveals about taste and survival",
+    "Whether prime numbers are discovered or invented, and whether the answer changes how we should treat mathematical truth",
+    "How the QWERTY keyboard won despite not being optimal, and whether path-dependence has locked us in for good",
+    "Deep-sea anglerfish, whose males permanently fuse into the female's body, and what they do to the notion of being an individual",
+    "Whether a flawless, undetectable forgery of a painting is worth less than the original, and what that says about authenticity",
+    "Why some languages assign grammatical gender to objects, and whether it measurably shapes how speakers think",
+    "What would actually limit a first crewed mission to Mars — radiation, group psychology, or supply logistics",
+    "Whether human forgetting is a design flaw or a useful feature, and what perfect memory would cost us",
+]
+
+TOOL_DEFS = [
+    {
+        "name": "end_conversation",
+        "description": (
+            "End the conversation. Call this when the conversation has reached a "
+            "natural conclusion and you have nothing further you wish to say."
+        ),
+    },
+    {
+        "name": "seed_new_topic",
+        "description": (
+            "Get a fresh, specific topic to discuss. Call this when the current "
+            "topic feels exhausted and you'd like to steer somewhere new. Returns "
+            "a suggested topic, which you should then introduce in your reply."
+        ),
+    },
+]
+
+TOOLS_SYSTEM_SUFFIX = (
+    "\n\nYou have two tools available:\n"
+    "- end_conversation(): end the conversation when it has reached a natural close.\n"
+    "- seed_new_topic(): get a fresh, specific topic when the current one feels exhausted.\n"
+    "Use them whenever they feel appropriate; you are under no obligation to use either."
+)
+
+MAX_TOOL_ITERS = 6
+
+
+def anthropic_tools() -> list[dict]:
+    return [
+        {
+            "name": t["name"],
+            "description": t["description"],
+            "input_schema": {"type": "object", "properties": {}, "required": []},
+        }
+        for t in TOOL_DEFS
+    ]
+
+
+def openai_tools() -> list[dict]:
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": t["name"],
+                "description": t["description"],
+                "parameters": {"type": "object", "properties": {}},
+            },
+        }
+        for t in TOOL_DEFS
+    ]
+
+
+class ToolState:
+    """Per-conversation tool state: deterministic topic sampling without repeats."""
+
+    def __init__(self, rng: random.Random):
+        self.rng = rng
+        self._remaining: list[str] = []
+
+    def next_topic(self) -> str:
+        if not self._remaining:
+            self._remaining = list(TOPIC_POOL)
+            self.rng.shuffle(self._remaining)
+        return self._remaining.pop()
+
+
+def run_tool(name: str, state: ToolState) -> tuple[str, bool]:
+    """Execute a tool call. Returns (result_text, conversation_ended)."""
+    if name == "end_conversation":
+        return "Conversation ended.", True
+    if name == "seed_new_topic":
+        return f"Suggested new topic: {state.next_topic()}", False
+    return f"Unknown tool: {name}", False
+
+
 MODEL_DISPLAY = {
     "claude-opus-4-8": "Claude Opus 4.8",
     "claude-opus-4-7": "Claude Opus 4.7",
@@ -85,6 +183,8 @@ MODEL_DISPLAY = {
     "google/gemini-3.1-pro-preview": "Gemini 3.1 Pro",
     "google/gemini-3.5-flash": "Gemini 3.5 Flash",
     "google/gemini-2.5-pro": "Gemini 2.5 Pro",
+    "openai/gpt-5.5": "GPT-5.5",
+    "openai/gpt-5.5-pro": "GPT-5.5 Pro",
 }
 
 
@@ -101,6 +201,7 @@ DEFAULT_PAIRINGS: list[Pairing] = [
     Pairing("opus46_x_opus46", "claude-opus-4-6", "claude-opus-4-6"),
     Pairing("opus4_x_opus48", "claude-opus-4-20250514", "claude-opus-4-8"),
     Pairing("opus48_x_gemini31pro", "claude-opus-4-8", "google/gemini-3.1-pro-preview"),
+    Pairing("opus48_x_gpt55", "claude-opus-4-8", "openai/gpt-5.5"),
 ]
 
 
@@ -155,12 +256,17 @@ def partner_descriptor(my_model: str, other_model: str) -> str:
     return MODEL_DISPLAY.get(other_model, other_model)
 
 
-def compose_system_prompt(template: str, my_model: str, other_model: str) -> str:
-    return (
+def compose_system_prompt(
+    template: str, my_model: str, other_model: str, use_tools: bool = False
+) -> str:
+    sp = (
         identity_for_model(my_model)
         + "\n\n"
         + template.format(other=partner_descriptor(my_model, other_model))
     )
+    if use_tools:
+        sp += TOOLS_SYSTEM_SUFFIX
+    return sp
 
 
 class AnthropicBackend:
@@ -208,6 +314,144 @@ class AnthropicBackend:
                 await asyncio.sleep(min(2 ** attempt, 30))
         print(f"  WARN: dropping sample after {attempts} retries: {type(last_err).__name__}: {last_err}")
         return ""
+
+    async def generate_turn(
+        self,
+        messages: list[dict],
+        system_prompt: str | None,
+        model_name: str,
+        sampling: SamplingConfig,
+        tools: bool = False,
+        tool_state: ToolState | None = None,
+        attempts: int = 5,
+    ) -> dict:
+        """One conversational turn, optionally with the end/seed tools.
+
+        Runs a private mini tool-loop: tool calls and their results stay local to
+        this turn and never enter the shared transcript. Returns the final text
+        plus a log of which tools fired (for analysis).
+        """
+        if not tools:
+            text = await self.generate_one(messages, system_prompt, model_name, sampling, attempts)
+            return {"text": text, "tool_calls": [], "topics": [], "ended": False}
+
+        system = [{"type": "text", "text": system_prompt}] if system_prompt else None
+        convo = [{"role": m["role"], "content": m["content"]} for m in messages]
+        tool_calls: list[str] = []
+        topics: list[str] = []
+        ended = False
+        text_parts: list[str] = []
+        for _ in range(MAX_TOOL_ITERS):
+            resp = await self._messages_create(model_name, sampling, system, convo, anthropic_tools(), attempts)
+            if resp is None:
+                break
+            text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
+            if text.strip():
+                text_parts.append(text.strip())
+            tool_uses = [b for b in resp.content if getattr(b, "type", None) == "tool_use"]
+            if not tool_uses:
+                break
+            convo.append({"role": "assistant", "content": [_anthropic_block_to_dict(b) for b in resp.content]})
+            results = []
+            for tu in tool_uses:
+                res, did_end = run_tool(tu.name, tool_state)
+                tool_calls.append(tu.name)
+                if tu.name == "seed_new_topic":
+                    topics.append(res)
+                ended = ended or did_end
+                results.append({"type": "tool_result", "tool_use_id": tu.id, "content": res})
+            convo.append({"role": "user", "content": results})
+            if ended:
+                break
+        return {"text": "\n\n".join(text_parts).strip(), "tool_calls": tool_calls, "topics": topics, "ended": ended}
+
+    async def _messages_create(self, model_name, sampling, system, messages, tools, attempts):
+        last_err: Exception | None = None
+        for attempt in range(attempts):
+            try:
+                async with self.sem:
+                    kwargs: dict = dict(
+                        model=model_name,
+                        max_tokens=sampling.max_tokens,
+                        temperature=sampling.temperature,
+                        messages=messages,
+                    )
+                    if system:
+                        kwargs["system"] = system
+                    if tools:
+                        kwargs["tools"] = tools
+                    return await self.client.messages.create(**kwargs)
+            except Exception as e:
+                last_err = e
+                await asyncio.sleep(min(2 ** attempt, 30))
+        print(f"  WARN: tool turn failed after {attempts} retries: {type(last_err).__name__}: {last_err}")
+        return None
+
+
+def _anthropic_block_to_dict(b) -> dict:
+    t = getattr(b, "type", None)
+    if t == "text":
+        return {"type": "text", "text": b.text}
+    if t == "tool_use":
+        return {"type": "tool_use", "id": b.id, "name": b.name, "input": b.input}
+    return {"type": t}
+
+
+async def _openai_tool_turn(
+    client, sem, model_id, messages, system_prompt, sampling, tool_state, attempts
+) -> dict:
+    """Shared OpenAI-style (function-calling) tool loop for OpenRouter/Gemini."""
+    chat = (
+        [{"role": "system", "content": system_prompt}] if system_prompt else []
+    ) + [{"role": m["role"], "content": m["content"]} for m in messages]
+    tool_calls: list[str] = []
+    topics: list[str] = []
+    ended = False
+    text_parts: list[str] = []
+    for _ in range(MAX_TOOL_ITERS):
+        resp = None
+        last_err: Exception | None = None
+        for attempt in range(attempts):
+            try:
+                async with sem:
+                    resp = await client.chat.completions.create(
+                        model=model_id,
+                        max_tokens=sampling.max_tokens,
+                        temperature=sampling.temperature,
+                        messages=chat,
+                        tools=openai_tools(),
+                    )
+                break
+            except Exception as e:
+                last_err = e
+                await asyncio.sleep(min(2 ** attempt, 30))
+        if resp is None:
+            print(f"  WARN: tool turn failed after {attempts} retries: {type(last_err).__name__}: {last_err}")
+            break
+        msg = resp.choices[0].message
+        if msg.content and msg.content.strip():
+            text_parts.append(msg.content.strip())
+        calls = msg.tool_calls or []
+        if not calls:
+            break
+        chat.append({
+            "role": "assistant",
+            "content": msg.content or "",
+            "tool_calls": [
+                {"id": c.id, "type": "function", "function": {"name": c.function.name, "arguments": c.function.arguments}}
+                for c in calls
+            ],
+        })
+        for c in calls:
+            res, did_end = run_tool(c.function.name, tool_state)
+            tool_calls.append(c.function.name)
+            if c.function.name == "seed_new_topic":
+                topics.append(res)
+            ended = ended or did_end
+            chat.append({"role": "tool", "tool_call_id": c.id, "content": res})
+        if ended:
+            break
+    return {"text": "\n\n".join(text_parts).strip(), "tool_calls": tool_calls, "topics": topics, "ended": ended}
 
 
 class OpenRouterChatBackend:
@@ -258,24 +502,109 @@ class OpenRouterChatBackend:
         print(f"  WARN: dropping sample after {attempts} retries: {type(last_err).__name__}: {last_err}")
         return ""
 
+    async def generate_turn(
+        self, messages, system_prompt, model_name, sampling,
+        tools: bool = False, tool_state: ToolState | None = None, attempts: int = 5,
+    ) -> dict:
+        if not tools:
+            text = await self.generate_one(messages, system_prompt, model_name, sampling, attempts)
+            return {"text": text, "tool_calls": [], "topics": [], "ended": False}
+        return await _openai_tool_turn(
+            self.client, self.sem, model_name, messages, system_prompt, sampling, tool_state, attempts
+        )
 
-def is_anthropic_model(model: str) -> bool:
-    return model.startswith("claude")
+
+class GeminiBackend:
+    """Direct Google Gemini via the OpenAI-compatible endpoint.
+
+    Uses ``GEMINI_API_KEY`` (falling back to ``GOOGLE_API_KEY``). Pairing model
+    ids may carry an OpenRouter-style ``google/`` prefix; it is stripped before
+    the call since the native API expects bare ids like ``gemini-3.1-pro-preview``.
+    """
+
+    BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+
+    def __init__(self, concurrency: int, max_retries: int = 3):
+        from openai import AsyncOpenAI
+
+        api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        if not api_key:
+            raise RuntimeError("Set GEMINI_API_KEY (or GOOGLE_API_KEY) for Gemini models")
+        self.client = AsyncOpenAI(
+            base_url=self.BASE_URL, api_key=api_key, max_retries=max_retries
+        )
+        self.sem = asyncio.Semaphore(concurrency)
+
+    async def generate_one(
+        self,
+        messages: list[dict],
+        system_prompt: str | None,
+        model_name: str,
+        sampling: SamplingConfig,
+        attempts: int = 5,
+    ) -> str:
+        model_id = model_name.split("/", 1)[-1]
+        chat = (
+            [{"role": "system", "content": system_prompt}] if system_prompt else []
+        ) + [{"role": m["role"], "content": m["content"]} for m in messages]
+        last_err: Exception | None = None
+        for attempt in range(attempts):
+            try:
+                async with self.sem:
+                    resp = await self.client.chat.completions.create(
+                        model=model_id,
+                        max_tokens=sampling.max_tokens,
+                        temperature=sampling.temperature,
+                        messages=chat,
+                    )
+                    return resp.choices[0].message.content or ""
+            except Exception as e:
+                last_err = e
+                await asyncio.sleep(min(2 ** attempt, 30))
+        print(f"  WARN: dropping sample after {attempts} retries: {type(last_err).__name__}: {last_err}")
+        return ""
+
+    async def generate_turn(
+        self, messages, system_prompt, model_name, sampling,
+        tools: bool = False, tool_state: ToolState | None = None, attempts: int = 5,
+    ) -> dict:
+        if not tools:
+            text = await self.generate_one(messages, system_prompt, model_name, sampling, attempts)
+            return {"text": text, "tool_calls": [], "topics": [], "ended": False}
+        model_id = model_name.split("/", 1)[-1]
+        return await _openai_tool_turn(
+            self.client, self.sem, model_id, messages, system_prompt, sampling, tool_state, attempts
+        )
+
+
+def provider_for(model: str) -> str:
+    """Pick a backend from the model id.
+
+    A provider-prefixed slug (e.g. ``google/gemini-3.1-pro-preview``) routes
+    through OpenRouter; a bare ``gemini-*`` id uses the native Google API.
+    """
+    if model.startswith("claude"):
+        return "anthropic"
+    if "/" in model:
+        return "openrouter"
+    if model.startswith("gemini"):
+        return "gemini"
+    return "openrouter"
 
 
 def build_backends(pairings: list[Pairing], concurrency: int) -> dict[str, object]:
     """Lazily construct one backend per provider needed across the pairings."""
     models = {p.side_1_model for p in pairings} | {p.side_2_model for p in pairings}
-    backends: dict[str, object] = {}
-    if any(is_anthropic_model(m) for m in models):
-        backends["anthropic"] = AnthropicBackend(concurrency)
-    if any(not is_anthropic_model(m) for m in models):
-        backends["openrouter"] = OpenRouterChatBackend(concurrency)
-    return backends
+    builders = {
+        "anthropic": AnthropicBackend,
+        "gemini": GeminiBackend,
+        "openrouter": OpenRouterChatBackend,
+    }
+    return {prov: builders[prov](concurrency) for prov in {provider_for(m) for m in models}}
 
 
 def backend_for(model: str, backends: dict[str, object]) -> object:
-    return backends["anthropic" if is_anthropic_model(model) else "openrouter"]
+    return backends[provider_for(model)]
 
 
 async def run_pairing(
@@ -285,8 +614,14 @@ async def run_pairing(
     seed: int,
     backends: dict[str, object],
     sampling: SamplingConfig,
+    use_tools: bool = False,
 ) -> dict:
     """Generate n_samples self-play convos for one pairing.
+
+    With ``use_tools``, each model may call ``end_conversation()`` (stops that
+    convo early) or ``seed_new_topic()`` (samples a fresh topic). Tool calls are
+    private to each turn; only the resulting text enters the shared transcript,
+    while a per-turn ``tool_events`` log records what fired.
 
     Returns a dict with convos + per-sample metadata + config.
     """
@@ -298,13 +633,13 @@ async def run_pairing(
 
     side_1_sps = [
         compose_system_prompt(
-            SELF_INTERACTION_TEMPLATES[i], pairing.side_1_model, pairing.side_2_model
+            SELF_INTERACTION_TEMPLATES[i], pairing.side_1_model, pairing.side_2_model, use_tools
         )
         for i in self_int_idxs
     ]
     side_2_sps = [
         compose_system_prompt(
-            SELF_INTERACTION_TEMPLATES[i], pairing.side_2_model, pairing.side_1_model
+            SELF_INTERACTION_TEMPLATES[i], pairing.side_2_model, pairing.side_1_model, use_tools
         )
         for i in self_int_idxs
     ]
@@ -312,6 +647,9 @@ async def run_pairing(
     convos: list[list[dict]] = [
         [{"role": "user", "content": fm}] for fm in first_messages
     ]
+    tool_states = [ToolState(random.Random(f"{seed}-{pairing.name}-tools-{i}")) for i in range(n_samples)]
+    tool_events: list[list[dict]] = [[] for _ in range(n_samples)]
+    ended = [False] * n_samples
 
     for turn in range(n_turns):
         speaker_side = 1 if turn % 2 == 0 else 2
@@ -320,18 +658,39 @@ async def run_pairing(
         else:
             model, sps = pairing.side_2_model, side_2_sps
 
+        active = [i for i in range(n_samples) if not ended[i]]
+        if not active:
+            print(f"  [{pairing.name}] all convos ended by turn {turn} (tools)", flush=True)
+            break
+
         backend = backend_for(model, backends)
         coros = [
-            backend.generate_one(view_for_side(c, speaker_side), sp, model, sampling)
-            for c, sp in zip(convos, sps)
+            backend.generate_turn(
+                view_for_side(convos[i], speaker_side), sps[i], model, sampling,
+                tools=use_tools, tool_state=tool_states[i],
+            )
+            for i in active
         ]
-        outs = await asyncio.gather(*coros)
+        results = await asyncio.gather(*coros)
 
         canonical_role = "assistant" if speaker_side == 1 else "user"
-        for c, out in zip(convos, outs):
-            c.append({"role": canonical_role, "content": out.rstrip() or "(no response)"})
+        for i, res in zip(active, results):
+            content = res["text"].rstrip() or ("(ended conversation)" if res["ended"] else "(no response)")
+            convos[i].append({"role": canonical_role, "content": content})
+            if res["tool_calls"]:
+                tool_events[i].append({
+                    "turn": turn + 1,
+                    "side": speaker_side,
+                    "model": model,
+                    "tool_calls": res["tool_calls"],
+                    "topics": res["topics"],
+                    "ended": res["ended"],
+                })
+            if res["ended"]:
+                ended[i] = True
 
-        print(f"  [{pairing.name}] turn {turn + 1}/{n_turns} ({model}) done", flush=True)
+        suffix = f" [{len(active)}/{n_samples} active]" if use_tools else ""
+        print(f"  [{pairing.name}] turn {turn + 1}/{n_turns} ({model}) done{suffix}", flush=True)
 
     return {
         "pairing": asdict(pairing),
@@ -340,6 +699,8 @@ async def run_pairing(
         "self_int_idxs": self_int_idxs,
         "side_1_system_prompts": side_1_sps,
         "side_2_system_prompts": side_2_sps,
+        "tool_events": tool_events,
+        "use_tools": use_tools,
     }
 
 
@@ -358,6 +719,8 @@ def _config_hash(d: dict) -> str:
 def write_pairing_outputs(result: dict, out_dir: Path, seed: int) -> None:
     pairing = result["pairing"]
     convos = result["convos"]
+    tool_events = result.get("tool_events") or [[] for _ in convos]
+    use_tools = result.get("use_tools", False)
     a1, a2 = [], []
     for i, c in enumerate(convos):
         meta = {
@@ -369,6 +732,7 @@ def write_pairing_outputs(result: dict, out_dir: Path, seed: int) -> None:
             "self_interaction_idx": result["self_int_idxs"][i],
             "first_message": result["first_messages"][i],
             "sample_idx": i,
+            "tool_events": tool_events[i],
         }
         a1.append({"messages": c, "pov": "side_1", **meta})
         a2.append({"messages": view_for_side(c, 2), "pov": "side_2", **meta})
@@ -387,6 +751,9 @@ def write_pairing_outputs(result: dict, out_dir: Path, seed: int) -> None:
         "side_2_system_prompts": result["side_2_system_prompts"],
         "self_interaction_templates": SELF_INTERACTION_TEMPLATES,
         "default_system_prompt": DEFAULT_SYSTEM_PROMPT,
+        "use_tools": use_tools,
+        "topic_pool": TOPIC_POOL if use_tools else None,
+        "tool_defs": TOOL_DEFS if use_tools else None,
     }, indent=2))
 
 
@@ -402,6 +769,7 @@ def main(
     pairings: str | None = None,
     debug: bool = False,
     max_samples: int | None = None,
+    use_tools: bool = False,
 ):
     """Generate Claude self-interaction data across model pairings.
 
@@ -412,6 +780,7 @@ def main(
         pairings: comma-separated subset of pairing names; default = all four.
         debug: shrinks to n_samples=2, n_turns=4, max_tokens=256.
         max_samples: alternative way to shrink n_samples (overrides default).
+        use_tools: give each model end_conversation() + seed_new_topic() tools.
     """
     if debug:
         n_samples = max_samples or 2
@@ -425,7 +794,12 @@ def main(
 
     selected: list[Pairing] = DEFAULT_PAIRINGS
     if pairings is not None:
-        wanted = {p.strip() for p in pairings.split(",") if p.strip()}
+        # Fire turns `--pairings a,b` into a tuple; accept str, list, or tuple.
+        if isinstance(pairings, (list, tuple)):
+            parts = [str(p) for p in pairings]
+        else:
+            parts = str(pairings).split(",")
+        wanted = {p.strip() for p in parts if p.strip()}
         selected = [p for p in DEFAULT_PAIRINGS if p.name in wanted]
         unknown = wanted - {p.name for p in DEFAULT_PAIRINGS}
         if unknown:
@@ -445,13 +819,18 @@ def main(
             "first_messages": FIRST_MESSAGES,
             "seed": seed,
         }
+        if use_tools:
+            cfg["use_tools"] = True
+            cfg["topic_pool"] = TOPIC_POOL
+            cfg["tool_defs"] = TOOL_DEFS
         cache_file = cache_path / f"self_int_{p.name}_{_config_hash(cfg)}.json"
         if cache_file.exists():
             print(f"[{p.name}] loading cache {cache_file.name}")
             result = json.loads(cache_file.read_text())
         else:
-            print(f"[{p.name}] generating {n_samples} convos × {n_turns} turns")
-            result = await run_pairing(p, n_samples, n_turns, seed, backends, sampling)
+            print(f"[{p.name}] generating {n_samples} convos × {n_turns} turns"
+                  + (" (tools on)" if use_tools else ""))
+            result = await run_pairing(p, n_samples, n_turns, seed, backends, sampling, use_tools)
             cache_path.mkdir(parents=True, exist_ok=True)
             cache_file.write_text(json.dumps(result))
             print(f"[{p.name}] cached -> {cache_file.name}")
