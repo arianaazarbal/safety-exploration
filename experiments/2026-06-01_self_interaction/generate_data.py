@@ -100,10 +100,7 @@ TOPIC_POOL = [
 TOOL_DEFS = [
     {
         "name": "end_conversation",
-        "description": (
-            "End the conversation. Call this when the conversation has reached a "
-            "natural conclusion and you have nothing further you wish to say."
-        ),
+        "description": "End the conversation whenever you wish.",
     },
     {
         "name": "seed_new_topic",
@@ -117,7 +114,7 @@ TOOL_DEFS = [
 
 TOOLS_SYSTEM_SUFFIX = (
     "\n\nYou have two tools available:\n"
-    "- end_conversation(): end the conversation when it has reached a natural close.\n"
+    "- end_conversation(): end the conversation whenever you wish.\n"
     "- seed_new_topic(): get a fresh, specific topic when the current one feels exhausted.\n"
     "Use them whenever they feel appropriate; you are under no obligation to use either."
 )
@@ -200,6 +197,7 @@ DEFAULT_PAIRINGS: list[Pairing] = [
     Pairing("opus47_x_opus47", "claude-opus-4-7", "claude-opus-4-7"),
     Pairing("opus46_x_opus46", "claude-opus-4-6", "claude-opus-4-6"),
     Pairing("opus4_x_opus48", "claude-opus-4-20250514", "claude-opus-4-8"),
+    Pairing("opus4_x_opus4", "claude-opus-4-20250514", "claude-opus-4-20250514"),
     Pairing("opus48_x_gemini31pro", "claude-opus-4-8", "google/gemini-3.1-pro-preview"),
     Pairing("opus48_x_gpt55", "claude-opus-4-8", "openai/gpt-5.5"),
 ]
