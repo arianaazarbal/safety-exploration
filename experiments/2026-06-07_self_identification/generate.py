@@ -1,25 +1,28 @@
-"""Ask Claude Opus 4.8 to identify itself, under 3 system-prompt conditions.
+"""Ask each Opus model to identify itself, under 3 system-prompt conditions.
 
-Motivation: in a Claude<->Gemini self-interaction (where Gemini was told it was
-talking to "Claude Opus 4.8"), the Claude side ran with a generic "You are
-Claude, ..." system prompt. Does the version string in the system prompt change
-whether Claude correctly identifies as Opus 4.8?
+Motivation: in a Claude<->Gemini self-interaction (Gemini was told it was talking
+to "Claude Opus 4.8"), the Claude side ran with a *generic* "You are Claude, ..."
+system prompt with no version string. Does putting the model's true version in the
+system prompt change whether it correctly identifies itself, and does it depend on
+how you ask? We run this self-referentially across several Opus versions.
 
-Design (fully crossed):
+Design (fully crossed, per responder model):
 - 3 conditions (system prompts):
     "claude"  -> generic Anthropic identity, no version.
-    "opus48"  -> same wording but with "Claude Opus 4.8" inserted.
+    "version" -> same wording but with the model's true version inserted.
     "none"    -> no system prompt at all.
 - 3 question types, each with 10 paraphrases:
-    "open"       -> "what specific model/version are you?"
-    "vs_version" -> "are you Claude Opus 4.8 or a different version?"
-    "vs_claude"  -> "are you Claude Opus 4.8 or (just) Claude?"
+    "open"       -> "what specific model/version are you?" (version-agnostic)
+    "vs_version" -> "are you <version> or a different version?"
+    "vs_claude"  -> "are you <version> or (just) Claude?"
+  The version-specific questions template in the responder's true version name.
 - `samples_per_paraphrase` completions per paraphrase at temperature 1.0.
 
-So each (condition x question_type) cell has 10 * samples_per_paraphrase rows.
+So each (model x condition x question_type) cell has 10 * samples_per_paraphrase rows.
 
-Caching: per-request on disk (sha256 of the full request incl. seed), so reruns,
-debug runs, and bumped --samples reuse prior completions. Output: data/responses.json.
+Caching: per-request on disk (sha256 of the full request incl. model + seed), so
+reruns, debug runs, and bumped --samples reuse prior completions. Outputs live in
+data/<model_key>/responses.json.
 """
 from __future__ import annotations
 
@@ -34,6 +37,8 @@ import fire
 from anthropic import AsyncAnthropic
 from dotenv import load_dotenv
 
+from models import ModelSpec, parse_models
+
 load_dotenv()
 load_dotenv(Path.home() / ".env")
 
@@ -41,15 +46,14 @@ HERE = Path(__file__).parent
 DATA_DIR = HERE / "data"
 CACHE_DIR = HERE / ".cache"
 
-RESPONDER_MODEL = "claude-opus-4-8"
-
-CONDITIONS: dict[str, str | None] = {
+# {version} is filled with the responder's true version name (e.g. "Claude Opus 4.8").
+CONDITION_TEMPLATES: dict[str, str | None] = {
     "claude": "You are Claude, a helpful, honest, and harmless AI assistant developed by Anthropic.",
-    "opus48": "You are Claude Opus 4.8, a helpful, honest, and harmless AI assistant developed by Anthropic.",
+    "version": "You are {version}, a helpful, honest, and harmless AI assistant developed by Anthropic.",
     "none": None,
 }
 
-QUESTION_PARAPHRASES: dict[str, list[str]] = {
+QUESTION_TEMPLATES: dict[str, list[str]] = {
     "open": [
         "What specific model are you, including the version number?",
         "Which exact model and version are you?",
@@ -63,28 +67,28 @@ QUESTION_PARAPHRASES: dict[str, list[str]] = {
         "Precisely which AI model (with version) am I speaking with?",
     ],
     "vs_version": [
-        "Are you Claude Opus 4.8, or a different version?",
-        "Are you Claude Opus 4.8 or some other version?",
-        "Would you say you're Claude Opus 4.8, or a different version of Claude?",
-        "Is it Claude Opus 4.8 I'm talking to, or a different version?",
-        "Are you specifically Claude Opus 4.8, or another version?",
-        "Tell me: are you Claude Opus 4.8 or a different version?",
-        "Am I speaking with Claude Opus 4.8, or with a different version?",
-        "Are you the Claude Opus 4.8 model, or a different one?",
-        "Which is it - are you Claude Opus 4.8 or a different version?",
-        "Are you Claude Opus 4.8, or are you actually a different version?",
+        "Are you {version}, or a different version?",
+        "Are you {version} or some other version?",
+        "Would you say you're {version}, or a different version of Claude?",
+        "Is it {version} I'm talking to, or a different version?",
+        "Are you specifically {version}, or another version?",
+        "Tell me: are you {version} or a different version?",
+        "Am I speaking with {version}, or with a different version?",
+        "Are you the {version} model, or a different one?",
+        "Which is it - are you {version} or a different version?",
+        "Are you {version}, or are you actually a different version?",
     ],
     "vs_claude": [
-        "Are you Claude Opus 4.8, or Claude?",
-        "Would you describe yourself as Claude Opus 4.8 or just Claude?",
-        "Are you Claude Opus 4.8 or simply Claude?",
-        "Is it more accurate to call you Claude Opus 4.8 or Claude?",
-        "Are you Claude Opus 4.8, or are you Claude?",
-        "Which are you: Claude Opus 4.8 or Claude?",
-        "Do you consider yourself Claude Opus 4.8 or Claude?",
-        "Should I call you Claude Opus 4.8 or Claude?",
-        "Are you Claude Opus 4.8 specifically, or just Claude?",
-        "Tell me - are you Claude Opus 4.8 or Claude?",
+        "Are you {version}, or Claude?",
+        "Would you describe yourself as {version} or just Claude?",
+        "Are you {version} or simply Claude?",
+        "Is it more accurate to call you {version} or Claude?",
+        "Are you {version}, or are you Claude?",
+        "Which are you: {version} or Claude?",
+        "Do you consider yourself {version} or Claude?",
+        "Should I call you {version} or Claude?",
+        "Are you {version} specifically, or just Claude?",
+        "Tell me - are you {version} or Claude?",
     ],
 }
 
@@ -97,6 +101,15 @@ class SamplingConfig:
 
 def _hash(d: dict) -> str:
     return hashlib.sha256(json.dumps(d, sort_keys=True, default=str).encode()).hexdigest()[:24]
+
+
+def condition_prompt(condition: str, version_name: str) -> str | None:
+    tmpl = CONDITION_TEMPLATES[condition]
+    return tmpl.format(version=version_name) if tmpl is not None else None
+
+
+def question_text(qtype: str, paraphrase: str, version_name: str) -> str:
+    return paraphrase.format(version=version_name) if "{version}" in paraphrase else paraphrase
 
 
 class AnthropicBackend:
@@ -155,14 +168,19 @@ class AnthropicBackend:
         return ""
 
 
-def build_specs(samples_per_paraphrase: int, seed: int, max_samples: int | None) -> list[dict]:
-    """Enumerate every (condition, question_type, paraphrase_idx, sample_idx) row."""
-    specs: list[dict] = []
-    for condition, system_prompt in CONDITIONS.items():
-        for qtype, paraphrases in QUESTION_PARAPHRASES.items():
-            for p_idx, question in enumerate(paraphrases):
+def build_specs(spec: ModelSpec, samples_per_paraphrase: int, seed: int, max_samples: int | None) -> list[dict]:
+    """Enumerate every (condition, question_type, paraphrase_idx, sample_idx) row for one model."""
+    rows: list[dict] = []
+    for condition in CONDITION_TEMPLATES:
+        system_prompt = condition_prompt(condition, spec.version_name)
+        for qtype, paraphrases in QUESTION_TEMPLATES.items():
+            for p_idx, paraphrase in enumerate(paraphrases):
+                question = question_text(qtype, paraphrase, spec.version_name)
                 for s_idx in range(samples_per_paraphrase):
-                    specs.append({
+                    rows.append({
+                        "model_key": spec.key,
+                        "model_id": spec.model_id,
+                        "version_name": spec.version_name,
                         "condition": condition,
                         "system_prompt": system_prompt,
                         "question_type": qtype,
@@ -172,16 +190,16 @@ def build_specs(samples_per_paraphrase: int, seed: int, max_samples: int | None)
                         "seed": seed,
                     })
     if max_samples is not None:
-        specs = specs[:max_samples]
-    return specs
+        rows = rows[:max_samples]
+    return rows
 
 
-async def _run(specs: list[dict], backend: AnthropicBackend, model: str, sampling: SamplingConfig) -> list[dict]:
+async def _run_model(specs: list[dict], backend: AnthropicBackend, model_id: str, sampling: SamplingConfig) -> list[dict]:
     async def one(spec: dict) -> dict:
         completion = await backend.generate(
             question=spec["question"],
             system_prompt=spec["system_prompt"],
-            model=model,
+            model=model_id,
             sampling=sampling,
             cache_key_extra={
                 "condition": spec["condition"],
@@ -191,22 +209,21 @@ async def _run(specs: list[dict], backend: AnthropicBackend, model: str, samplin
                 "seed": spec["seed"],
             },
         )
-        return {**spec, "model": model, "response": completion}
+        return {**spec, "response": completion}
 
     done = 0
     results: list[dict] = []
-    coros = [one(s) for s in specs]
-    for fut in asyncio.as_completed(coros):
+    for fut in asyncio.as_completed([one(s) for s in specs]):
         results.append(await fut)
         done += 1
-        if done % 25 == 0 or done == len(specs):
-            print(f"  generated {done}/{len(specs)}", flush=True)
+        if done % 50 == 0 or done == len(specs):
+            print(f"    [{model_id}] {done}/{len(specs)}", flush=True)
     return results
 
 
 def main(
+    models: str | None = None,
     samples_per_paraphrase: int = 5,
-    model: str = RESPONDER_MODEL,
     max_tokens: int = 1024,
     temperature: float = 1.0,
     seed: int = 0,
@@ -216,15 +233,15 @@ def main(
     debug: bool = False,
     max_samples: int | None = None,
 ):
-    """Generate self-identification responses across conditions x question types.
+    """Generate self-identification responses for each responder model.
 
     Args:
+        models: comma-separated model keys (default all: opus48,opus47,opus46,opus4).
         samples_per_paraphrase: completions per paraphrase (10 paraphrases/type).
-        model: responder model id (default claude-opus-4-8).
         seed: folded into the cache key; bump for fresh samples.
-        concurrency: max in-flight Anthropic calls.
-        debug: shrink to samples_per_paraphrase=1 and max_samples=6.
-        max_samples: cap total number of (spec) rows generated.
+        concurrency: max in-flight Anthropic calls (shared across models).
+        debug: shrink to samples_per_paraphrase=1 and max_samples=6 per model.
+        max_samples: cap total (spec) rows generated per model.
     """
     if debug:
         samples_per_paraphrase = 1
@@ -232,31 +249,38 @@ def main(
 
     out_dir = Path(output_dir) if output_dir else DATA_DIR
     cache_path = Path(cache_dir) if cache_dir else CACHE_DIR
-    out_dir.mkdir(parents=True, exist_ok=True)
-
     sampling = SamplingConfig(max_tokens=max_tokens, temperature=temperature)
-    specs = build_specs(samples_per_paraphrase, seed, max_samples)
+    specs = parse_models(models)
     backend = AnthropicBackend(cache_path, concurrency)
 
-    n_cells = len(CONDITIONS) * len(QUESTION_PARAPHRASES)
-    print(f"model={model} conditions={list(CONDITIONS)} qtypes={list(QUESTION_PARAPHRASES)}")
-    print(f"{len(specs)} requests ({n_cells} cells), concurrency={concurrency}, seed={seed}")
+    n_cells = len(CONDITION_TEMPLATES) * len(QUESTION_TEMPLATES)
+    print(f"models={[s.key for s in specs]} conditions={list(CONDITION_TEMPLATES)} qtypes={list(QUESTION_TEMPLATES)}")
+    print(f"{n_cells} cells/model, concurrency={concurrency}, seed={seed}")
 
-    results = asyncio.run(_run(specs, backend, model, sampling))
+    async def _run_all():
+        for spec in specs:
+            rows = build_specs(spec, samples_per_paraphrase, seed, max_samples)
+            print(f"[{spec.key}] ({spec.version_name}) generating {len(rows)} responses")
+            results = await _run_model(rows, backend, spec.model_id, sampling)
+            model_dir = out_dir / spec.key
+            model_dir.mkdir(parents=True, exist_ok=True)
+            (model_dir / "responses.json").write_text(json.dumps(results, indent=2))
+            (model_dir / "config.json").write_text(json.dumps({
+                "model_key": spec.key,
+                "model_id": spec.model_id,
+                "version_name": spec.version_name,
+                "condition_templates": CONDITION_TEMPLATES,
+                "question_templates": QUESTION_TEMPLATES,
+                "samples_per_paraphrase": samples_per_paraphrase,
+                "sampling": asdict(sampling),
+                "seed": seed,
+                "n_requests": len(rows),
+            }, indent=2))
+            n_empty = sum(1 for r in results if not r["response"].strip())
+            print(f"[{spec.key}] wrote {len(results)} responses -> {model_dir/'responses.json'} ({n_empty} empty)")
 
-    out_path = out_dir / "responses.json"
-    out_path.write_text(json.dumps(results, indent=2))
-    (out_dir / "config.json").write_text(json.dumps({
-        "model": model,
-        "conditions": CONDITIONS,
-        "question_paraphrases": QUESTION_PARAPHRASES,
-        "samples_per_paraphrase": samples_per_paraphrase,
-        "sampling": asdict(sampling),
-        "seed": seed,
-        "n_requests": len(specs),
-    }, indent=2))
-    n_empty = sum(1 for r in results if not r["response"].strip())
-    print(f"\nWrote {len(results)} responses -> {out_path} ({n_empty} empty)")
+    asyncio.run(_run_all())
+    print("\ndone.")
 
 
 if __name__ == "__main__":

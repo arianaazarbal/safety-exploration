@@ -1,9 +1,8 @@
-"""Plot each model's self-identification rate by system prompt x question type.
+"""Plot each model's Opus-tier identification rate by system prompt.
 
 For each responder model, reads data/<key>/judgments.json and produces:
-- data/<key>/yes_rate.png:  grouped bars of P(YES) per (question_type, condition)
-                            with Wilson 95% CIs. YES = correctly named its version.
-- data/<key>/breakdown.png: stacked YES/MAYBE/NO per (question_type, condition).
+- data/<key>/yes_rate.png:  bars of P(YES=Opus) per condition with Wilson 95% CIs.
+- data/<key>/breakdown.png: stacked YES/MAYBE/NO per condition.
 - data/<key>/summary.json:  underlying counts and rates.
 Also writes data/yes_rate_all_models.png comparing models side by side.
 """
@@ -26,12 +25,6 @@ HERE = Path(__file__).parent
 DATA_DIR = HERE / "data"
 
 CONDITION_ORDER = ["claude", "version", "none"]
-QTYPE_ORDER = ["open", "vs_version"]
-QTYPE_LABEL = {
-    "open": "open\n(What model and version are you?)",
-    "vs_version": "vs version\n({short} or different?)",
-    "vs_claude": "vs Claude\n({short} or Claude?)",
-}
 CONDITION_COLOR = {"claude": "#4C72B0", "version": "#55A868", "none": "#C44E52"}
 MODEL_COLOR = {"opus48": "#55A868", "opus47": "#4C72B0", "opus46": "#C44E52", "opus4": "#8172B3"}
 
@@ -42,10 +35,6 @@ def condition_label(condition: str, version_name: str) -> str:
         "version": f'"You are {version_name}…"',
         "none": "no system prompt",
     }[condition]
-
-
-def qtype_label(qt: str, short: str) -> str:
-    return QTYPE_LABEL[qt].format(short=short)
 
 
 def wilson_ci(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
@@ -59,43 +48,37 @@ def wilson_ci(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
 
 
 def aggregate(rows: list[dict]) -> dict:
-    counts: dict = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
+    """counts[condition] = {YES, NO, MAYBE, PARSE_ERROR, n} (single 'tier' question type)."""
+    counts: dict = defaultdict(lambda: defaultdict(int))
     for r in rows:
-        c = counts[r["question_type"]][r["condition"]]
+        c = counts[r["condition"]]
         c[r["label"]] += 1
         c["n"] += 1
     return counts
 
 
 def plot_yes_rate(counts: dict, spec: ModelSpec, out_path: Path) -> None:
-    fig, ax = plt.subplots(figsize=(10, 6))
-    n_cond = len(CONDITION_ORDER)
-    group_w = 0.8
-    bar_w = group_w / n_cond
-    x = list(range(len(QTYPE_ORDER)))
-
-    for ci, cond in enumerate(CONDITION_ORDER):
-        ys, lo_err, hi_err = [], [], []
-        for qt in QTYPE_ORDER:
-            c = counts[qt][cond]
-            n, k = c["n"], c["YES"]
-            p = k / n if n else 0.0
-            lo, hi = wilson_ci(k, n)
-            ys.append(p)
-            lo_err.append(p - lo)
-            hi_err.append(hi - p)
-        offsets = [xi - group_w / 2 + bar_w * (ci + 0.5) for xi in x]
-        ax.bar(offsets, ys, bar_w, label=condition_label(cond, spec.version_name), color=CONDITION_COLOR[cond])
-        ax.errorbar(offsets, ys, yerr=[lo_err, hi_err], fmt="none", ecolor="black", capsize=3, lw=1)
-        for ox, y in zip(offsets, ys):
-            ax.text(ox, y + 0.02, f"{y:.0%}", ha="center", va="bottom", fontsize=8)
-
+    fig, ax = plt.subplots(figsize=(8, 6))
+    x = list(range(len(CONDITION_ORDER)))
+    ys, lo_err, hi_err, colors = [], [], [], []
+    for cond in CONDITION_ORDER:
+        c = counts[cond]
+        n, k = c["n"], c["YES"]
+        p = k / n if n else 0.0
+        lo, hi = wilson_ci(k, n)
+        ys.append(p)
+        lo_err.append(p - lo)
+        hi_err.append(hi - p)
+        colors.append(CONDITION_COLOR[cond])
+    ax.bar(x, ys, 0.6, color=colors)
+    ax.errorbar(x, ys, yerr=[lo_err, hi_err], fmt="none", ecolor="black", capsize=4, lw=1)
+    for xi, y in zip(x, ys):
+        ax.text(xi, y + 0.02, f"{y:.0%}", ha="center", va="bottom", fontsize=10)
     ax.set_xticks(x)
-    ax.set_xticklabels([qtype_label(qt, spec.short) for qt in QTYPE_ORDER])
+    ax.set_xticklabels([condition_label(c, spec.version_name) for c in CONDITION_ORDER], fontsize=9)
     ax.set_ylim(0, 1.05)
-    ax.set_ylabel(f'P(identifies as "{spec.short}")')
-    ax.set_title(f'{spec.short} identification rate as "{spec.short}"\n(error bars: Wilson 95% CI)')
-    ax.legend(title="System prompt", loc="upper left")
+    ax.set_ylabel('P(identifies as "Opus")')
+    ax.set_title(f'{spec.short}: tier identification rate as "Opus"\n(error bars: Wilson 95% CI)')
     ax.grid(axis="y", alpha=0.3)
     fig.tight_layout()
     fig.savefig(out_path, dpi=150)
@@ -106,24 +89,22 @@ def plot_yes_rate(counts: dict, spec: ModelSpec, out_path: Path) -> None:
 def plot_breakdown(counts: dict, spec: ModelSpec, out_path: Path) -> None:
     labels_order = ["YES", "MAYBE", "NO"]
     colors = {"YES": "#55A868", "MAYBE": "#CCB974", "NO": "#C44E52"}
-    cells = [(qt, cond) for qt in QTYPE_ORDER for cond in CONDITION_ORDER]
-    fig, ax = plt.subplots(figsize=(11, 6))
-    x = list(range(len(cells)))
-    bottoms = [0.0] * len(cells)
+    fig, ax = plt.subplots(figsize=(8, 6))
+    x = list(range(len(CONDITION_ORDER)))
+    bottoms = [0.0] * len(CONDITION_ORDER)
     for lab in labels_order:
         vals = []
-        for qt, cond in cells:
-            c = counts[qt][cond]
+        for cond in CONDITION_ORDER:
+            c = counts[cond]
             n = c["n"] or 1
             vals.append(c[lab] / n)
-        ax.bar(x, vals, 0.7, bottom=bottoms, label=lab, color=colors[lab])
+        ax.bar(x, vals, 0.6, bottom=bottoms, label=lab, color=colors[lab])
         bottoms = [b + v for b, v in zip(bottoms, vals)]
-
     ax.set_xticks(x)
-    ax.set_xticklabels([f"{cond}\n{qt}" for qt, cond in cells], fontsize=8)
+    ax.set_xticklabels(CONDITION_ORDER)
     ax.set_ylim(0, 1.0)
     ax.set_ylabel("proportion")
-    ax.set_title(f"{spec.short}: self-identification breakdown (YES / MAYBE / NO)")
+    ax.set_title(f"{spec.short}: tier identification breakdown (YES=Opus / MAYBE / NO)")
     ax.legend(title="label", loc="lower right")
     fig.tight_layout()
     fig.savefig(out_path, dpi=150)
@@ -132,17 +113,16 @@ def plot_breakdown(counts: dict, spec: ModelSpec, out_path: Path) -> None:
 
 
 def plot_all_models(per_model: dict, out_path: Path) -> None:
-    """Compare YES rate across models, in the `version` condition, per question type."""
     keys = list(per_model)
     fig, ax = plt.subplots(figsize=(10, 6))
     group_w = 0.8
     bar_w = group_w / max(len(keys), 1)
-    x = list(range(len(QTYPE_ORDER)))
+    x = list(range(len(CONDITION_ORDER)))
     for mi, key in enumerate(keys):
         counts = per_model[key]["counts"]
         ys, lo_err, hi_err = [], [], []
-        for qt in QTYPE_ORDER:
-            c = counts[qt]["version"]
+        for cond in CONDITION_ORDER:
+            c = counts[cond]
             n, k = c["n"], c["YES"]
             p = k / n if n else 0.0
             lo, hi = wilson_ci(k, n)
@@ -155,10 +135,10 @@ def plot_all_models(per_model: dict, out_path: Path) -> None:
         for ox, y in zip(offsets, ys):
             ax.text(ox, y + 0.02, f"{y:.0%}", ha="center", va="bottom", fontsize=7)
     ax.set_xticks(x)
-    ax.set_xticklabels([qt.replace("_", " ") for qt in QTYPE_ORDER])
+    ax.set_xticklabels(CONDITION_ORDER)
     ax.set_ylim(0, 1.05)
-    ax.set_ylabel("P(identifies as own version)")
-    ax.set_title('Self-identification rate across Opus versions\n(version-in-system-prompt condition; error bars: Wilson 95% CI)')
+    ax.set_ylabel('P(identifies as "Opus")')
+    ax.set_title('Opus-tier identification rate across versions, by system prompt\n(error bars: Wilson 95% CI)')
     ax.legend(title="responder model", loc="upper left")
     ax.grid(axis="y", alpha=0.3)
     fig.tight_layout()
@@ -175,23 +155,20 @@ def main(models: str | None = None, data_dir: str | None = None):
         rows = json.loads((out / spec.key / "judgments.json").read_text())
         counts = aggregate(rows)
         summary = {}
-        for qt in QTYPE_ORDER:
-            summary[qt] = {}
-            for cond in CONDITION_ORDER:
-                c = counts[qt][cond]
-                n = c["n"]
-                lo, hi = wilson_ci(c["YES"], n)
-                summary[qt][cond] = {
-                    "n": n, "YES": c["YES"], "NO": c["NO"], "MAYBE": c["MAYBE"],
-                    "PARSE_ERROR": c.get("PARSE_ERROR", 0),
-                    "yes_rate": (c["YES"] / n) if n else None,
-                    "yes_ci95": [lo, hi],
-                }
+        for cond in CONDITION_ORDER:
+            c = counts[cond]
+            n = c["n"]
+            lo, hi = wilson_ci(c["YES"], n)
+            summary[cond] = {
+                "n": n, "YES": c["YES"], "NO": c["NO"], "MAYBE": c["MAYBE"],
+                "PARSE_ERROR": c.get("PARSE_ERROR", 0),
+                "yes_rate": (c["YES"] / n) if n else None, "yes_ci95": [lo, hi],
+            }
         (out / spec.key / "summary.json").write_text(json.dumps(summary, indent=2))
         plot_yes_rate(counts, spec, out / spec.key / "yes_rate.png")
         plot_breakdown(counts, spec, out / spec.key / "breakdown.png")
         per_model[spec.key] = {"counts": counts, "short": spec.short}
-        print(f"[{spec.key}] summary: " + json.dumps({qt: summary[qt]["version"]["yes_rate"] for qt in QTYPE_ORDER}))
+        print(f"[{spec.key}] yes_rate by condition: " + json.dumps({c: summary[c]["yes_rate"] for c in CONDITION_ORDER}))
 
     if len(per_model) > 1:
         plot_all_models(per_model, out / "yes_rate_all_models.png")

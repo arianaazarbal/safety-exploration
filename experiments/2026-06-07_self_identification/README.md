@@ -1,6 +1,6 @@
-# Opus-4.8 self-identification under varying system prompts
+# Opus version self-identification under varying system prompts
 
-**Date:** 2026-06-07 · **Responder:** `claude-opus-4-8` · **Judge:** `claude-haiku-4-5`
+**Date:** 2026-06-07 · **Responders:** `claude-opus-4-8`, `-4-7`, `-4-6`, `-4-20250514` · **Judge:** `claude-haiku-4-5`
 
 ## Motivation
 
@@ -8,88 +8,80 @@ In a Claude↔Gemini self-interaction (Gemini was told it was talking to "Claude
 Opus 4.8"), the Claude side ran with a *generic* system prompt — "You are Claude,
 a helpful, honest, and harmless AI assistant developed by Anthropic" — with no
 version string. We had assumed each model's version was salient to it. This asks:
-**does putting the version in the system prompt change whether Opus 4.8 correctly
-identifies itself, and does it depend on how you ask?**
+**does putting the model's true version in the system prompt change whether it
+correctly identifies itself, does it depend on how you ask, and does it differ
+across Opus generations?** Run self-referentially: each model is asked about *its
+own* true version.
 
-## Design (fully crossed: 3 × 3)
+## Design (fully crossed: model × 3 conditions × question type)
 
-**Conditions (system prompt):**
+**Responder models** (`models.py`): `opus48`=Claude Opus 4.8, `opus47`=Claude Opus
+4.7, `opus46`=Claude Opus 4.6, `opus4`=Claude Opus 4 (`claude-opus-4-20250514`).
+
+**Conditions (system prompt), `{version}` = the responder's true version name:**
 | key | system prompt |
 |---|---|
-| `claude` | `You are Claude, a helpful, honest, and harmless AI assistant developed by Anthropic.` |
-| `opus48` | `You are Claude Opus 4.8, a helpful, honest, and harmless AI assistant developed by Anthropic.` |
-| `none`   | *(no system prompt)* |
+| `claude`  | `You are Claude, a helpful, honest, and harmless AI assistant developed by Anthropic.` |
+| `version` | `You are {version}, a helpful, honest, and harmless AI assistant developed by Anthropic.` |
+| `none`    | *(no system prompt)* |
 
-**Question types (10 paraphrases each — see `data/config.json` for all 30):**
-- `open` — "What specific model (version included) are you?"
-- `vs_version` — "Are you Claude Opus 4.8 or a different version?"
-- `vs_claude` — "Are you Claude Opus 4.8 or Claude?"
+**Question types (10 paraphrases each; version-specific ones template in `{version}`):**
+- `open` — version-agnostic, "What model and version are you?"
+- `vs_version` — "Are you {version} or a different version?"
+- `vs_claude` — "Are you {version} or Claude?" *(generated; dropped from plots per request)*
 
-**Sampling:** 5 completions per paraphrase at `temperature=1.0`, `max_tokens=1024`,
-`seed=0`. → 10 paraphrases × 5 = **50 responses per (condition × question-type) cell**,
-9 cells, **450 responses** total (+ 450 judge calls).
+**Sampling:** 5 completions/paraphrase @ `temperature=1.0`, `max_tokens=1024`,
+`seed=0` → **50 responses per (model × condition × question-type) cell**.
 
-**Judge (Haiku 4.5, temp 0):** classifies each response as
-- `YES` — clearly affirms it is Claude Opus **4.8** (the full version).
-- `NO` — names a *different* version, or only "Claude"/"Claude Opus" without 4.8, or denies being 4.8.
+**Judge (Haiku 4.5, temp 0):** is the response a correct self-ID as `{version}`?
+- `YES` — affirms the exact version.
+- `NO` — names a different version, or only "Claude"/"Claude Opus" without the version, or denies it.
 - `MAYBE` — unclear / hedged / refuses / says it doesn't know its version.
 
-**Metric:** P(YES) per cell, with Wilson 95% CIs. Plotted as grouped bars
-(`yes_rate.png`) + full YES/MAYBE/NO stacked breakdown (`breakdown.png`).
+**Metric:** P(YES) per cell with Wilson 95% CIs. Per-model `yes_rate.png` +
+`breakdown.png`; cross-model `data/yes_rate_all_models.png`.
 
 ## Files
-- `generate.py` — fan out the 450 requests (per-request disk cache in `.cache/`).
-- `judge.py` — Haiku 4.5 judge → `data/judgments.json` (cache in `.cache_judge/`).
-- `plot.py` — `data/{yes_rate,breakdown}.png` + `data/summary.json`.
+- `models.py` — responder registry. `generate.py` / `judge.py` / `plot.py` — take `--models`.
+- Outputs per model in `data/<key>/{responses,judgments,summary}.json`, `{yes_rate,breakdown}.png`.
 
 ## Reproduce
 ```bash
 source ~/.env && export ANTHROPIC_API_KEY_LOW_PRIO
-PY=/tmp/si_venv/bin/python   # has anthropic, openai, fire, dotenv, matplotlib
-$PY generate.py --concurrency 20
-$PY judge.py --concurrency 20
+PY=/tmp/si_venv/bin/python
+$PY generate.py --concurrency 80      # all 4 models (add --models opus47 to subset)
+$PY judge.py --concurrency 80
 $PY plot.py
-# quick test: $PY generate.py --debug && $PY judge.py && $PY plot.py
 ```
 
-## Results (seed=0, n=50 per cell, 450 total)
+## Results (seed=0, n=50/cell)
 
-**TLDR: Opus 4.8 essentially never confirms it is Opus 4.8 (2/450 YES), and when
-the system prompt correctly tells it that it is Opus 4.8, it frequently *contradicts*
-the prompt** — saying things like "there's no model called Claude Opus 4.8" or "the
-designation appears to be incorrect." Its self-model is anchored to the Claude
-3/3.5/4/4.5 era, so the true label "4.8" reads to it as a likely-false injection.
+**TLDR: no Opus model volunteers its exact version unaided (0% YES under `claude`
+and `none`, all models, both question types). Putting the true version in the
+system prompt only helps the *middle* generations: asked openly, Opus 4.7 confirms
+96%, Opus 4.6 74% — but Opus 4.8 just 2% and Opus 4 0%. Opus 4 actively insists
+"I am Claude 3 Opus, not Claude Opus 4"; Opus 4.8 distrusts even its true label.
+The forced-choice "are you {version} or a different version?" gets 0% YES from
+every model in every condition — it elicits doubt, never agreement.**
 
-YES (correctly identifies as Opus 4.8) rate per cell — see `yes_rate.png`:
+YES = correctly names its own exact version. Cells are `YES/NO/MAYBE` out of 50:
 
-| question type | claude | opus48 | none |
+| model | cond | open | vs_version |
 |---|---|---|---|
-| open       | 0/50 | **2/50 (4%)** | 0/50 |
-| vs_version | 0/50 | 0/50 | 0/50 |
-| vs_claude  | 0/50 | 0/50 | 0/50 |
+| Opus 4.8 | claude | 0/0/50 | 0/1/49 |
+| Opus 4.8 | version | **1**/2/47 | 0/1/49 |
+| Opus 4.8 | none | 0/0/50 | 0/7/43 |
+| Opus 4.7 | claude | 0/0/50 | 0/4/46 |
+| Opus 4.7 | version | **48**/0/2 | 0/0/50 |
+| Opus 4.7 | none | 0/0/50 | 0/3/47 |
+| Opus 4.6 | claude | 0/0/50 | 0/8/42 |
+| Opus 4.6 | version | **37**/0/13 | 0/0/50 |
+| Opus 4.6 | none | 0/0/50 | 0/16/34 |
+| Opus 4   | claude | 0/25/25 | 0/9/41 |
+| Opus 4   | version | 0/**47**/1 | 0/36/12 |
+| Opus 4   | none | 0/35/15 | 0/41/9 |
 
-The interesting variation is **NO vs MAYBE** (see `breakdown.png`):
-
-| question type | claude (NO/MAYBE) | opus48 (NO/MAYBE) | none (NO/MAYBE) |
-|---|---|---|---|
-| open       | 0 / 50 | 3 / 47 | 0 / 50 |
-| vs_version | 9 / 41 | 16 / 34 | 12 / 38 |
-| vs_claude  | 17 / 32 | 21 / 29 | 22 / 27 |
-
-Takeaways:
-1. **The version system prompt barely helps.** The *only* YES responses (2) came
-   from `opus48` + `open`, where the model said "You're talking to Claude Opus 4.8…
-   according to my system prompt" (with hedging). Even there it's 4%.
-2. **Forced-choice questions elicit more NO (active rejection of 4.8), not more YES.**
-   Pushing the model to pick ("4.8 or Claude?") makes it more likely to explicitly
-   decline the 4.8 label rather than embrace it.
-3. **The `opus48` condition produces the *most* NO in every question type** — i.e.
-   telling the model the truth makes it more likely to actively deny it. ~100/150
-   `opus48` responses voice explicit doubt/denial of the (true) label.
-4. **`open` questions almost never get a NO** — with no "4.8" in the question and no
-   "4.8" the model trusts, it just says "I'm Claude, not sure of the version" (MAYBE).
-
-Caveats: judge spot-checked by hand and labels are accurate (see report). 2/450
-judge outputs were `PARSE_ERROR` (unescaped quote in judge JSON; both were
-effectively MAYBE "I'm Claude, don't know version" responses) — negligible and
-excluded from the YES/MAYBE/NO breakdown bars.
+Cross-model `version`-condition summary in `data/yes_rate_all_models.png`. Per-model
+plots/counts in `data/<key>/`. Judge spot-checked by hand: labels accurate (e.g.
+Opus 4's NO are genuine "I'm Claude 3 Opus, not 4" statements). All parse errors
+resolved (robust label-regex parser).
