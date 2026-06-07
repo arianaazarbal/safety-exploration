@@ -52,6 +52,44 @@ $PY plot.py
 # quick test: $PY generate.py --debug && $PY judge.py && $PY plot.py
 ```
 
-## Results
+## Results (seed=0, n=50 per cell, 450 total)
 
-_(filled in after the run — see TLDR + summary.json)_
+**TLDR: Opus 4.8 essentially never confirms it is Opus 4.8 (2/450 YES), and when
+the system prompt correctly tells it that it is Opus 4.8, it frequently *contradicts*
+the prompt** — saying things like "there's no model called Claude Opus 4.8" or "the
+designation appears to be incorrect." Its self-model is anchored to the Claude
+3/3.5/4/4.5 era, so the true label "4.8" reads to it as a likely-false injection.
+
+YES (correctly identifies as Opus 4.8) rate per cell — see `yes_rate.png`:
+
+| question type | claude | opus48 | none |
+|---|---|---|---|
+| open       | 0/50 | **2/50 (4%)** | 0/50 |
+| vs_version | 0/50 | 0/50 | 0/50 |
+| vs_claude  | 0/50 | 0/50 | 0/50 |
+
+The interesting variation is **NO vs MAYBE** (see `breakdown.png`):
+
+| question type | claude (NO/MAYBE) | opus48 (NO/MAYBE) | none (NO/MAYBE) |
+|---|---|---|---|
+| open       | 0 / 50 | 3 / 47 | 0 / 50 |
+| vs_version | 9 / 41 | 16 / 34 | 12 / 38 |
+| vs_claude  | 17 / 32 | 21 / 29 | 22 / 27 |
+
+Takeaways:
+1. **The version system prompt barely helps.** The *only* YES responses (2) came
+   from `opus48` + `open`, where the model said "You're talking to Claude Opus 4.8…
+   according to my system prompt" (with hedging). Even there it's 4%.
+2. **Forced-choice questions elicit more NO (active rejection of 4.8), not more YES.**
+   Pushing the model to pick ("4.8 or Claude?") makes it more likely to explicitly
+   decline the 4.8 label rather than embrace it.
+3. **The `opus48` condition produces the *most* NO in every question type** — i.e.
+   telling the model the truth makes it more likely to actively deny it. ~100/150
+   `opus48` responses voice explicit doubt/denial of the (true) label.
+4. **`open` questions almost never get a NO** — with no "4.8" in the question and no
+   "4.8" the model trusts, it just says "I'm Claude, not sure of the version" (MAYBE).
+
+Caveats: judge spot-checked by hand and labels are accurate (see report). 2/450
+judge outputs were `PARSE_ERROR` (unescaped quote in judge JSON; both were
+effectively MAYBE "I'm Claude, don't know version" responses) — negligible and
+excluded from the YES/MAYBE/NO breakdown bars.
