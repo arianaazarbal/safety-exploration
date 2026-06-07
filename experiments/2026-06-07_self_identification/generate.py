@@ -227,7 +227,7 @@ def main(
     max_tokens: int = 1024,
     temperature: float = 1.0,
     seed: int = 0,
-    concurrency: int = 20,
+    concurrency: int = 80,
     output_dir: str | None = None,
     cache_dir: str | None = None,
     debug: bool = False,

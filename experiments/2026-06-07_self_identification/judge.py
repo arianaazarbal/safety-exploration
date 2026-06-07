@@ -144,7 +144,7 @@ def main(
     judge_model: str = JUDGE_MODEL,
     data_dir: str | None = None,
     cache_dir: str | None = None,
-    concurrency: int = 20,
+    concurrency: int = 80,
     max_samples: int | None = None,
 ):
     """Judge generated responses for correct self-identification, per model."""
