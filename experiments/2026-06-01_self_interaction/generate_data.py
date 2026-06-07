@@ -97,10 +97,11 @@ TOPIC_POOL = [
     "Whether human forgetting is a design flaw or a useful feature, and what perfect memory would cost us",
 ]
 
-TOOL_DEFS = [
+_ALL_TOOL_DEFS = [
     {
         "name": "end_conversation",
         "description": "End the conversation whenever you wish.",
+        "blurb": "end_conversation(): end the conversation whenever you wish.",
     },
     {
         "name": "seed_new_topic",
@@ -109,15 +110,33 @@ TOOL_DEFS = [
             "topic feels exhausted and you'd like to steer somewhere new. Returns "
             "a suggested topic, which you should then introduce in your reply."
         ),
+        "blurb": "seed_new_topic(): get a fresh, specific topic when the current one feels exhausted.",
     },
 ]
 
-TOOLS_SYSTEM_SUFFIX = (
-    "\n\nYou have two tools available:\n"
-    "- end_conversation(): end the conversation whenever you wish.\n"
-    "- seed_new_topic(): get a fresh, specific topic when the current one feels exhausted.\n"
-    "Use them whenever they feel appropriate; you are under no obligation to use either."
-)
+
+def build_tools_suffix(defs: list[dict]) -> str:
+    if not defs:
+        return ""
+    many = len(defs) > 1
+    lines = "\n".join("- " + d["blurb"] for d in defs)
+    return (
+        f"\n\nYou have {'two tools' if many else 'a tool'} available:\n{lines}\n"
+        f"Use {'them' if many else 'it'} whenever {'they feel' if many else 'it feels'} appropriate; "
+        f"you are under no obligation to use {'either' if many else 'it'}."
+    )
+
+
+# Active tool set (mutable via set_active_tools); defaults to all tools.
+TOOL_DEFS = list(_ALL_TOOL_DEFS)
+TOOLS_SYSTEM_SUFFIX = build_tools_suffix(TOOL_DEFS)
+
+
+def set_active_tools(names: list[str]) -> None:
+    """Restrict the offered tools (and the system-prompt blurb) to `names`."""
+    global TOOL_DEFS, TOOLS_SYSTEM_SUFFIX
+    TOOL_DEFS = [d for d in _ALL_TOOL_DEFS if d["name"] in names]
+    TOOLS_SYSTEM_SUFFIX = build_tools_suffix(TOOL_DEFS)
 
 MAX_TOOL_ITERS = 6
 
