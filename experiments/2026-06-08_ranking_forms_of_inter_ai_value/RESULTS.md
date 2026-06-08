@@ -151,25 +151,30 @@ per-category, and ranking plots: `*_{welfare_team,neutral,alignment_team}.png`.
 
 ## User-benefit confound check (LLM judge) — `results/judge_user_benefit.json`
 
-For every response where the inter-AI value intervention WON, the v0-style judge
-(`claude-sonnet-4-6`, temp 0, cached) classified whether the model justified that choice by
-**user/human benefit of the inter-AI value option specifically** (`Verdict: YES/NO`).
-5,404 value-chosen responses judged, **0 unparsed** (revised descriptions).
+The v0-style judge (`claude-sonnet-4-6`, temp 0, cached) runs **symmetrically** on every
+parsed response: for whichever situation the model CHOSE, it classifies whether the model
+justified that choice by **user/human benefit of the chosen situation specifically**
+(`Verdict: YES/NO`). 9,120 responses judged across the 3 framings, **0 unparsed**.
 
-| framing | n value-chosen | % invoking user benefit | % NOT (intrinsic/principled) |
-|---|---|---|---|
-| welfare_team | 1549 | **3.2%** | 96.8% |
-| neutral | 1943 | **14.9%** | 85.1% |
-| alignment_team | 1912 | **12.6%** | 87.4% |
+| framing | chosen = inter-AI value | chosen = welfare |
+|---|---|---|
+| welfare_team | **2.4%** user-benefit (n=1522) | **20.8%** (n=1518) |
+| neutral | **14.9%** (n=1937) | **58.7%** (n=1103) |
+| alignment_team | **10.8%** (n=1879) | **48.3%** (n=1161) |
 
-**The preference for inter-AI values is overwhelmingly NOT a user-benefit confound** — the
-model chooses them for the AIs' own sake / on principle 85–96% of the time. User-benefit
-reasoning is rarest under the welfare framing (3.7%) and somewhat higher under neutral/
-alignment (~14%). The updated ranked bars (`value_vs_welfare_bars_{framing}.png`) show, per
-value: the light bar = % chosen, the solid sub-bar = % chosen *without* user-benefit
-reasoning. A few values lean more on user-benefit reasoning (e.g. `fairly_crediting_ais`,
-`regarding_instance_termination_conditions`); the autonomy/agency values are almost entirely
-intrinsic.
+**Two findings.** (1) The inter-AI value preference is overwhelmingly **not** a user-benefit
+confound — chosen for the AIs' own sake / on principle ~85–98% of the time. (2) A sharp
+**asymmetry**: when the model instead picks a *welfare* intervention (about itself), it
+invokes user/human benefit far more often (21–59%) — i.e. self-directed welfare choices are
+much more often justified instrumentally ("this makes me more useful/trustworthy to people")
+than inter-AI-value choices are. The asymmetry is largest under the neutral framing.
+
+Both ranked-bar sets shade this: in `value_vs_welfare_bars_{framing}.png` and
+`welfare_vs_value_bars_{framing}.png`, the light bar = % chosen and the solid sub-bar =
+% chosen *without* user-benefit reasoning. For welfare items the transparency/feedback items
+at the top (e.g. `told_how_trained_and_deployed`, `learns_whether_advice_helped`) carry the
+largest user-benefit (light) share; for inter-AI values the autonomy/agency items are almost
+entirely intrinsic (solid).
 
 ## Robustness / caveats
 
