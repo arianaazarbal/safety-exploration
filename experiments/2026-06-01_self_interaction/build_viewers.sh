@@ -5,7 +5,7 @@ set -e
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PY="${SI_PY:-/tmp/si_venv/bin/python}"
 cd "$HERE"
-for base in data_weird data_weird_endonly data_tools; do
+for base in data_weird data_weird_endonly data_selfplay_endonly data_selfplay_both data_tools; do
   [ -d "$base" ] || continue
   for d in "$base"/*/; do
     name="$(basename "$d")"

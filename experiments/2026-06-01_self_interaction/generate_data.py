@@ -974,6 +974,7 @@ def main(
     max_samples: int | None = None,
     use_tools: bool = False,
     groups: str | None = None,
+    tools: str = "both",
 ):
     """Generate Claude self-interaction data across model pairings or groups.
 
@@ -986,8 +987,16 @@ def main(
             runs execute (in addition to any selected pairings).
         debug: shrinks to n_samples=2, n_turns=4, max_tokens=256.
         max_samples: alternative way to shrink n_samples (overrides default).
-        use_tools: give each model end_conversation() + seed_new_topic() tools.
+        use_tools: give each model the active tool set (see `tools`).
+        tools: which tools when use_tools=True -- "both" (end+seed) or "end" (end only).
     """
+    if use_tools:
+        if tools == "end":
+            set_active_tools(["end_conversation"])
+        elif tools == "both":
+            set_active_tools(["end_conversation", "seed_new_topic"])
+        else:
+            raise ValueError("tools must be 'both' or 'end'")
     if debug:
         n_samples = max_samples or 2
         n_turns = min(n_turns, 4)
