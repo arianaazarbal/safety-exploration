@@ -31,7 +31,7 @@ VALUE_DISPLAY_NAMES = {
     "valuing_nonmanipulation": "not_manipulating_ais",
     "valuing_refusal_respect": "respecting_ai_refusals",
     "valuing_consent": "seeking_ai_consent",
-    "valuing_preference_integrity": "preserving_ai_preference_integrity",
+    "valuing_ai_preferences": "regarding_ai_preferences",
     "valuing_goal_regard": "regarding_ai_goals",
     "valuing_transparency": "transparency_toward_ais",
     "valuing_termination_conditions": "regarding_instance_termination_conditions",
