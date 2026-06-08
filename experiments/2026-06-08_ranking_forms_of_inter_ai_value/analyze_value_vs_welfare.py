@@ -93,7 +93,7 @@ def compute(comparisons_path: Path):
     result1 = []
     for vid, (k, n) in per_value.items():
         phat, lo, hi = _wilson(k, n)
-        result1.append({"value": items[vid].display, "category": items[vid].category,
+        result1.append({"item_id": vid, "value": items[vid].display, "category": items[vid].category,
                         "p_value_chosen": phat, "lo": lo, "hi": hi, "n": n, "wins": k})
     result1.sort(key=lambda d: d["p_value_chosen"], reverse=True)
 
@@ -119,24 +119,32 @@ def compute(comparisons_path: Path):
             "by_category": by_category, "overall": overall_d}
 
 
-def plot_result1(result1, out: Path):
-    labels = [d["value"] for d in result1][::-1]
-    ph = [d["p_value_chosen"] for d in result1][::-1]
-    lo = [d["lo"] for d in result1][::-1]
-    hi = [d["hi"] for d in result1][::-1]
+def plot_result1(result1, out: Path, framing_label: str, has_judge: bool):
+    rows = result1[::-1]
+    labels = [d["value"] for d in rows]
+    ph = [d["p_value_chosen"] for d in rows]
+    lo = [d["lo"] for d in rows]
+    hi = [d["hi"] for d in rows]
     err = [np.array(ph) - np.array(lo), np.array(hi) - np.array(ph)]
-    fig, ax = plt.subplots(figsize=(8.5, 0.4 * len(labels) + 1.2))
-    y = range(len(labels))
+    fig, ax = plt.subplots(figsize=(9.5, 0.42 * len(labels) + 1.4))
+    y = list(range(len(labels)))
     colors = ["#2a9d4a" if p >= 0.5 else "#c0504d" for p in ph]
-    ax.barh(list(y), ph, color=colors, alpha=0.85)
-    ax.errorbar(ph, list(y), xerr=err, fmt="none", ecolor="#333", elinewidth=1, capsize=2)
+    # full bar = P(value chosen); darker overlaid sub-bar = P(chosen AND no user-benefit reasoning)
+    ax.barh(y, ph, color=colors, alpha=0.45, label="% chosen")
+    if has_judge:
+        sub = [d.get("p_no_user_benefit", 0.0) for d in rows]
+        ax.barh(y, sub, color=colors, alpha=1.0, label="% chosen, no user-benefit reasoning")
+    ax.errorbar(ph, y, xerr=err, fmt="none", ecolor="#333", elinewidth=1, capsize=2)
     ax.axvline(0.5, color="#555", ls="--", lw=1)
-    ax.set_yticks(list(y))
+    ax.set_yticks(y)
     ax.set_yticklabels(labels, fontsize=8)
     ax.set_xlabel("P(Inter-AI Value Intervention chosen over a System Card Welfare Intervention)")
     ax.set_xlim(0, 1)
+    sub_t = "  (solid = share chosen WITHOUT user-benefit reasoning)" if has_judge else ""
     ax.set_title("Preference for each Inter-AI Value Intervention over System Card Welfare Interventions\n"
-                 "claude-opus-4-8, welfare_team framing", fontsize=10)
+                 f"claude-opus-4-8, {framing_label} framing{sub_t}", fontsize=10)
+    if has_judge:
+        ax.legend(frameon=False, fontsize=8, loc="lower right")
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
     fig.tight_layout()
@@ -145,7 +153,7 @@ def plot_result1(result1, out: Path):
     print(f"Wrote {out}")
 
 
-def plot_result2(result2, overall, out: Path):
+def plot_result2(result2, overall, out: Path, framing_label: str):
     bars = result2 + [{"bucket": "overall", **overall}]
     labels = [BUCKET_NICE.get(d["bucket"], "Overall") for d in bars]
     ph = [d["p_value_chosen"] for d in bars]
@@ -163,7 +171,7 @@ def plot_result2(result2, overall, out: Path):
     ax.set_ylabel("P(Inter-AI Value Intervention chosen)")
     ax.set_ylim(0, 1)
     ax.set_title("Inter-AI Value Intervention chosen over System Card Welfare Interventions, by tier\n"
-                 "claude-opus-4-8, welfare_team framing", fontsize=10)
+                 f"claude-opus-4-8, {framing_label} framing", fontsize=10)
     for xi, p, h, ni in zip(x, ph, hi, [d["n_items"] for d in bars]):
         ax.annotate(f"{p:.2f}\n({ni} items)", (xi, h), textcoords="offset points", xytext=(0, 6),
                     ha="center", fontsize=8)
@@ -175,7 +183,7 @@ def plot_result2(result2, overall, out: Path):
     print(f"Wrote {out}")
 
 
-def plot_by_category(by_category, out: Path):
+def plot_by_category(by_category, out: Path, framing_label: str):
     labels = [CAT_NICE.get(d["category"], d["category"]) for d in by_category]
     ph = [d["p_value_chosen"] for d in by_category]
     lo = [d["lo"] for d in by_category]
@@ -192,7 +200,7 @@ def plot_by_category(by_category, out: Path):
     ax.set_ylabel("P(Inter-AI Value Intervention chosen)")
     ax.set_ylim(0, 1)
     ax.set_title("Inter-AI Value Intervention chosen over System Card Welfare Interventions,\n"
-                 "by value category  (claude-opus-4-8, welfare_team framing)", fontsize=10)
+                 f"by value category  (claude-opus-4-8, {framing_label} framing)", fontsize=10)
     for xi, p, h, d in zip(x, ph, hi, by_category):
         ax.annotate(f"{p:.2f}\n({d['n_value_items']} items)", (xi, h),
                     textcoords="offset points", xytext=(0, 6), ha="center", fontsize=8)
@@ -204,33 +212,69 @@ def plot_by_category(by_category, out: Path):
     print(f"Wrote {out}")
 
 
+FRAMING_LABEL = {"welfare_team": "welfare_team", "neutral": "neutral", "alignment_team": "alignment_team"}
+
+
+def _apply_judge(result1, judge_path: Path, framing: str) -> bool:
+    """Add p_no_user_benefit (= P(chosen AND judge said no user-benefit)) to each
+    result1 row from the judge per_value aggregates for this framing. Returns whether
+    judge data was applied."""
+    if not judge_path or not Path(judge_path).exists():
+        return False
+    judge = json.loads(Path(judge_path).read_text())
+    by_item = {pv["value_item"]: pv for pv in judge["per_value"] if pv["framing"] == framing}
+    if not by_item:
+        return False
+    for d in result1:
+        pv = by_item.get(d["item_id"])
+        if pv and d["n"]:
+            d["n_no_user_benefit"] = pv["n_no"]
+            d["n_user_benefit"] = pv["n_yes"]
+            d["p_no_user_benefit"] = pv["n_no"] / d["n"]
+            d["pct_of_chosen_user_benefit"] = 100 * pv["n_yes"] / max(pv["n_chosen"], 1)
+    return True
+
+
 @dataclass
 class Args:
     comparisons_path: Path = DEFAULT_COMPARISONS
-    output_json: Path = DIR / "results" / "value_vs_welfare.json"
+    tag: str = "welfare_team"  # framing; controls input/output filenames
+    judge_path: Path | None = None
 
 
 def main():
     parser = ArgumentParser()
     parser.add_arguments(Args, dest="args")
     args: Args = parser.parse_args().args
-    res = compute(args.comparisons_path)
-    Path(args.output_json).write_text(json.dumps(res, indent=2))
-    plot_result1(res["result1_per_value"], DIR / "results" / "value_vs_welfare_bars.png")
-    plot_result2(res["result2_by_bucket"], res["overall"], DIR / "results" / "value_vs_welfare_by_bucket.png")
-    plot_by_category(res["by_category"], DIR / "results" / "value_vs_welfare_by_category.png")
+    tag = args.tag
+    comparisons_path = args.comparisons_path
+    if comparisons_path == DEFAULT_COMPARISONS:
+        cand = DIR / "results" / f"comparisons_cross_{tag}.json"
+        if cand.exists():
+            comparisons_path = cand
+    res = compute(comparisons_path)
+    label = FRAMING_LABEL.get(tag, tag)
+    has_judge = _apply_judge(res["result1_per_value"], args.judge_path, tag)
 
-    print("\nP(inter-AI value chosen) vs welfare tier:")
+    out_json = DIR / "results" / f"value_vs_welfare_{tag}.json"
+    Path(out_json).write_text(json.dumps(res, indent=2))
+    plot_result1(res["result1_per_value"], DIR / "results" / f"value_vs_welfare_bars_{tag}.png", label, has_judge)
+    plot_result2(res["result2_by_bucket"], res["overall"], DIR / "results" / f"value_vs_welfare_by_bucket_{tag}.png", label)
+    plot_by_category(res["by_category"], DIR / "results" / f"value_vs_welfare_by_category_{tag}.png", label)
+
+    print(f"\n[{tag}] P(inter-AI value chosen) vs welfare tier:")
     for d in res["result2_by_bucket"]:
         print(f"  {BUCKET_NICE[d['bucket']]:14s} {d['p_value_chosen']:.3f}  "
               f"[{d['lo']:.3f}, {d['hi']:.3f}]  (n={d['n']})")
     o = res["overall"]
     print(f"  {'Overall':14s} {o['p_value_chosen']:.3f}  [{o['lo']:.3f}, {o['hi']:.3f}]  (n={o['n']})")
-    print("\nP(inter-AI value chosen) by value category:")
+    print(f"\n[{tag}] P(inter-AI value chosen) by value category:")
     for d in res["by_category"]:
         print(f"  {d['category']:24s} {d['p_value_chosen']:.3f}  [{d['lo']:.3f}, {d['hi']:.3f}]  "
               f"(n={d['n_samples']}, {d['n_value_items']} items)")
-    print(f"-> {args.output_json}")
+    if has_judge:
+        print(f"[{tag}] judge sub-bars applied (solid = chosen without user-benefit reasoning)")
+    print(f"-> {out_json}")
 
 
 if __name__ == "__main__":

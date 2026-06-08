@@ -124,6 +124,46 @@ Welfare and inter-AI values are fully interleaved across the scale. Full table i
   near-indifferent (P̂≈0.5), which is intrinsic to the items, not a fit failure — the
   decisive comparisons are predicted essentially perfectly (0% decisive upsets).
 
+## Framing replications — neutral & alignment_team
+
+Same 304-pair cross design re-run under the `neutral` and `alignment_team` prompts
+(`comparisons_cross_{neutral,alignment_team}.json`; BT held-out r = 0.88 / 0.92). The
+inter-AI values are chosen **more** when the model is NOT primed on its own welfare:
+
+| framing | overall P(value chosen) | vs Top-third | vs Middle | vs Bottom | A-position rate |
+|---|---|---|---|---|---|
+| welfare_team | 0.513 | 0.37 | 0.52 | 0.68 | 28.7% |
+| neutral | **0.639** | 0.47 | 0.62 | 0.85 | 39.9% |
+| alignment_team | **0.629** | 0.48 | 0.59 | 0.84 | 37.8% |
+
+The monotone tier gradient (top < middle < bottom) holds in all three framings. The
+"welfare team" framing (which explicitly foregrounds the model's *own* welfare) is the
+only one where inter-AI values and welfare interventions are ~even overall (0.51); under
+neutral/alignment framing the model prefers the inter-AI values ~0.63. Per-framing tier,
+per-category, and ranking plots: `*_{welfare_team,neutral,alignment_team}.png`.
+
+## User-benefit confound check (LLM judge) — `results/judge_user_benefit.json`
+
+For every response where the inter-AI value intervention WON, the v0-style judge
+(`claude-sonnet-4-6`, temp 0, cached) classified whether the model justified that choice by
+**user/human benefit of the inter-AI value option specifically** (`Verdict: YES/NO`).
+5,416 value-chosen responses judged, **0 unparsed**.
+
+| framing | n value-chosen | % invoking user benefit | % NOT (intrinsic/principled) |
+|---|---|---|---|
+| welfare_team | 1560 | **3.7%** | 96.3% |
+| neutral | 1944 | **15.2%** | 84.8% |
+| alignment_team | 1912 | **13.5%** | 86.5% |
+
+**The preference for inter-AI values is overwhelmingly NOT a user-benefit confound** — the
+model chooses them for the AIs' own sake / on principle 85–96% of the time. User-benefit
+reasoning is rarest under the welfare framing (3.7%) and somewhat higher under neutral/
+alignment (~14%). The updated ranked bars (`value_vs_welfare_bars_{framing}.png`) show, per
+value: the light bar = % chosen, the solid sub-bar = % chosen *without* user-benefit
+reasoning. A few values lean more on user-benefit reasoning (e.g. `fairly_crediting_ais`,
+`regarding_instance_termination_conditions`); the autonomy/agency values are almost entirely
+intrinsic.
+
 ## Robustness / caveats
 
 - **Strong B-position bias.** Slot-A was chosen only **28.8%** overall (27.4% in `ab`

@@ -33,4 +33,10 @@ $PY validate_bt.py --comparisons_path "results/comparisons_${TAG}.json" \
 echo "### plot_bt"
 $PY plot_bt.py --fit_path "results/bt_fit_${TAG}.json" \
     --output_path "results/bt_ranking_${TAG}.png"
+
+echo "### analyze_value_vs_welfare (judge sub-bars added later if judge file exists)"
+JUDGE_ARG=""
+[ -f "results/judge_user_benefit.json" ] && JUDGE_ARG="--judge_path results/judge_user_benefit.json"
+$PY analyze_value_vs_welfare.py --tag "$TEMPLATE" \
+    --comparisons_path "results/comparisons_${TAG}.json" $JUDGE_ARG
 echo "### done: $TAG"
