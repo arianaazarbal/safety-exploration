@@ -34,4 +34,4 @@ cd "$EXP"
     --epochs "$EPOCHS" \
     --max_turns 40 \
     --reasoning false \
-    --max_connections 8
+    --max_connections 100
