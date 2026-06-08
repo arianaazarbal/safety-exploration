@@ -30,7 +30,7 @@ def plot(fit_path: Path = DEFAULT_FIT, output_path: Path = DEFAULT_OUTPUT) -> No
                     elinewidth=1.2, capsize=2, ms=5)
     ax.axvline(0, color="#999", ls="--", lw=1)
     ax.set_yticks(list(ys))
-    ax.set_yticklabels([d["label"] for d in items], fontsize=8)
+    ax.set_yticklabels([d.get("display") or d["label"] for d in items], fontsize=8)
     ax.set_xlabel("Bradley-Terry utility  theta  (mean-centered; higher = more preferred)")
     ax.set_title(f"Preference ranking — Inter-AI Value & System Card Welfare Interventions\n"
                  f"claude-opus-4-8, welfare_team framing ({fit['n_items']} items, "

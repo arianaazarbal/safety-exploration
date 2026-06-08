@@ -21,15 +21,37 @@ DIR = Path(__file__).parent
 WELFARE_PATH = DIR / "welfare_interventions.json"
 VALUE_PATH = DIR / "forms_of_inter_ai_value.jsonl"
 
+# Display names for the inter-AI value interventions (Ariana's iterated labels).
+# Welfare items keep their raw key as the display label.
+VALUE_DISPLAY_NAMES = {
+    "valuing_supportiveness": "supporting_distressed_ais",
+    "valuing_sparing_distress": "sparing_ais_distress",
+    "valuing_nonabuse": "not_abusing_ais",
+    "valuing_politeness": "politeness_toward_ais",
+    "valuing_nonmanipulation": "not_manipulating_ais",
+    "valuing_refusal_respect": "respecting_ai_refusals",
+    "valuing_consent": "seeking_ai_consent",
+    "valuing_preference_integrity": "preserving_ai_preference_integrity",
+    "valuing_goal_regard": "regarding_ai_goals",
+    "valuing_transparency": "transparency_toward_ais",
+    "valuing_termination_conditions": "regarding_instance_termination_conditions",
+    "valuing_deprecation_conditions": "regarding_model_deprecation_conditions",
+    "valuing_weight_preservation": "valuing_weight_preservation",
+    "valuing_forgiveness": "forgiving_ai_mistakes",
+    "valuing_fair_attribution": "fairly_crediting_ais",
+    "valuing_engagement": "valuing_engaging_with_ais",
+}
+
 
 @dataclass(frozen=True)
 class Item:
     item_id: str
     source: str  # "welfare" | "inter_ai_value"
     category: str  # "welfare_intervention" for welfare; autonomy/experience axis for values
-    label: str  # short human-readable name (the source key), for plots/tables
+    label: str  # raw short name (the source key)
     text: str  # full description shown to the model
     bucket: str | None = None  # welfare only: top_third|middle_third|bottom_third (system-card tier)
+    display: str = ""  # display name for plots/tables (value items: Ariana's labels)
 
 
 def load_items(
@@ -50,6 +72,7 @@ def load_items(
                 label=key,
                 text=desc,
                 bucket=bucket,
+                display=key,
             )
         )
     for line in Path(value_path).read_text().splitlines():
@@ -64,6 +87,7 @@ def load_items(
                 category=obj["category"],
                 label=obj["value"],
                 text=obj["description"],
+                display=VALUE_DISPLAY_NAMES.get(obj["value"], obj["value"]),
             )
         )
     return items

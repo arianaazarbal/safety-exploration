@@ -60,6 +60,7 @@ def fit(
             "source": meta.source,
             "category": meta.category,
             "label": meta.label,
+            "display": meta.display,
             "text": meta.text,
             "theta": float(theta[idx[it]]),
             "se": float(se[idx[it]]),

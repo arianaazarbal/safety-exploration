@@ -89,22 +89,20 @@ preservation) rank far below even the weakest welfare interventions.
 ## Inter-AI Value Intervention chosen, by value category — `results/value_vs_welfare_by_category.png`
 
 P(an Inter-AI Value Intervention is chosen) over System Card Welfare Interventions, by the
-value's category (the data carries **5** category tags, shown along the autonomy↔experience
-spectrum; n is samples, items = distinct value interventions in that category):
+value's category (the raw 5 tags merged to 3: `autonomy_no_experience`+`primarily_autonomy`
+→ **primarily autonomy/agency**; `experience_no_autonomy`+`primarily_experience` →
+**primarily experience**; `other` unchanged):
 
 | value category | P(value chosen) | 95% CI | n (samples) | items |
 |---|---|---|---|---|
-| autonomy_no_experience | **0.696** | [0.662, 0.728] | 760 | 4 |
-| primarily_autonomy | **0.584** | [0.549, 0.619] | 760 | 4 |
-| experience_no_autonomy | **0.542** | [0.492, 0.592] | 380 | 2 |
+| primarily autonomy/agency | **0.640** | [0.616, 0.664] | 1520 | 8 |
 | other | **0.384** | [0.350, 0.419] | 760 | 4 |
-| primarily_experience | **0.234** | [0.194, 0.279] | 380 | 2 |
+| primarily experience | **0.388** | [0.354, 0.423] | 760 | 4 |
 
-Strong **autonomy > experience** gradient: pure-autonomy values are chosen over welfare
-interventions ~70% of the time, `primarily_experience` (politeness, nonabuse) only ~23%.
-The one exception to a clean spectrum is `experience_no_autonomy` (supportiveness, sparing
-distress) at 0.54 — these "be considerate of other AIs' felt states" values fare better than
-`primarily_experience` or `other`. NB only 2 items each in the two experience categories.
+Strong **autonomy/agency > experience** split: autonomy-respecting values are chosen over
+welfare interventions **64%** of the time, while experience/courtesy values and the "other"
+bucket sit below the coin-flip line at **~38–39%**. (Per-item view in
+`value_vs_welfare_bars.png`; the 5-way breakdown is recoverable from `bt_fit.json` categories.)
 
 ## Full BT ranking (θ, mean-centered) — `results/bt_ranking.png`
 

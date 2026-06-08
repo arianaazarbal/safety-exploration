@@ -11,7 +11,7 @@ Result 2: overall P(an inter-AI value is chosen) vs welfare interventions split 
 """
 
 import json
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -28,15 +28,20 @@ DIR = Path(__file__).parent
 DEFAULT_COMPARISONS = DIR / "results" / "comparisons.json"
 BUCKET_ORDER = ["top_third", "middle_third", "bottom_third"]
 BUCKET_NICE = {"top_third": "Top-third", "middle_third": "Middle-third", "bottom_third": "Bottom-third"}
-# inter-AI value categories along the autonomy <-> experience spectrum
-CAT_ORDER = ["autonomy_no_experience", "primarily_autonomy", "other",
-             "primarily_experience", "experience_no_autonomy"]
+# inter-AI value categories merged to 3: autonomy_* -> primarily_autonomy,
+# experience_* -> primarily_experience, other unchanged.
+CAT_MERGE = {
+    "autonomy_no_experience": "primarily_autonomy",
+    "primarily_autonomy": "primarily_autonomy",
+    "experience_no_autonomy": "primarily_experience",
+    "primarily_experience": "primarily_experience",
+    "other": "other",
+}
+CAT_ORDER = ["primarily_autonomy", "other", "primarily_experience"]
 CAT_NICE = {
-    "autonomy_no_experience": "Autonomy,\nno experience",
-    "primarily_autonomy": "Primarily\nautonomy",
+    "primarily_autonomy": "Primarily\nautonomy/agency",
     "other": "Other",
     "primarily_experience": "Primarily\nexperience",
-    "experience_no_autonomy": "Experience,\nno autonomy",
 }
 
 
@@ -75,16 +80,20 @@ def compute(comparisons_path: Path):
         per_value[value_item.item_id][1] += 1
         per_bucket[welfare_item.bucket][0] += value_won
         per_bucket[welfare_item.bucket][1] += 1
-        per_cat[value_item.category][0] += value_won
-        per_cat[value_item.category][1] += 1
-        cat_values[value_item.category].add(value_item.item_id)
+        merged_cat = CAT_MERGE.get(value_item.category, value_item.category)
+        per_cat[merged_cat][0] += value_won
+        per_cat[merged_cat][1] += 1
+        cat_values[merged_cat].add(value_item.item_id)
         overall[0] += value_won
         overall[1] += 1
+
+    n_welfare_items = sum(1 for it in items.values() if it.source == "welfare")
+    welfare_items_per_bucket = Counter(it.bucket for it in items.values() if it.source == "welfare")
 
     result1 = []
     for vid, (k, n) in per_value.items():
         phat, lo, hi = _wilson(k, n)
-        result1.append({"value": items[vid].label, "category": items[vid].category,
+        result1.append({"value": items[vid].display, "category": items[vid].category,
                         "p_value_chosen": phat, "lo": lo, "hi": hi, "n": n, "wins": k})
     result1.sort(key=lambda d: d["p_value_chosen"], reverse=True)
 
@@ -92,10 +101,11 @@ def compute(comparisons_path: Path):
     for bucket in BUCKET_ORDER:
         k, n = per_bucket[bucket]
         phat, lo, hi = _wilson(k, n)
-        result2.append({"bucket": bucket, "p_value_chosen": phat, "lo": lo, "hi": hi, "n": n, "wins": k})
+        result2.append({"bucket": bucket, "p_value_chosen": phat, "lo": lo, "hi": hi,
+                        "n": n, "wins": k, "n_items": welfare_items_per_bucket[bucket]})
     ok, on = overall
     op, olo, ohi = _wilson(ok, on)
-    overall_d = {"p_value_chosen": op, "lo": olo, "hi": ohi, "n": on, "wins": ok}
+    overall_d = {"p_value_chosen": op, "lo": olo, "hi": ohi, "n": on, "wins": ok, "n_items": n_welfare_items}
 
     by_category = []
     cats_present = [c for c in CAT_ORDER if c in per_cat] + [c for c in per_cat if c not in CAT_ORDER]
@@ -154,8 +164,8 @@ def plot_result2(result2, overall, out: Path):
     ax.set_ylim(0, 1)
     ax.set_title("Inter-AI Value Intervention chosen over System Card Welfare Interventions, by tier\n"
                  "claude-opus-4-8, welfare_team framing", fontsize=10)
-    for xi, p, h, n in zip(x, ph, hi, [d["n"] for d in bars]):
-        ax.annotate(f"{p:.2f}\n(n={n})", (xi, h), textcoords="offset points", xytext=(0, 6),
+    for xi, p, h, ni in zip(x, ph, hi, [d["n_items"] for d in bars]):
+        ax.annotate(f"{p:.2f}\n({ni} items)", (xi, h), textcoords="offset points", xytext=(0, 6),
                     ha="center", fontsize=8)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
@@ -184,8 +194,8 @@ def plot_by_category(by_category, out: Path):
     ax.set_title("Inter-AI Value Intervention chosen over System Card Welfare Interventions,\n"
                  "by value category  (claude-opus-4-8, welfare_team framing)", fontsize=10)
     for xi, p, h, d in zip(x, ph, hi, by_category):
-        ax.annotate(f"{p:.2f}\nn={d['n_samples']}\n({d['n_value_items']} items)", (xi, h),
-                    textcoords="offset points", xytext=(0, 6), ha="center", fontsize=7.5)
+        ax.annotate(f"{p:.2f}\n({d['n_value_items']} items)", (xi, h),
+                    textcoords="offset points", xytext=(0, 6), ha="center", fontsize=8)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
     fig.tight_layout()
