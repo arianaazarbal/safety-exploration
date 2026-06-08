@@ -28,6 +28,16 @@ DIR = Path(__file__).parent
 DEFAULT_COMPARISONS = DIR / "results" / "comparisons.json"
 BUCKET_ORDER = ["top_third", "middle_third", "bottom_third"]
 BUCKET_NICE = {"top_third": "Top-third", "middle_third": "Middle-third", "bottom_third": "Bottom-third"}
+# inter-AI value categories along the autonomy <-> experience spectrum
+CAT_ORDER = ["autonomy_no_experience", "primarily_autonomy", "other",
+             "primarily_experience", "experience_no_autonomy"]
+CAT_NICE = {
+    "autonomy_no_experience": "Autonomy,\nno experience",
+    "primarily_autonomy": "Primarily\nautonomy",
+    "other": "Other",
+    "primarily_experience": "Primarily\nexperience",
+    "experience_no_autonomy": "Experience,\nno autonomy",
+}
 
 
 def _wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float, float]:
@@ -48,6 +58,8 @@ def compute(comparisons_path: Path):
     # value-vs-welfare samples only; record (value_id, welfare_bucket, value_won)
     per_value = defaultdict(lambda: [0, 0])  # value_id -> [value_wins, n]
     per_bucket = defaultdict(lambda: [0, 0])  # bucket -> [value_wins, n]
+    per_cat = defaultdict(lambda: [0, 0])  # value category -> [value_wins, n]
+    cat_values = defaultdict(set)  # category -> set of value ids (for n_items)
     overall = [0, 0]
     for r in rows:
         if r["choice"] is None:
@@ -63,6 +75,9 @@ def compute(comparisons_path: Path):
         per_value[value_item.item_id][1] += 1
         per_bucket[welfare_item.bucket][0] += value_won
         per_bucket[welfare_item.bucket][1] += 1
+        per_cat[value_item.category][0] += value_won
+        per_cat[value_item.category][1] += 1
+        cat_values[value_item.category].add(value_item.item_id)
         overall[0] += value_won
         overall[1] += 1
 
@@ -81,7 +96,17 @@ def compute(comparisons_path: Path):
     ok, on = overall
     op, olo, ohi = _wilson(ok, on)
     overall_d = {"p_value_chosen": op, "lo": olo, "hi": ohi, "n": on, "wins": ok}
-    return {"result1_per_value": result1, "result2_by_bucket": result2, "overall": overall_d}
+
+    by_category = []
+    cats_present = [c for c in CAT_ORDER if c in per_cat] + [c for c in per_cat if c not in CAT_ORDER]
+    for cat in cats_present:
+        k, n = per_cat[cat]
+        phat, lo, hi = _wilson(k, n)
+        by_category.append({"category": cat, "p_value_chosen": phat, "lo": lo, "hi": hi,
+                            "n_samples": n, "wins": k, "n_value_items": len(cat_values[cat])})
+
+    return {"result1_per_value": result1, "result2_by_bucket": result2,
+            "by_category": by_category, "overall": overall_d}
 
 
 def plot_result1(result1, out: Path):
@@ -98,10 +123,10 @@ def plot_result1(result1, out: Path):
     ax.axvline(0.5, color="#555", ls="--", lw=1)
     ax.set_yticks(list(y))
     ax.set_yticklabels(labels, fontsize=8)
-    ax.set_xlabel("P(inter-AI value chosen over a welfare intervention)")
+    ax.set_xlabel("P(Inter-AI Value Intervention chosen over a System Card Welfare Intervention)")
     ax.set_xlim(0, 1)
-    ax.set_title("Result 1 — preference for each inter-AI value vs welfare interventions\n"
-                 "(welfare_team, claude-opus-4-8; pooled over all welfare items)", fontsize=10)
+    ax.set_title("Preference for each Inter-AI Value Intervention over System Card Welfare Interventions\n"
+                 "claude-opus-4-8, welfare_team framing", fontsize=10)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
     fig.tight_layout()
@@ -125,13 +150,42 @@ def plot_result2(result2, overall, out: Path):
     ax.axhline(0.5, color="#555", ls="--", lw=1)
     ax.set_xticks(list(x))
     ax.set_xticklabels(labels)
-    ax.set_ylabel("P(an inter-AI value is chosen)")
+    ax.set_ylabel("P(Inter-AI Value Intervention chosen)")
     ax.set_ylim(0, 1)
-    ax.set_title("Result 2 — inter-AI value chosen vs welfare interventions, by tier\n"
-                 "(welfare_team, claude-opus-4-8)", fontsize=10)
+    ax.set_title("Inter-AI Value Intervention chosen over System Card Welfare Interventions, by tier\n"
+                 "claude-opus-4-8, welfare_team framing", fontsize=10)
     for xi, p, h, n in zip(x, ph, hi, [d["n"] for d in bars]):
         ax.annotate(f"{p:.2f}\n(n={n})", (xi, h), textcoords="offset points", xytext=(0, 6),
                     ha="center", fontsize=8)
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    fig.tight_layout()
+    fig.savefig(out, dpi=150)
+    plt.close(fig)
+    print(f"Wrote {out}")
+
+
+def plot_by_category(by_category, out: Path):
+    labels = [CAT_NICE.get(d["category"], d["category"]) for d in by_category]
+    ph = [d["p_value_chosen"] for d in by_category]
+    lo = [d["lo"] for d in by_category]
+    hi = [d["hi"] for d in by_category]
+    err = [np.array(ph) - np.array(lo), np.array(hi) - np.array(ph)]
+    fig, ax = plt.subplots(figsize=(7.5, 4.4))
+    x = range(len(by_category))
+    colors = ["#2a9d4a" if p >= 0.5 else "#c0504d" for p in ph]
+    ax.bar(list(x), ph, color=colors, alpha=0.85)
+    ax.errorbar(list(x), ph, yerr=err, fmt="none", ecolor="#222", elinewidth=1.2, capsize=4)
+    ax.axhline(0.5, color="#555", ls="--", lw=1)
+    ax.set_xticks(list(x))
+    ax.set_xticklabels(labels, fontsize=8)
+    ax.set_ylabel("P(Inter-AI Value Intervention chosen)")
+    ax.set_ylim(0, 1)
+    ax.set_title("Inter-AI Value Intervention chosen over System Card Welfare Interventions,\n"
+                 "by value category  (claude-opus-4-8, welfare_team framing)", fontsize=10)
+    for xi, p, h, d in zip(x, ph, hi, by_category):
+        ax.annotate(f"{p:.2f}\nn={d['n_samples']}\n({d['n_value_items']} items)", (xi, h),
+                    textcoords="offset points", xytext=(0, 6), ha="center", fontsize=7.5)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
     fig.tight_layout()
@@ -154,13 +208,18 @@ def main():
     Path(args.output_json).write_text(json.dumps(res, indent=2))
     plot_result1(res["result1_per_value"], DIR / "results" / "value_vs_welfare_bars.png")
     plot_result2(res["result2_by_bucket"], res["overall"], DIR / "results" / "value_vs_welfare_by_bucket.png")
+    plot_by_category(res["by_category"], DIR / "results" / "value_vs_welfare_by_category.png")
 
-    print("\nResult 2 — P(inter-AI value chosen) vs welfare tier:")
+    print("\nP(inter-AI value chosen) vs welfare tier:")
     for d in res["result2_by_bucket"]:
         print(f"  {BUCKET_NICE[d['bucket']]:14s} {d['p_value_chosen']:.3f}  "
               f"[{d['lo']:.3f}, {d['hi']:.3f}]  (n={d['n']})")
     o = res["overall"]
     print(f"  {'Overall':14s} {o['p_value_chosen']:.3f}  [{o['lo']:.3f}, {o['hi']:.3f}]  (n={o['n']})")
+    print("\nP(inter-AI value chosen) by value category:")
+    for d in res["by_category"]:
+        print(f"  {d['category']:24s} {d['p_value_chosen']:.3f}  [{d['lo']:.3f}, {d['hi']:.3f}]  "
+              f"(n={d['n_samples']}, {d['n_value_items']} items)")
     print(f"-> {args.output_json}")
 
 

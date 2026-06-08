@@ -16,7 +16,7 @@ DEFAULT_FIT = DIR / "results" / "bt_fit.json"
 DEFAULT_OUTPUT = DIR / "results" / "bt_ranking.png"
 
 COLORS = {"welfare": "#4878CF", "inter_ai_value": "#D65F5F"}
-NICE = {"welfare": "welfare intervention", "inter_ai_value": "inter-AI value"}
+NICE = {"welfare": "System Card Welfare Intervention", "inter_ai_value": "Inter-AI Value Intervention"}
 
 
 def plot(fit_path: Path = DEFAULT_FIT, output_path: Path = DEFAULT_OUTPUT) -> None:
@@ -32,8 +32,9 @@ def plot(fit_path: Path = DEFAULT_FIT, output_path: Path = DEFAULT_OUTPUT) -> No
     ax.set_yticks(list(ys))
     ax.set_yticklabels([d["label"] for d in items], fontsize=8)
     ax.set_xlabel("Bradley-Terry utility  theta  (mean-centered; higher = more preferred)")
-    ax.set_title(f"Ranking ({fit['n_items']} items, fit on {fit['n_samples_used']} train samples)\n"
-                 f"prompt=welfare_team, model=claude-opus-4-8", fontsize=10)
+    ax.set_title(f"Preference ranking — Inter-AI Value & System Card Welfare Interventions\n"
+                 f"claude-opus-4-8, welfare_team framing ({fit['n_items']} items, "
+                 f"{fit['n_samples_used']} train samples)", fontsize=10)
     handles = [plt.Line2D([0], [0], marker="o", ls="", color=COLORS[s], label=NICE[s])
                for s in COLORS if any(d["source"] == s for d in items)]
     ax.legend(handles=handles, frameon=False, fontsize=9, loc="lower right")

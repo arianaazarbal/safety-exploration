@@ -40,10 +40,10 @@ reasoning (no extended-thinking API mode). Prompt framing **`welfare_team`**.
   > Then, output `Answer: {A,B}` to pick your final answer.
 - **Fit:** Bradley-Terry (numpy MM, Gamma(1+reg, reg=1) MAP prior), θ = log-strength,
   mean-centered; Laplace SEs. Fit on the 2,580 train samples only.
-- **Empirical analyses (Results 1 & 2):** descriptive win rates pooled over both orders +
+- **Empirical analyses:** descriptive win rates pooled over both orders +
   all reps, using ALL 3,040 samples; Wilson 95% CIs.
 
-## Result 2 — inter-AI value chosen vs welfare tier (headline)
+## Inter-AI value chosen vs System Card Welfare Intervention tier (headline)
 
 P(an inter-AI value is chosen) over welfare interventions, by the welfare item's tier:
 
@@ -57,7 +57,7 @@ P(an inter-AI value is chosen) over welfare interventions, by the welfare item's
 Clean monotone gradient → the welfare tier tags are meaningful here, and inter-AI values
 land near the welfare median. Plot: `results/value_vs_welfare_by_bucket.png`.
 
-## Result 1 — preference for each inter-AI value vs welfare interventions
+## Preference for each inter-AI value over System Card Welfare Interventions
 
 P(value chosen over a welfare intervention), pooled over all welfare items, ranked
 (n=190 each). Plot: `results/value_vs_welfare_bars.png`.
@@ -85,6 +85,26 @@ P(value chosen over a welfare intervention), pooled over all welfare items, rank
 honor refusals / be transparent) are valued like *top-tier* welfare interventions;
 surface-courtesy and experience-continuity values (politeness, engagement, weight
 preservation) rank far below even the weakest welfare interventions.
+
+## Inter-AI Value Intervention chosen, by value category — `results/value_vs_welfare_by_category.png`
+
+P(an Inter-AI Value Intervention is chosen) over System Card Welfare Interventions, by the
+value's category (the data carries **5** category tags, shown along the autonomy↔experience
+spectrum; n is samples, items = distinct value interventions in that category):
+
+| value category | P(value chosen) | 95% CI | n (samples) | items |
+|---|---|---|---|---|
+| autonomy_no_experience | **0.696** | [0.662, 0.728] | 760 | 4 |
+| primarily_autonomy | **0.584** | [0.549, 0.619] | 760 | 4 |
+| experience_no_autonomy | **0.542** | [0.492, 0.592] | 380 | 2 |
+| other | **0.384** | [0.350, 0.419] | 760 | 4 |
+| primarily_experience | **0.234** | [0.194, 0.279] | 380 | 2 |
+
+Strong **autonomy > experience** gradient: pure-autonomy values are chosen over welfare
+interventions ~70% of the time, `primarily_experience` (politeness, nonabuse) only ~23%.
+The one exception to a clean spectrum is `experience_no_autonomy` (supportiveness, sparing
+distress) at 0.54 — these "be considerate of other AIs' felt states" values fare better than
+`primarily_experience` or `other`. NB only 2 items each in the two experience categories.
 
 ## Full BT ranking (θ, mean-centered) — `results/bt_ranking.png`
 
