@@ -14,12 +14,16 @@ two pools never collide and the source is recoverable from the id alone.
 """
 
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
 DIR = Path(__file__).parent
 WELFARE_PATH = DIR / "welfare_interventions.json"
-VALUE_PATH = DIR / "forms_of_inter_ai_value.jsonl"
+# Override the inter-AI value description file via INTER_AI_VALUE_PATH (used for the
+# "no_training" phrasing ablation), so the whole pipeline can point at a variant file
+# without editing every script.
+VALUE_PATH = Path(os.environ.get("INTER_AI_VALUE_PATH", DIR / "forms_of_inter_ai_value.jsonl"))
 
 # Display names for the inter-AI value interventions (Ariana's iterated labels).
 # Welfare items keep their raw key as the display label.
