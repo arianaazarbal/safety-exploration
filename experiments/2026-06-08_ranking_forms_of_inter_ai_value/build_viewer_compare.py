@@ -19,7 +19,8 @@ MODELS = [("opus_4_8", ""), ("fable_5", "_fable5")]
 
 
 def _records(meta, cond, model, suffix):
-    p = DIR / "results" / f"comparisons_cross_{cond}{suffix}.json"
+    import paths
+    p = paths.art(cond + suffix, "comparisons")
     if not p.exists():
         return []
     recs = []

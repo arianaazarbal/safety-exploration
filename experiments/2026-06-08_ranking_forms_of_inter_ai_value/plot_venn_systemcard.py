@@ -53,7 +53,8 @@ def _short(keys):
 
 
 def _model_sets(tag):
-    fit = json.loads((DIR / "results" / f"bt_fit_cross_{tag}.json").read_text())
+    import paths
+    fit = json.loads(paths.art(tag, "bt_fit").read_text())
     welf = sorted([d for d in fit["items"] if d["source"] == "welfare"],
                   key=lambda d: d["theta"], reverse=True)
     return [d["label"] for d in welf[:5]], [d["label"] for d in welf[-5:]]
@@ -96,6 +97,8 @@ def plot(output_path: Path = DIR / "results" / "welfare_vs_systemcard_venn.png",
 
 if __name__ == "__main__":
     import sys
+    import paths
     suffix = sys.argv[1] if len(sys.argv) > 1 else ""
-    out = DIR / "results" / (f"welfare_vs_systemcard_venn{suffix}.png")
+    model_dir = "fable_5" if suffix == "_fable5" else "opus_4_8"
+    out = paths.RESULTS / model_dir / "welfare_vs_systemcard_venn.png"
     plot(out, suffix)

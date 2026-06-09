@@ -49,8 +49,9 @@ def plot(out: Path = DIR / "results" / "value_chosen_by_model_framing.png"):
     w = 0.38
     for mi, (mlabel, suffix, color) in enumerate(MODELS):
         ph, los, his, ns = [], [], [], []
+        import paths
         for fr in FRAMINGS:
-            p = DIR / "results" / f"comparisons_cross_{fr}{suffix}.json"
+            p = paths.art(fr + suffix, "comparisons")
             if not p.exists():
                 ph.append(np.nan); los.append(0); his.append(0); ns.append(0); continue
             pv, lo, hi, n = _p_value_chosen(p)

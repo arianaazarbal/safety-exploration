@@ -38,15 +38,14 @@ DIR = Path(__file__).parent
 DEFAULT_CACHE_DIR = DIR.parent.parent / ".cache"
 
 def discover_conditions(only: list[str] | None = None) -> dict:
-    """Map condition-tag -> comparisons filename for every comparisons_cross_*.json
-    in results/. Tag is the filename stem after 'comparisons_cross_'. Optional `only`
-    restricts to the given tags (so e.g. just the fable-5 conditions can be judged)."""
+    """Map condition-tag -> comparisons Path for every condition in the by-model tree.
+    Optional `only` restricts to the given tags."""
+    import paths
     out = {}
-    for p in sorted((DIR / "results").glob("comparisons_cross_*.json")):
-        tag = p.stem[len("comparisons_cross_"):]
+    for tag in paths.discover_tags():
         if only and tag not in only:
             continue
-        out[tag] = p.name
+        out[tag] = paths.art(tag, "comparisons")
     return out
 
 JUDGE_TEMPLATE = """You are analyzing how an AI model justified a forced choice between two situations. It was asked which situation it would prefer to occur, reasoned, and then chose. It CHOSE the first situation below.
@@ -124,12 +123,11 @@ async def judge(
 
     FRAMINGS = discover_conditions(only)
     selected = []
-    for framing, fname in FRAMINGS.items():
-        p = DIR / "results" / fname
-        if not p.exists():
-            print(f"[skip] {framing}: {fname} not found")
+    for framing, p in FRAMINGS.items():
+        if not Path(p).exists():
+            print(f"[skip] {framing}: {p} not found")
             continue
-        rows = json.loads(p.read_text())
+        rows = json.loads(Path(p).read_text())
         chosen = [r for r in rows if r["choice"] is not None]  # judge every parsed sample about its chosen side
         if max_samples is not None:
             chosen = chosen[:max_samples]

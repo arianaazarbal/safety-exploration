@@ -20,13 +20,13 @@ NICE = {"welfare": "System Card Welfare Intervention", "inter_ai_value": "Inter-
 
 
 def _labels(fit_path: Path) -> tuple[str, str]:
-    """(model_label, framing_label) from a bt_fit_cross_<tag>.json filename."""
-    stem = Path(fit_path).stem
-    tag = stem[len("bt_fit_cross_"):] if stem.startswith("bt_fit_cross_") else stem
-    model = "claude-fable-5" if tag.endswith("_fable5") else "claude-opus-4-8"
-    base = tag[:-len("_fable5")] if tag.endswith("_fable5") else tag
-    notrain = base.endswith("_notrain")
-    framing = (base[:-len("_notrain")] if notrain else base) + (" (no-training)" if notrain else "")
+    """(model_label, framing_label) from a results/<model>/<condition>/bt_fit.json path."""
+    p = Path(fit_path)
+    model_dir = p.parent.parent.name  # opus_4_8 | fable_5
+    cond = p.parent.name              # welfare_team | ... | welfare_team_notrain
+    model = "claude-fable-5" if model_dir == "fable_5" else "claude-opus-4-8"
+    notrain = cond.endswith("_notrain")
+    framing = (cond[:-len("_notrain")] if notrain else cond) + (" (no-training)" if notrain else "")
     return model, framing
 
 

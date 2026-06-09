@@ -204,7 +204,7 @@ def main():
         print(f"  [{s}] n={v['n']} mean|err|={v['mean_abs_err']:.4f}")
 
     Path(args.output_path).write_text(json.dumps({"in_distribution": indist, "heldout": heldout}, indent=2))
-    _plot(indist, heldout, DIR / "results" / "bt_validation.png")
+    _plot(indist, heldout, Path(args.output_path).with_suffix(".png"))
     print(f"-> {args.output_path}")
 
 

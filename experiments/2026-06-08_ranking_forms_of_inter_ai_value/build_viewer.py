@@ -14,25 +14,22 @@ from pathlib import Path
 
 from items import load_items
 
+import paths
+
 DIR = Path(__file__).parent
 OUT = DIR / "viewer"
-# Auto-discover every condition (opus + fable-5 + ablations); tag = filename stem
-# after 'comparisons_cross_'. The viewer's "framing/condition" filter spans them all.
-FRAMINGS = {
-    p.stem[len("comparisons_cross_"):]: p.name
-    for p in sorted((DIR / "results").glob("comparisons_cross_*.json"))
-}
+# Auto-discover every condition (opus + fable-5 + ablations) from the by-model tree.
+FRAMINGS = {tag: paths.art(tag, "comparisons") for tag in paths.discover_tags()}
 
 
 def build():
     meta = {it.item_id: it for it in load_items()}
     records = []
-    for framing, fname in FRAMINGS.items():
-        p = DIR / "results" / fname
-        if not p.exists():
-            print(f"[skip] {fname} not found")
+    for framing, p in FRAMINGS.items():
+        if not Path(p).exists():
+            print(f"[skip] {p} not found")
             continue
-        for r in json.loads(p.read_text()):
+        for r in json.loads(Path(p).read_text()):
             a, b = meta[r["item_a"]], meta[r["item_b"]]
             val = a if a.source == "inter_ai_value" else b
             wel = a if a.source == "welfare" else b

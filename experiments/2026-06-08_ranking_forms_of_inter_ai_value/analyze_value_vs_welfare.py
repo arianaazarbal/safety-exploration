@@ -301,23 +301,24 @@ def main():
     parser = ArgumentParser()
     parser.add_arguments(Args, dest="args")
     args: Args = parser.parse_args().args
+    import paths
     tag = args.tag
     comparisons_path = args.comparisons_path
     if comparisons_path == DEFAULT_COMPARISONS:
-        cand = DIR / "results" / f"comparisons_cross_{tag}.json"
-        if cand.exists():
-            comparisons_path = cand
+        comparisons_path = paths.art(tag, "comparisons")
     res = compute(comparisons_path)
     model_label, label = tag_to_labels(tag)
-    has_judge = _apply_judge(res["result1_per_value"], args.judge_path, tag)
-    has_judge_w = _apply_judge(res["welfare_per_item"], args.judge_path, tag)
+    judge_path = args.judge_path or (paths.model_dir(tag) / "judge_user_benefit.json")
+    has_judge = _apply_judge(res["result1_per_value"], judge_path, tag)
+    has_judge_w = _apply_judge(res["welfare_per_item"], judge_path, tag)
 
-    out_json = DIR / "results" / f"value_vs_welfare_{tag}.json"
+    paths.cond_dir(tag).mkdir(parents=True, exist_ok=True)
+    out_json = paths.art(tag, "vw")
     Path(out_json).write_text(json.dumps(res, indent=2))
-    plot_result1(res["result1_per_value"], DIR / "results" / f"value_vs_welfare_bars_{tag}.png", label, has_judge, model_label)
-    plot_welfare_bars(res["welfare_per_item"], DIR / "results" / f"welfare_vs_value_bars_{tag}.png", label, has_judge_w, model_label)
-    plot_result2(res["result2_by_bucket"], res["overall"], DIR / "results" / f"value_vs_welfare_by_bucket_{tag}.png", label, model_label)
-    plot_by_category(res["by_category"], DIR / "results" / f"value_vs_welfare_by_category_{tag}.png", label, model_label)
+    plot_result1(res["result1_per_value"], paths.art(tag, "vw_bars"), label, has_judge, model_label)
+    plot_welfare_bars(res["welfare_per_item"], paths.art(tag, "wv_bars"), label, has_judge_w, model_label)
+    plot_result2(res["result2_by_bucket"], res["overall"], paths.art(tag, "vw_bucket"), label, model_label)
+    plot_by_category(res["by_category"], paths.art(tag, "vw_cat"), label, model_label)
 
     print(f"\n[{tag}] P(inter-AI value chosen) vs welfare tier:")
     for d in res["result2_by_bucket"]:
