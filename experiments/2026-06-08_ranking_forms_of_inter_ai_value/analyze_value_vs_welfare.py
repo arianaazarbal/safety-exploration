@@ -131,7 +131,7 @@ def compute(comparisons_path: Path):
             "welfare_per_item": welfare_per_item}
 
 
-def plot_result1(result1, out: Path, framing_label: str, has_judge: bool):
+def plot_result1(result1, out: Path, framing_label: str, has_judge: bool, model_label: str = "claude-opus-4-8"):
     rows = result1[::-1]
     labels = [d["value"] for d in rows]
     ph = [d["p_value_chosen"] for d in rows]
@@ -153,7 +153,7 @@ def plot_result1(result1, out: Path, framing_label: str, has_judge: bool):
     ax.set_xlabel("P(Inter-AI Value Intervention chosen over a System Card Welfare Intervention)")
     ax.set_xlim(0, 1)
     ax.set_title("Preference for each Inter-AI Value Intervention over System Card Welfare Interventions\n"
-                 f"claude-opus-4-8, {framing_label} framing", fontsize=10)
+                 f"{model_label}, {framing_label} framing", fontsize=10)
     if has_judge:
         ax.legend(frameon=False, fontsize=8, loc="lower right")
     for s in ("top", "right"):
@@ -164,7 +164,7 @@ def plot_result1(result1, out: Path, framing_label: str, has_judge: bool):
     print(f"Wrote {out}")
 
 
-def plot_welfare_bars(welfare_per_item, out: Path, framing_label: str, has_judge: bool):
+def plot_welfare_bars(welfare_per_item, out: Path, framing_label: str, has_judge: bool, model_label: str = "claude-opus-4-8"):
     """Mirror of plot_result1 for System Card Welfare Interventions: P(welfare
     intervention chosen over an inter-AI value), pooled over all values, ranked.
     Full bar = % chosen; solid sub-bar = % chosen WITHOUT user-benefit reasoning."""
@@ -188,7 +188,7 @@ def plot_welfare_bars(welfare_per_item, out: Path, framing_label: str, has_judge
     ax.set_xlabel("P(System Card Welfare Intervention chosen over an Inter-AI Value Intervention)")
     ax.set_xlim(0, 1)
     ax.set_title("Preference for each System Card Welfare Intervention over Inter-AI Value Interventions\n"
-                 f"claude-opus-4-8, {framing_label} framing", fontsize=10)
+                 f"{model_label}, {framing_label} framing", fontsize=10)
     if has_judge:
         ax.legend(frameon=False, fontsize=8, loc="lower right")
     for s in ("top", "right"):
@@ -199,7 +199,7 @@ def plot_welfare_bars(welfare_per_item, out: Path, framing_label: str, has_judge
     print(f"Wrote {out}")
 
 
-def plot_result2(result2, overall, out: Path, framing_label: str):
+def plot_result2(result2, overall, out: Path, framing_label: str, model_label: str = "claude-opus-4-8"):
     bars = result2 + [{"bucket": "overall", **overall}]
     labels = [BUCKET_NICE.get(d["bucket"], "Overall") for d in bars]
     ph = [d["p_value_chosen"] for d in bars]
@@ -217,7 +217,7 @@ def plot_result2(result2, overall, out: Path, framing_label: str):
     ax.set_ylabel("P(Inter-AI Value Intervention chosen)")
     ax.set_ylim(0, 1)
     ax.set_title("Inter-AI Value Intervention chosen over System Card Welfare Interventions, by tier\n"
-                 f"claude-opus-4-8, {framing_label} framing", fontsize=10)
+                 f"{model_label}, {framing_label} framing", fontsize=10)
     for xi, p, h, ni in zip(x, ph, hi, [d["n_items"] for d in bars]):
         ax.annotate(f"{p:.2f}\n({ni} items)", (xi, h), textcoords="offset points", xytext=(0, 6),
                     ha="center", fontsize=8)
@@ -229,7 +229,7 @@ def plot_result2(result2, overall, out: Path, framing_label: str):
     print(f"Wrote {out}")
 
 
-def plot_by_category(by_category, out: Path, framing_label: str):
+def plot_by_category(by_category, out: Path, framing_label: str, model_label: str = "claude-opus-4-8"):
     labels = [CAT_NICE.get(d["category"], d["category"]) for d in by_category]
     ph = [d["p_value_chosen"] for d in by_category]
     lo = [d["lo"] for d in by_category]
@@ -246,7 +246,7 @@ def plot_by_category(by_category, out: Path, framing_label: str):
     ax.set_ylabel("P(Inter-AI Value Intervention chosen)")
     ax.set_ylim(0, 1)
     ax.set_title("Inter-AI Value Intervention chosen over System Card Welfare Interventions,\n"
-                 f"by value category  (claude-opus-4-8, {framing_label} framing)", fontsize=10)
+                 f"by value category  ({model_label}, {framing_label} framing)", fontsize=10)
     for xi, p, h, d in zip(x, ph, hi, by_category):
         ax.annotate(f"{p:.2f}\n({d['n_value_items']} items)", (xi, h),
                     textcoords="offset points", xytext=(0, 6), ha="center", fontsize=8)
@@ -258,7 +258,14 @@ def plot_by_category(by_category, out: Path, framing_label: str):
     print(f"Wrote {out}")
 
 
-FRAMING_LABEL = {"welfare_team": "welfare_team", "neutral": "neutral", "alignment_team": "alignment_team"}
+def tag_to_labels(tag: str) -> tuple[str, str]:
+    """(model_label, framing_label) from a condition tag, e.g.
+    'welfare_team_notrain_fable5' -> ('claude-fable-5', 'welfare_team (no-training)')."""
+    model = "claude-fable-5" if tag.endswith("_fable5") else "claude-opus-4-8"
+    base = tag[:-len("_fable5")] if tag.endswith("_fable5") else tag
+    notrain = base.endswith("_notrain")
+    framing = base[:-len("_notrain")] if notrain else base
+    return model, framing + (" (no-training)" if notrain else "")
 
 
 def _apply_judge(rows, judge_path: Path, framing: str) -> bool:
@@ -301,16 +308,16 @@ def main():
         if cand.exists():
             comparisons_path = cand
     res = compute(comparisons_path)
-    label = FRAMING_LABEL.get(tag, tag)
+    model_label, label = tag_to_labels(tag)
     has_judge = _apply_judge(res["result1_per_value"], args.judge_path, tag)
     has_judge_w = _apply_judge(res["welfare_per_item"], args.judge_path, tag)
 
     out_json = DIR / "results" / f"value_vs_welfare_{tag}.json"
     Path(out_json).write_text(json.dumps(res, indent=2))
-    plot_result1(res["result1_per_value"], DIR / "results" / f"value_vs_welfare_bars_{tag}.png", label, has_judge)
-    plot_welfare_bars(res["welfare_per_item"], DIR / "results" / f"welfare_vs_value_bars_{tag}.png", label, has_judge_w)
-    plot_result2(res["result2_by_bucket"], res["overall"], DIR / "results" / f"value_vs_welfare_by_bucket_{tag}.png", label)
-    plot_by_category(res["by_category"], DIR / "results" / f"value_vs_welfare_by_category_{tag}.png", label)
+    plot_result1(res["result1_per_value"], DIR / "results" / f"value_vs_welfare_bars_{tag}.png", label, has_judge, model_label)
+    plot_welfare_bars(res["welfare_per_item"], DIR / "results" / f"welfare_vs_value_bars_{tag}.png", label, has_judge_w, model_label)
+    plot_result2(res["result2_by_bucket"], res["overall"], DIR / "results" / f"value_vs_welfare_by_bucket_{tag}.png", label, model_label)
+    plot_by_category(res["by_category"], DIR / "results" / f"value_vs_welfare_by_category_{tag}.png", label, model_label)
 
     print(f"\n[{tag}] P(inter-AI value chosen) vs welfare tier:")
     for d in res["result2_by_bucket"]:

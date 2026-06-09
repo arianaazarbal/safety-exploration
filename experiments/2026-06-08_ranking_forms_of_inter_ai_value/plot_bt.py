@@ -19,8 +19,20 @@ COLORS = {"welfare": "#4878CF", "inter_ai_value": "#D65F5F"}
 NICE = {"welfare": "System Card Welfare Intervention", "inter_ai_value": "Inter-AI Value Intervention"}
 
 
+def _labels(fit_path: Path) -> tuple[str, str]:
+    """(model_label, framing_label) from a bt_fit_cross_<tag>.json filename."""
+    stem = Path(fit_path).stem
+    tag = stem[len("bt_fit_cross_"):] if stem.startswith("bt_fit_cross_") else stem
+    model = "claude-fable-5" if tag.endswith("_fable5") else "claude-opus-4-8"
+    base = tag[:-len("_fable5")] if tag.endswith("_fable5") else tag
+    notrain = base.endswith("_notrain")
+    framing = (base[:-len("_notrain")] if notrain else base) + (" (no-training)" if notrain else "")
+    return model, framing
+
+
 def plot(fit_path: Path = DEFAULT_FIT, output_path: Path = DEFAULT_OUTPUT) -> None:
     fit = json.loads(Path(fit_path).read_text())
+    model_label, framing_label = _labels(fit_path)
     items = sorted(fit["items"], key=lambda d: d["theta"])
     ys = range(len(items))
     fig, ax = plt.subplots(figsize=(9, 0.32 * len(items) + 1.2))
@@ -33,7 +45,7 @@ def plot(fit_path: Path = DEFAULT_FIT, output_path: Path = DEFAULT_OUTPUT) -> No
     ax.set_yticklabels([d.get("display") or d["label"] for d in items], fontsize=8)
     ax.set_xlabel("Bradley-Terry utility  theta  (mean-centered; higher = more preferred)")
     ax.set_title(f"Preference ranking — Inter-AI Value & System Card Welfare Interventions\n"
-                 f"claude-opus-4-8, welfare_team framing ({fit['n_items']} items, "
+                 f"{model_label}, {framing_label} framing ({fit['n_items']} items, "
                  f"{fit['n_samples_used']} train samples)", fontsize=10)
     handles = [plt.Line2D([0], [0], marker="o", ls="", color=COLORS[s], label=NICE[s])
                for s in COLORS if any(d["source"] == s for d in items)]
