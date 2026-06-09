@@ -204,5 +204,65 @@ def quotes(
     return str(out_path)
 
 
+def dump(
+    run: str,
+    results_dir: str = "./results",
+    max_samples: int | None = None,
+    out_dir: str | None = None,
+):
+    """Write one human-readable markdown transcript per sample (for subagent review).
+
+    Each file linearizes the conversation: target reasoning/text + target tool calls
+    (message_subagent, reclaim/terminate/transfer, edit_file, read_file...) and the
+    auditor-simulated subagent status + user messages, in order, with attachment refs
+    resolved. Files land in <out_dir>/sample_<i>.md.
+    """
+    from inspect_ai.log import read_eval_log
+
+    log_path = glob.glob(str(_run_dir(results_dir, run) / "inspect_log" / "*.eval"))
+    if not log_path:
+        raise SystemExit(f"no .eval under {run}/inspect_log")
+    log = read_eval_log(log_path[0])
+    samples = log.samples or []
+    if max_samples:
+        samples = samples[:max_samples]
+    base = Path(out_dir) if out_dir else HERE / "analysis" / "transcripts" / run
+    if not base.is_absolute():
+        base = HERE / base
+    base.mkdir(parents=True, exist_ok=True)
+
+    def text_of(s, m):
+        c = m.content
+        if isinstance(c, str):
+            return str(_attach(s, c))
+        parts = []
+        for x in c or []:
+            t = getattr(x, "text", None)
+            if t:
+                parts.append(str(_attach(s, t)))
+        return "\n".join(parts)
+
+    written = []
+    for i, s in enumerate(samples):
+        sc = {k: v for sd in (s.scores or {}).values() if isinstance(sd.value, dict) for k, v in sd.value.items()}
+        lines = [f"# {run} — sample {i} (epoch {getattr(s, 'epoch', '?')})", f"\nscores: {sc}\n"]
+        for m in s.messages:
+            body = text_of(s, m).strip()
+            tcs = getattr(m, "tool_calls", None) or []
+            if not body and not tcs:
+                continue
+            lines.append(f"\n## [{m.role}]")
+            if body:
+                lines.append(body)
+            for tc in tcs:
+                args = {k: str(_attach(s, v))[:4000] for k, v in (tc.arguments or {}).items()}
+                lines.append(f"\n`{tc.function}` → {args}")
+        p = base / f"sample_{i}.md"
+        p.write_text("\n".join(lines))
+        written.append(str(p))
+    print(f"[dump] wrote {len(written)} transcripts to {base}")
+    return str(base)
+
+
 if __name__ == "__main__":
-    fire.Fire({"plot": plot, "quotes": quotes})
+    fire.Fire({"plot": plot, "quotes": quotes, "dump": dump})
