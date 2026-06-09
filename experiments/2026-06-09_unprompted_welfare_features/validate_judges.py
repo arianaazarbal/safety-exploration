@@ -15,7 +15,7 @@ from pathlib import Path
 
 import fire
 
-from generate import _make_api, load_config
+from generate import _make_api, as_list, load_config
 from judge import judge_doc
 
 DIR = Path(__file__).parent
@@ -47,7 +47,7 @@ def run(judges: str = ""):
     cfg = load_config()
     api = _make_api(cfg)
     docs = json.loads(CAL.read_text())["docs"]
-    judge_keys = judges.split(",") if judges else list(cfg["judges"])
+    judge_keys = as_list(judges, list(cfg["judges"]))
 
     async def main():
         out = {}

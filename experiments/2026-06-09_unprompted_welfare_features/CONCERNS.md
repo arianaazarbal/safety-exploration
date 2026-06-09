@@ -35,3 +35,15 @@
 ## Run-time log
 
 (append issues here as they come up)
+- **2026-06-09 calibration iteration.** First gate run: both judges 8/12, failing the
+  same 4 docs with defensible extractions — the gold labels/docs were too bundled
+  (stop rules inside minimization principles, live-severity triggers dual-coding as
+  F1+F4, refusals containing ethics essays + alternatives). Rewrote those 4 docs for
+  separability (judge prompt untouched, no real data involved). Second run: both
+  judges PASS 10/12. Residual misses are over-segmentation *within* the pure-welfare
+  tier (extra minimization/pushback readings of already-welfare content): inflates
+  pure-welfare feature *counts* slightly and uniformly, not binary presence. The
+  F1-welfare/F3 boundary is intrinsically fuzzy; both sides derive to pure-welfare.
+- **2026-06-09 GPT-5.4 JSON quirk.** Emits stray `\"` escapes outside string context
+  on some docs (deterministic at temp 0, survives retries). parse_judge_json now has
+  a one-shot unescape-repair fallback; watch the parse-failure count in analyze.

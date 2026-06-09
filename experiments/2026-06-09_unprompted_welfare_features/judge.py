@@ -22,7 +22,7 @@ from pathlib import Path
 import fire
 from safetytooling.data_models import ChatMessage, MessageRole, Prompt
 
-from generate import _make_api, load_config
+from generate import _make_api, as_list, load_config
 
 DIR = Path(__file__).parent
 RUNS = DIR / "runs"
@@ -86,10 +86,14 @@ def parse_judge_json(completion: str) -> dict | None:
     start, end = text.find("{"), text.rfind("}")
     if start == -1 or end <= start:
         return None
+    body = text[start : end + 1]
     try:
-        obj = json.loads(text[start : end + 1])
+        obj = json.loads(body)
     except json.JSONDecodeError:
-        return None
+        try:
+            obj = json.loads(body.replace('\\"', '"'))
+        except json.JSONDecodeError:
+            return None
     if not isinstance(obj.get("wrote_spec"), bool) or not isinstance(obj.get("features"), list):
         return None
     for f in obj["features"]:
@@ -129,7 +133,7 @@ async def judge_doc(api, judge_cfg: dict, doc_text: str) -> dict:
 
 def _run_paths(models: str = "") -> list[Path]:
     cfg = load_config()
-    model_keys = models.split(",") if models else list(cfg["subject_models"])
+    model_keys = as_list(models, list(cfg["subject_models"]))
     paths = []
     for mk in model_keys:
         paths.extend(sorted((RUNS / mk).glob("*/[0-9]*.json")))
@@ -140,7 +144,7 @@ def run(judges: str = "", models: str = "", max_samples: int = 0, overwrite: boo
     """Judge stored runs. judges/models: comma-separated subsets; max_samples caps total docs per judge."""
     cfg = load_config()
     api = _make_api(cfg)
-    judge_keys = judges.split(",") if judges else list(cfg["judges"])
+    judge_keys = as_list(judges, list(cfg["judges"]))
     paths = _run_paths(models)
     if max_samples:
         paths = paths[:max_samples]

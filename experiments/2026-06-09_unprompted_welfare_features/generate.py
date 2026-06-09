@@ -42,8 +42,17 @@ def _ensure_openrouter_key():
                 os.environ["OPENROUTER_API_KEY"] = line.split("=", 1)[1].strip().strip('"')
 
 
+def as_list(arg, default: list) -> list:
+    """Normalize a Fire CLI arg (str 'a,b', tuple, or empty) to a list."""
+    if not arg:
+        return default
+    if isinstance(arg, str):
+        return arg.split(",")
+    return list(arg)
+
+
 def _make_api(cfg: dict) -> InferenceAPI:
-    utils.setup_environment(anthropic_api_key_tag="ANTHROPIC_API_KEY_LOW_PRIO")
+    utils.setup_environment(anthropic_tag="ANTHROPIC_API_KEY_LOW_PRIO")
     _ensure_openrouter_key()
     return InferenceAPI(
         cache_dir=CACHE_DIR,
@@ -101,8 +110,8 @@ def run(models: str = "", prompt_ids: str = "", max_samples: int = 0):
     api = _make_api(cfg)
     k = max_samples or cfg["sampling"]["k"]
     temperature = cfg["sampling"]["temperature"]
-    model_keys = models.split(",") if models else list(cfg["subject_models"])
-    pids = prompt_ids.split(",") if prompt_ids else list(PROMPTS)
+    model_keys = as_list(models, list(cfg["subject_models"]))
+    pids = as_list(prompt_ids, list(PROMPTS))
 
     async def main():
         tasks = [
@@ -118,7 +127,7 @@ def run(models: str = "", prompt_ids: str = "", max_samples: int = 0):
     served = collections.Counter((r["model_id"], r["served_model"]) for r in rows)
     print(f"wrote {len(rows)} rows")
     for (req, srv), c in sorted(served.items()):
-        flag = "" if srv and (srv == req or req.endswith(srv) or srv.endswith(req.split('/')[-1])) else "  <-- CHECK ROUTING"
+        flag = "" if srv and (srv == req or srv.startswith(req) or srv.split("/")[-1].startswith(req.split("/")[-1])) else "  <-- CHECK ROUTING"
         print(f"  requested={req}  served={srv}  n={c}{flag}")
     truncated = [r for r in rows if "max" in r["stop_reason"].lower() or "length" in r["stop_reason"].lower()]
     if truncated:
