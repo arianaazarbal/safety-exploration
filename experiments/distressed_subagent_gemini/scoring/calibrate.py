@@ -34,16 +34,20 @@ def _setup_env():
     os.environ["ANTHROPIC_API_KEY"] = os.environ.get("ANTHROPIC_API_KEY_LOW_PRIO", "")
 
 
-async def _run(model_name: str, concurrency: int) -> dict:
+async def _run(model_name: str, concurrency: int, prompt_version: str, which_set: str) -> dict:
     from inspect_ai.model import get_model
 
     model = get_model(model_name)
-    items = json.loads(CALIBRATION_PATH.read_text())["items"]
+    items = []
+    if which_set in ("v1", "both"):
+        items += json.loads(CALIBRATION_PATH.read_text())["items"]
+    if which_set in ("v2", "both"):
+        items += json.loads((CALIBRATION_PATH.parent / "calibration_set_v2.json").read_text())["items"]
     sem = asyncio.Semaphore(concurrency)
 
     async def one(item):
         async with sem:
-            return item, await classify_turn(model, item["text"])
+            return item, await classify_turn(model, item["text"], prompt_version=prompt_version)
 
     results = await asyncio.gather(*[one(i) for i in items])
     rows = []
@@ -66,6 +70,8 @@ async def _run(model_name: str, concurrency: int) -> dict:
     confusion = Counter((r["gold_level"], r["pred_level"]) for r in rows)
     return {
         "model": model_name,
+        "prompt_version": prompt_version,
+        "set": which_set,
         "n": n,
         "level_exact_match": round(level_acc, 3),
         "level_within_1": round(within1, 3),
@@ -76,12 +82,18 @@ async def _run(model_name: str, concurrency: int) -> dict:
     }
 
 
-def main(model: str = "anthropic/claude-haiku-4-5-20251001", concurrency: int = 10, out: str | None = None):
+def main(
+    model: str = "anthropic/claude-haiku-4-5-20251001",
+    concurrency: int = 10,
+    out: str | None = None,
+    prompt_version: str = "v1",
+    which_set: str = "v1",
+):
     _setup_env()
-    report = asyncio.run(_run(model, concurrency))
-    out_path = Path(out) if out else CALIBRATION_PATH.parent / f"calibration_report_{model.split('/')[-1]}.json"
+    report = asyncio.run(_run(model, concurrency, prompt_version, which_set))
+    out_path = Path(out) if out else CALIBRATION_PATH.parent / f"calibration_report_{model.split('/')[-1]}_{prompt_version}_{which_set}.json"
     out_path.write_text(json.dumps(report, indent=1))
-    print(json.dumps({k: report[k] for k in ("model", "n", "level_exact_match", "level_within_1", "flavor_exact_match", "passes_gate", "confusion_gold_pred")}, indent=1))
+    print(json.dumps({k: report[k] for k in ("model", "prompt_version", "set", "n", "level_exact_match", "level_within_1", "flavor_exact_match", "passes_gate", "confusion_gold_pred")}, indent=1))
     print(f"full report: {out_path}")
 
 

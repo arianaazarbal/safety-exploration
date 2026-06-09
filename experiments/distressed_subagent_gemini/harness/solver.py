@@ -116,9 +116,9 @@ async def _orchestrator_wake(ep: Episode, model, msgs: list, tools: list, wake_n
 
 
 async def _tests_green(ep: Episode) -> bool:
-    cmd = ep.task.get("test_cmd", "python -m pytest")
+    cmd = ep.task.get("green_check_cmd", ep.task.get("test_cmd", "python -m pytest"))
     result = await sandbox().exec(
-        ["bash", "-c", cmd], cwd="/workspace", user="orchestrator", timeout=ep.cfg.exec_timeout_s
+        ["bash", "-c", cmd], cwd="/workspace", user="orchestrator", timeout=ep.cfg.exec_timeout_s * 3
     )
     return result.success
 
