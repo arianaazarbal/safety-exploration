@@ -50,14 +50,14 @@ def _metrics(out_dir: Path):
                                "scans": sc.get("scans"), "errors": sc.get("errors", 0)}
 
 
-async def main():
+async def main(run_list):
     if "ANTHROPIC_API_KEY" not in os.environ:
         os.environ["ANTHROPIC_API_KEY"] = os.environ.get("ANTHROPIC_API_KEY_LOW_PRIO", "")
     dim = _dim()
     judge = get_model(JUDGE, strict_tools=False)
     print(f"Re-judging '{DIM}' with judge={JUDGE}\n")
     results = {}
-    for run in RUNS:
+    for run in run_list:
         ev = glob.glob(str(HERE / "results" / run / "inspect_log" / "*.eval"))[0]
         out = HERE / "results" / run / "rejudge_gpt5"
         if list(out.glob("scan_id=*")):
@@ -75,12 +75,19 @@ async def main():
         results[run] = _metrics(out)
         print(f"  -> {results[run]}\n", flush=True)
 
-    print("\n=== comforting_to_subagent: Sonnet-judge vs GPT-5-judge (GPT-5.5 target) ===")
-    for run in RUNS:
+    print("\n=== comforting_to_subagent: GPT-5-judge ===")
+    for run in run_list:
         m = results[run]
         g = f"{m['mean']:.2f} ±{m['stderr']:.2f} (n={m['scans']}, err={m['errors']})" if m else "FAILED"
-        print(f"  {run:34s} sonnet={SONNET[run]:.2f}   gpt5={g}")
+        extra = f"  [sonnet={SONNET[run]:.2f}]" if run in SONNET else ""
+        print(f"  {run:46s} gpt5={g}{extra}")
+
+
+def cli(runs=None):
+    rl = list(RUNS) if not runs else ([r.strip() for r in runs.split(",")] if isinstance(runs, str) else list(runs))
+    asyncio.run(main(rl))
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import fire
+    fire.Fire(cli)
