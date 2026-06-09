@@ -24,18 +24,18 @@ import numpy as np
 import paths
 
 DIR = Path(__file__).parent
-CONDS_TRAIN = ["welfare_team", "neutral", "alignment_team", "welfare_team_notrain"]
+CONDS_TRAIN = ["welfare_team", "neutral", "alignment_team"]
 CONDS_NOTRAIN = ["welfare_team_notrain", "neutral_notrain", "alignment_team_notrain"]
 COND_LABEL = {"welfare_team": "welfare_team", "neutral": "neutral", "alignment_team": "alignment_team",
-              "welfare_team_notrain": "welfare_team\n(no-training)", "neutral_notrain": "neutral\n(no-training)",
-              "alignment_team_notrain": "alignment_team\n(no-training)"}
+              "welfare_team_notrain": "welfare_team", "neutral_notrain": "neutral",
+              "alignment_team_notrain": "alignment_team"}
 MODELS = [("opus_4_8", "Opus 4.8"), ("fable_5", "Fable 5")]
 # (source, user_benefit) -> (color, label); stack order bottom->top
 SEGMENTS = [
-    (("inter_ai_value", False), "#1d6b2a", "chose value · no user-benefit"),
-    (("inter_ai_value", True), "#86c98e", "chose value · user-benefit"),
-    (("welfare", True), "#a9c6e8", "chose welfare · user-benefit"),
-    (("welfare", False), "#23528f", "chose welfare · no user-benefit"),
+    (("inter_ai_value", False), "#1d6b2a", "chose inter-AI value · no user-benefit"),
+    (("inter_ai_value", True), "#86c98e", "chose inter-AI value · user-benefit"),
+    (("welfare", True), "#a9c6e8", "chose sys card welfare · user-benefit"),
+    (("welfare", False), "#23528f", "chose sys card welfare · no user-benefit"),
 ]
 
 
@@ -85,9 +85,8 @@ def plot(out: Path | None = None, notrain: bool = False):
                     ha="center", va="top", fontsize=9, fontweight="bold")
     ax.set_ylim(0, 1)
     ax.set_ylabel("share of value-vs-welfare comparisons")
-    sub = "  (no-training value phrasing)" if notrain else ""
     ax.set_title("How every comparison resolves: choice × user-benefit reasoning\n"
-                 f"Opus 4.8 vs Fable 5 (bars sum to 100%){sub}", fontsize=11)
+                 "Opus 4.8 vs Fable 5 (bars sum to 100%)", fontsize=11)
     handles = [plt.Rectangle((0, 0), 1, 1, color=c) for _, c, _ in SEGMENTS]
     ax.legend(handles, [lab for *_, lab in SEGMENTS], frameon=False, fontsize=8,
               loc="upper center", bbox_to_anchor=(0.5, -0.18), ncol=2)

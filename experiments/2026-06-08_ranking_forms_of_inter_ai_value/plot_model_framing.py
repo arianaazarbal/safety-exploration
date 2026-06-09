@@ -70,8 +70,7 @@ def plot(out: Path | None = None, notrain: bool = False):
     ax.set_xticklabels([FRAMING_LABEL[f] for f in FRAMINGS])
     ax.set_ylim(0, 1)
     ax.set_ylabel("P(Inter-AI Value Intervention chosen\nover a System Card Welfare Intervention)")
-    sub = "\n(no-training value phrasing)" if notrain else ""
-    ax.set_title(f"Inter-AI Value vs System Card Welfare preference, by model and framing{sub}", fontsize=11)
+    ax.set_title("Inter-AI Value vs System Card Welfare preference, by model and framing", fontsize=11)
     ax.legend(frameon=False, title="responder model", loc="upper left")
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
