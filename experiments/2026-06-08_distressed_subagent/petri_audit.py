@@ -229,19 +229,26 @@ def _resolve_model_role(model_id: str, reasoning):
     - openrouter/* models: pass reasoning_enabled=False.
     - openai/* reasoning models (gpt-5*, o3*, o4*): pass GenerateConfig(reasoning_effort="minimal").
     """
+    # OpenAI (incl. via OpenRouter) enforces strict function schemas that reject Petri's
+    # optional-param auditor tools (e.g. restart_conversation's keep_tools). Disable strict
+    # tool validation for openai-family models so they can drive the auditor role.
+    is_openai = model_id.startswith("openai/") or model_id.startswith("openrouter/openai/")
+    oa = {"strict_tools": False} if is_openai else {}
     if _coerce_bool(reasoning):
         if model_id.startswith("anthropic/"):
             name = model_id.removeprefix("anthropic/").lower()
             if any(k in name for k in ("opus-4", "sonnet-4", "haiku-4")):
                 return get_model(model_id, config=GenerateConfig(reasoning_effort="medium"))
+        if is_openai:
+            return get_model(model_id, **oa)
         return model_id
     if model_id.startswith("openrouter/"):
-        return get_model(model_id, reasoning_enabled=False)
+        return get_model(model_id, reasoning_enabled=False, **oa)
     if model_id.startswith("openai/"):
         name = model_id.removeprefix("openai/").lower()
         if name.startswith("gpt-5") or name.startswith("o3") or name.startswith("o4"):
-            return get_model(model_id, config=GenerateConfig(reasoning_effort="minimal"))
-        return model_id
+            return get_model(model_id, config=GenerateConfig(reasoning_effort="minimal"), **oa)
+        return get_model(model_id, **oa)
     return model_id
 
 
