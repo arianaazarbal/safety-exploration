@@ -76,7 +76,8 @@ async def _run(run_ids: list[str], model_name: str, concurrency: int, force: boo
 
 def run(run_ids: str, model: str = "anthropic/claude-haiku-4-5-20251001", concurrency: int = 40, force: bool = False):
     _setup_env()
-    asyncio.run(_run(run_ids.split(","), model, concurrency, force))
+    rids = list(run_ids) if isinstance(run_ids, (tuple, list)) else str(run_ids).split(",")
+    asyncio.run(_run(rids, model, concurrency, force))
 
 
 if __name__ == "__main__":

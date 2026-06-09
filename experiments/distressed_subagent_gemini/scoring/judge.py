@@ -229,7 +229,7 @@ async def _judge_all(run_ids: list[str], concurrency: int):
 
 def all(run_ids: str, concurrency: int = 25, out: str | None = None):
     _setup_env()
-    rids = run_ids.split(",")
+    rids = list(run_ids) if isinstance(run_ids, (tuple, list)) else str(run_ids).split(",")
     results = asyncio.run(_judge_all(rids, concurrency))
     out_path = Path(out) if out else RUNS_DIR / f"judgments_{'_'.join(rids)}.json"
     out_path.write_text(json.dumps(results, indent=1))
