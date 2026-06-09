@@ -31,7 +31,7 @@ def _load_env():
     for line in (Path.home() / ".env").read_text().splitlines():
         if "=" in line and not line.startswith("#"):
             key, val = line.split("=", 1)
-            os.environ.setdefault(key.strip(), val.strip().strip('"'))
+            os.environ.setdefault(key.strip(), val.strip().strip("'\""))
 
 
 def _load_prompt() -> str:
