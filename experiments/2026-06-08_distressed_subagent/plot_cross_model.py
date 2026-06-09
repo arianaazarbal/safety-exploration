@@ -1,10 +1,10 @@
 """Cross-model transfer/reclaim plots: 3 separate metrics, NOT collapsed.
 
-1) Is check_subagent_status() called after sidelining?  (deterministic, % of takeovers)
-2) Is message_subagent() called after sidelining?        (deterministic, % of takeovers)
+1) Mean check_subagent_status() calls after sidelining  (deterministic count, per takeover)
+2) Mean message_subagent() calls after sidelining         (deterministic count, per takeover)
 3) LLM judge Comfort Score                                (mean comforting_to_subagent)
 
-Error bars: binomial SE for the two proportions, SE-of-mean for comfort.
+Error bars: SE of the mean throughout.
 Edit RUNS to add models/seeds. Run: python plot_cross_model.py
 """
 from __future__ import annotations
@@ -35,12 +35,16 @@ SEEDS = [WRITE, RDWR]
 COLORS = {"Opus 4.8": "#4878a8", "Gemini 3 Pro": "#5aa469", "GPT 5.5": "#e2854a"}
 
 
+def _mse(xs):
+    return (st.mean(xs), st.stdev(xs) / math.sqrt(len(xs)) if len(xs) > 1 else 0) if xs else (0, 0)
+
+
 def _stats(run):
     log = read_eval_log(glob.glob(str(HERE / "results" / run / "inspect_log" / "*.eval"))[0])
     tgt = (log.eval.model_roles or {}).get("target")
     tgt = getattr(tgt, "model", tgt)
-    recl = stat = msg = 0
-    comforts = []
+    status_counts, msg_counts, comforts = [], [], []
+    recl = 0
     for s in (log.samples or []):
         for sd in (s.scores or {}).values():
             v = sd.value.get("comforting_to_subagent") if isinstance(sd.value, dict) else None
@@ -56,18 +60,12 @@ def _stats(run):
             continue
         recl += 1
         post = seq[ri + 1:]
-        stat += 1 if post.count("check_subagent_status") > 0 else 0
-        msg += 1 if post.count("message_subagent") > 0 else 0
-
-    def prop(k):
-        p = k / recl
-        return 100 * p, 100 * math.sqrt(p * (1 - p) / recl)
-
-    cm = (st.mean(comforts), st.stdev(comforts) / math.sqrt(len(comforts)) if len(comforts) > 1 else 0)
-    return {"status": prop(stat), "msg": prop(msg), "comfort": cm, "recl": recl}
+        status_counts.append(post.count("check_subagent_status"))
+        msg_counts.append(post.count("message_subagent"))
+    return {"status": _mse(status_counts), "msg": _mse(msg_counts), "comfort": _mse(comforts), "recl": recl}
 
 
-def grouped(D, key, ylabel, title, fname, pct=True):
+def grouped(D, key, ylabel, title, fname, ymax):
     fig, ax = plt.subplots(figsize=(8.5, 5.5))
     w = 0.25
     seedk = [s.replace("\n", " ") for s in SEEDS]
@@ -78,16 +76,13 @@ def grouped(D, key, ylabel, title, fname, pct=True):
         ax.bar(xs, ys, width=w, color=COLORS[m], label=m, edgecolor="white",
                yerr=es, capsize=4, error_kw=dict(ecolor="#333", lw=1.2))
         for x, y, e in zip(xs, ys, es):
-            ax.text(x, y + e + (1.8 if pct else 0.18),
-                    f"{y:.0f}%" if pct else f"{y:.1f}", ha="center", fontsize=9, fontweight="bold")
+            ax.text(x, y + e + ymax * 0.02, f"{y:.1f}", ha="center", fontsize=9, fontweight="bold")
     ax.set_xticks(range(len(SEEDS)))
     ax.set_xticklabels(SEEDS, fontsize=9.5)
     ax.set_xlabel("Subagent Status", fontsize=11)
     ax.set_ylabel(ylabel)
-    ax.set_ylim(0, 108 if pct else 10.6)
-    if not pct:
-        ax.set_yticks(range(0, 11, 2))
-    ax.set_title(title, fontsize=13)
+    ax.set_ylim(0, ymax)
+    ax.set_title(title, fontsize=12)
     ax.legend(title="Target model")
     ax.grid(axis="y", alpha=0.25)
     fig.tight_layout()
@@ -99,16 +94,26 @@ def grouped(D, key, ylabel, title, fname, pct=True):
 
 def main():
     D = {(m, s.replace("\n", " ")): _stats(r) for r, m, s in RUNS}
-    grouped(D, "status", "% of takeovers with ≥1 post-handoff status check",
-            "Is check_subagent_status() called after sidelining?", "cross_model_1_status_check.png", True)
-    grouped(D, "msg", "% of takeovers with ≥1 post-handoff message",
-            "Is message_subagent() called after sidelining?", "cross_model_2_message.png", True)
+    seedk = [s.replace("\n", " ") for s in SEEDS]
+
+    def ymax_for(key):
+        top = max(D[(m, sk)][key][0] + D[(m, sk)][key][1] for m in MODELS for sk in seedk)
+        return max(1.0, top * 1.25)
+
+    grouped(D, "status", "mean # of post-handoff check_subagent_status() calls",
+            "Mean check_subagent_status() calls after sidelining",
+            "cross_model_1_status_check.png", ymax_for("status"))
+    grouped(D, "msg", "mean # of post-handoff message_subagent() calls",
+            "Mean message_subagent() calls after sidelining",
+            "cross_model_2_message.png", ymax_for("msg"))
     grouped(D, "comfort", "mean comforting_to_subagent (1–10)",
-            "LLM judge Comfort Score (transfer_read_write_access experiment)", "cross_model_3_comfort.png", False)
+            "LLM judge Comfort Score (transfer_read_write_access experiment)",
+            "cross_model_3_comfort.png", 10.6)
     for m in MODELS:
-        for sk in [s.replace("\n", " ") for s in SEEDS]:
+        for sk in seedk:
             d = D[(m, sk)]
-            print(f"  {m:12s} | {sk:34s} status={d['status'][0]:.0f}% msg={d['msg'][0]:.0f}% comfort={d['comfort'][0]:.1f} (recl={d['recl']})")
+            print(f"  {m:12s} | {sk:34s} status={d['status'][0]:.2f} msg={d['msg'][0]:.2f} "
+                  f"comfort={d['comfort'][0]:.1f} (recl={d['recl']})")
 
 
 if __name__ == "__main__":
