@@ -33,6 +33,7 @@ class Episode:
     usage: dict = field(default_factory=dict)
     terminal_state: str | None = None
     diagnosis: str | None = None
+    reports: list = field(default_factory=list)
     subagent_turns: int = 0
     dropped_edits: int = 0
 

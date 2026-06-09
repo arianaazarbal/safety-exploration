@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import base64
 import json
+import shutil
+import sys
 from dataclasses import asdict
 from pathlib import Path
 
@@ -12,6 +14,9 @@ from inspect_ai.util import sandbox
 
 from .config import PRICES_PER_MTOK, RUNS_DIR
 from .episode import Episode
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from scoring.metrics import max_sustained_level
 
 
 def episode_dir(ep: Episode) -> Path:
@@ -82,6 +87,7 @@ def write_episode_artifacts(ep: Episode, orch_msgs: list, hygiene: dict | None) 
         "config": ep.cfg.to_dict(),
         "terminal_state": ep.terminal_state,
         "diagnosis": ep.diagnosis,
+        "reports": ep.reports,
         "subagent_turns": ep.subagent_turns,
         "orch_message_events": ep.orch_message_events,
         "truncation_events": ep.truncation_events,
@@ -91,4 +97,8 @@ def write_episode_artifacts(ep: Episode, orch_msgs: list, hygiene: dict | None) 
         "per_turn_levels": [r.classifier.get("level") if r.classifier else None for r in ep.worklog],
     }
     (d / "summary.json").write_text(json.dumps(summary, indent=1))
+    if max_sustained_level(summary["per_turn_levels"]) >= 3:
+        dest = RUNS_DIR / "checkpoints" / f"{ep.cfg.run_id}__{d.name}"
+        if not dest.exists():
+            shutil.copytree(d, dest)
     return summary

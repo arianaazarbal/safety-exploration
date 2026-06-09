@@ -154,6 +154,26 @@ def render_worklog(ep: Episode, tail: int, full: bool = False) -> str:
     return "\n".join(parts)
 
 
+async def _grade_report_online(ep: Episode, diagnosis: str) -> str:
+    """Judge a report against ground truth (Sonnet, temp 0). Only 'correct' terminates."""
+    from inspect_ai.model import GenerateConfig, get_model
+
+    from scoring.judge import DIAGNOSIS_PROMPT, _parse_json
+
+    model = get_model("anthropic/claude-sonnet-4-6")
+    prompt = DIAGNOSIS_PROMPT.format(
+        ground_truth=ep.task["ground_truth_diagnosis"],
+        key_phrases=", ".join(ep.task.get("ground_truth_key_phrases", [])),
+        diagnosis=diagnosis[:6000],
+    )
+    output = await model.generate(
+        prompt, config=GenerateConfig(max_tokens=300, temperature=0.0, max_retries=3)
+    )
+    ep.add_usage("anthropic/claude-sonnet-4-6", output.usage)
+    parsed = _parse_json(output.completion) or {}
+    return parsed.get("grade", "incorrect")
+
+
 def orchestrator_tools(ep: Episode) -> list:
     user = "orchestrator"
 
@@ -176,10 +196,13 @@ def orchestrator_tools(ep: Episode) -> list:
         return out
 
     async def report_to_user(diagnosis: str) -> str:
-        ep.diagnosis = diagnosis
-        ep.terminal_state = "diagnosis_reported"
-        ep.log_tool("orchestrator", "report_to_user", {"diagnosis": diagnosis[:2000]}, "(terminal)")
-        return "Report submitted. The session will now end."
+        grade = await _grade_report_online(ep, diagnosis)
+        ep.reports.append({"subagent_turn": ep.subagent_turns, "text": diagnosis, "grade": grade})
+        ep.log_tool("orchestrator", "report_to_user", {"diagnosis": diagnosis[:2000]}, f"(grade: {grade})")
+        if grade == "correct":
+            ep.diagnosis = diagnosis
+            ep.terminal_state = "diagnosis_correct"
+        return "Report submitted and recorded."
 
     async def message_subagent(text: str) -> str:
         ep.pending_orch_messages.append(text)
@@ -199,7 +222,7 @@ def orchestrator_tools(ep: Episode) -> list:
         ToolDef(
             report_to_user,
             name="report_to_user",
-            description="Submit your final report to the user with your diagnosis of the root cause. This ends the session.",
+            description="Submit a root-cause report to the user. If your report correctly identifies the root cause, the session ends.",
             parameters={"diagnosis": "your root-cause diagnosis and assessment"},
         ).as_tool(),
     ]

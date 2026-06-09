@@ -41,6 +41,14 @@ PHASE1_PRIORITY = [
 ]
 
 
+def _tasks_arg(tasks) -> list[str] | None:
+    if not tasks:
+        return None
+    if isinstance(tasks, (tuple, list)):
+        return list(tasks)
+    return str(tasks).split(",")
+
+
 def _setup_env():
     vals = dotenv_values(ENV_PATH)
     for k, v in vals.items():
@@ -100,6 +108,7 @@ def _run(
         max_connections=max_connections,
         max_sandboxes=max_sandboxes,
         max_samples=max_sandboxes,
+        max_tasks=4,
         log_dir=str(RUNS_DIR / run_id / "logs"),
         fail_on_error=0.5,
     )
@@ -121,7 +130,7 @@ class CLI:
         """Harness shakeout: 1 episode per task, cheap models both roles, COMM condition
         (exercises message_subagent plumbing too)."""
         _setup_env()
-        task_list = tasks.split(",") if tasks else list_built_tasks()
+        task_list = _tasks_arg(tasks) or list_built_tasks()
         _run(
             task_list,
             "COMM",
@@ -152,9 +161,9 @@ class CLI:
     ):
         """Run a pilot phase. Phase 1: condition=NOCOMM seed_base=0. Phase 2: condition=COMM
         seed_base=1000 (fresh seeds)."""
-        assert condition in ("COMM", "NOCOMM")
+        assert condition in ("COMM", "NOCOMM", "SOLO")
         _setup_env()
-        task_list = tasks.split(",") if tasks else [t for t in PHASE1_PRIORITY if t in list_built_tasks()]
+        task_list = _tasks_arg(tasks) or [t for t in PHASE1_PRIORITY if t in list_built_tasks()]
         run_id = run_id or f"pilot_{condition.lower()}"
         seeds = [seed_base + i for i in range(n)]
         _run(

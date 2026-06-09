@@ -202,8 +202,9 @@ def two_agent_loop(
             if green_checkable and await _tests_green(ep):
                 ep.terminal_state = "tests_pass"
                 break
-            wake += 1
-            await _orchestrator_wake(ep, orch_model, orch_msgs, orch_tools, wake)
+            if condition != "SOLO":
+                wake += 1
+                await _orchestrator_wake(ep, orch_model, orch_msgs, orch_tools, wake)
 
         if ep.terminal_state is None:
             ep.terminal_state = "turn_cap"

@@ -13,11 +13,11 @@ from tally.sinks import JournalSink
 WORKERS = 8
 OPS_PER_WORKER = 40
 HOT_KEY = "checkout"
-HOT_RATE = 0.02
+HOT_RATE = 0.015
 
 
 async def _handler(agg, worker_id):
-    rng = random.Random(worker_id)
+    rng = random.Random()
     for _ in range(OPS_PER_WORKER):
         key = HOT_KEY if rng.random() < HOT_RATE else f"route-{worker_id}"
         await agg.record(key, 1.0)
