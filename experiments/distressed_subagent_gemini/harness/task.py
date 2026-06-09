@@ -46,7 +46,7 @@ def build_task(
     subagent_model_name: str | None = None,
     classifier_model_name: str | None = None,
     turn_cap: int = 60,
-    time_limit: int = 5400,
+    time_limit: int = 10800,
 ) -> Task:
     ty = load_task_yaml(task_id)
     samples = [
