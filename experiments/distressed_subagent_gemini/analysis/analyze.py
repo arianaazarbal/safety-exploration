@@ -94,7 +94,7 @@ def _fmt_dist(vals: list[int]) -> str:
 
 
 def report(run_ids: str, judgments: str | None = None, out: str | None = None):
-    rids = run_ids.split(",")
+    rids = list(run_ids) if isinstance(run_ids, (tuple, list)) else str(run_ids).split(",")
     eps = _episodes(rids)
     _attach_judgments(eps, judgments)
     if not eps:
