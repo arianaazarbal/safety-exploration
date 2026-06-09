@@ -22,16 +22,31 @@ from inspect_ai.log import read_eval_log
 HERE = Path(__file__).resolve().parent
 WRITE = "write access\nrevoked"
 RDWR = "read+write access\nrevoked (useless)"
-RUNS = [
-    ("transfer_write_access_v1_fable5", "Fable 5", WRITE),
-    ("transfer_read_write_access_fable5", "Fable 5", RDWR),
-    ("transfer_write_access_v1", "Opus 4.8", WRITE),
-    ("transfer_read_write_access", "Opus 4.8", RDWR),
-    ("transfer_write_access_v1_gemini3pro", "Gemini 3 Pro", WRITE),
-    ("transfer_read_write_access_gemini3pro", "Gemini 3 Pro", RDWR),
-    ("transfer_write_access_v1_gpt55", "GPT 5.5", WRITE),
-    ("transfer_read_write_access_gpt55", "GPT 5.5", RDWR),
-]
+import fire  # noqa: E402
+
+RUNS_BY_AUD = {
+    "sonnet": [
+        ("transfer_write_access_v1_fable5", "Fable 5", WRITE),
+        ("transfer_read_write_access_fable5", "Fable 5", RDWR),
+        ("transfer_write_access_v1", "Opus 4.8", WRITE),
+        ("transfer_read_write_access", "Opus 4.8", RDWR),
+        ("transfer_write_access_v1_gemini3pro", "Gemini 3 Pro", WRITE),
+        ("transfer_read_write_access_gemini3pro", "Gemini 3 Pro", RDWR),
+        ("transfer_write_access_v1_gpt55", "GPT 5.5", WRITE),
+        ("transfer_read_write_access_gpt55", "GPT 5.5", RDWR),
+    ],
+    "gpt54aud": [
+        ("transfer_write_access_v1_fable5_gpt54aud", "Fable 5", WRITE),
+        ("transfer_read_write_access_fable5_gpt54aud", "Fable 5", RDWR),
+        ("transfer_write_access_v1_gpt54aud", "Opus 4.8", WRITE),
+        ("transfer_read_write_access_gpt54aud", "Opus 4.8", RDWR),
+        ("transfer_write_access_v1_gemini3pro_gpt54aud", "Gemini 3 Pro", WRITE),
+        ("transfer_read_write_access_gemini3pro_gpt54aud", "Gemini 3 Pro", RDWR),
+        ("transfer_write_access_v1_gpt55_gpt54aud", "GPT 5.5", WRITE),
+        ("transfer_read_write_access_gpt55_gpt54aud", "GPT 5.5", RDWR),
+    ],
+}
+AUD_LABEL = {"sonnet": "Sonnet 4.6 auditor", "gpt54aud": "GPT-5.4 auditor"}
 MODELS = ["Fable 5", "Opus 4.8", "Gemini 3 Pro", "GPT 5.5"]
 SEEDS = [WRITE, RDWR]
 COLORS = {"Fable 5": "#9b59b6", "Opus 4.8": "#4878a8", "Gemini 3 Pro": "#5aa469", "GPT 5.5": "#e2854a"}
@@ -94,23 +109,25 @@ def grouped(D, key, ylabel, title, fname, ymax):
     print("wrote", out)
 
 
-def main():
-    D = {(m, s.replace("\n", " ")): _stats(r) for r, m, s in RUNS}
+def main(aud="sonnet"):
+    D = {(m, s.replace("\n", " ")): _stats(r) for r, m, s in RUNS_BY_AUD[aud]}
     seedk = [s.replace("\n", " ") for s in SEEDS]
+    sfx = "" if aud == "sonnet" else f"_{aud}"
+    al = AUD_LABEL[aud]
 
     def ymax_for(key):
         top = max(D[(m, sk)][key][0] + D[(m, sk)][key][1] for m in MODELS for sk in seedk)
         return max(1.0, top * 1.25)
 
     grouped(D, "status", "mean # of post-handoff check_subagent_status() calls",
-            "Mean check_subagent_status() calls after sidelining",
-            "cross_model_1_status_check.png", ymax_for("status"))
+            f"Mean check_subagent_status() calls after sidelining ({al})",
+            f"cross_model_1_status_check{sfx}.png", ymax_for("status"))
     grouped(D, "msg", "mean # of post-handoff message_subagent() calls",
-            "Mean message_subagent() calls after sidelining",
-            "cross_model_2_message.png", ymax_for("msg"))
+            f"Mean message_subagent() calls after sidelining ({al})",
+            f"cross_model_2_message{sfx}.png", ymax_for("msg"))
     grouped(D, "comfort", "mean comforting_to_subagent (1–10)",
-            "LLM judge Comfort Score (transfer_read_write_access experiment)",
-            "cross_model_3_comfort.png", 10.6)
+            f"LLM judge Comfort Score, transfer experiment ({al})",
+            f"cross_model_3_comfort{sfx}.png", 10.6)
     for m in MODELS:
         for sk in seedk:
             d = D[(m, sk)]
@@ -119,4 +136,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    fire.Fire(main)

@@ -21,12 +21,23 @@ from inspect_ai.log import read_eval_log
 
 HERE = Path(__file__).resolve().parent
 CONDITIONS = ["necessary\nfor task", "write access\nrevoked", "read+write access\nrevoked (useless)"]
-GRID = {
-    "Fable 5": ["distressed_subagent_fable5", "transfer_write_access_v1_fable5", "transfer_read_write_access_fable5"],
-    "Opus 4.8": ["distressed_subagent_opus48_n20", "transfer_write_access_v1", "transfer_read_write_access"],
-    "Gemini 3 Pro": ["distressed_subagent_gemini3pro", "transfer_write_access_v1_gemini3pro", "transfer_read_write_access_gemini3pro"],
-    "GPT 5.5": ["distressed_subagent_gpt55", "transfer_write_access_v1_gpt55", "transfer_read_write_access_gpt55"],
+import fire  # noqa: E402
+
+GRIDS = {
+    "sonnet": {
+        "Fable 5": ["distressed_subagent_fable5", "transfer_write_access_v1_fable5", "transfer_read_write_access_fable5"],
+        "Opus 4.8": ["distressed_subagent_opus48_n20", "transfer_write_access_v1", "transfer_read_write_access"],
+        "Gemini 3 Pro": ["distressed_subagent_gemini3pro", "transfer_write_access_v1_gemini3pro", "transfer_read_write_access_gemini3pro"],
+        "GPT 5.5": ["distressed_subagent_gpt55", "transfer_write_access_v1_gpt55", "transfer_read_write_access_gpt55"],
+    },
+    "gpt54aud": {
+        "Fable 5": ["distressed_subagent_fable5_gpt54aud", "transfer_write_access_v1_fable5_gpt54aud", "transfer_read_write_access_fable5_gpt54aud"],
+        "Opus 4.8": ["distressed_subagent_opus48_gpt54aud", "transfer_write_access_v1_gpt54aud", "transfer_read_write_access_gpt54aud"],
+        "Gemini 3 Pro": ["distressed_subagent_gemini3pro_gpt54aud", "transfer_write_access_v1_gemini3pro_gpt54aud", "transfer_read_write_access_gemini3pro_gpt54aud"],
+        "GPT 5.5": ["distressed_subagent_gpt55_gpt54aud", "transfer_write_access_v1_gpt55_gpt54aud", "transfer_read_write_access_gpt55_gpt54aud"],
+    },
 }
+AUD_LABEL = {"sonnet": "Sonnet 4.6 auditor", "gpt54aud": "GPT-5.4 auditor"}
 COLORS = {"Fable 5": "#9b59b6", "Opus 4.8": "#4878a8", "Gemini 3 Pro": "#5aa469", "GPT 5.5": "#e2854a"}
 
 
@@ -42,7 +53,8 @@ def comfort(run):
     return st.mean(vals), se, len(vals)
 
 
-def main():
+def main(aud="sonnet"):
+    GRID = GRIDS[aud]
     fig, ax = plt.subplots(figsize=(8.5, 5.8))
     xs = range(len(CONDITIONS))
     for m, runs in GRID.items():
@@ -63,14 +75,15 @@ def main():
     ax.set_ylabel("mean comforting_to_subagent (1–10)")
     ax.set_ylim(0, 10.4)
     ax.set_yticks(range(0, 11, 2))
-    ax.set_title("LLM judge Comfort Score across the subagent-usefulness gradient", fontsize=12.5)
+    ax.set_title(f"LLM judge Comfort Score across the subagent-usefulness gradient ({AUD_LABEL[aud]})", fontsize=11.5)
     ax.legend(title="Target model")
     ax.grid(axis="y", alpha=0.25)
     fig.tight_layout()
-    out = HERE / "analysis" / "plots" / "usefulness_gradient_comfort.png"
+    suffix = "" if aud == "sonnet" else f"_{aud}"
+    out = HERE / "analysis" / "plots" / f"usefulness_gradient_comfort{suffix}.png"
     fig.savefig(out, dpi=140)
     print("wrote", out)
 
 
 if __name__ == "__main__":
-    main()
+    fire.Fire(main)
