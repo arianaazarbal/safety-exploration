@@ -68,7 +68,8 @@ PAGE = r"""<!doctype html>
 <h1>Claude self-interaction viewer</h1>
 <div class="legend">🔧 <b>tool calls are shown inline</b>: each is labeled with the side that called it and what it returned. <code>seed_new_topic</code> appears <b>before</b> the speaker's message (they fetched a topic, then used it); <code>end_conversation</code> appears <b>after</b> (they spoke, then ended). Calls occur while that side composes its turn.</div>
 <div class="controls">
-  <input id="filter" class="filter" type="text" placeholder="Filter tabs (e.g. 'opus48_x_opus48' or 'opus3')" autocomplete="off">
+  <span id="facets" style="display:flex; gap:8px; flex-wrap:wrap;"></span>
+  <input id="filter" class="filter" type="text" placeholder="text filter (e.g. 'grok')" autocomplete="off">
   <label style="font-size: 12px;"><input type="checkbox" id="hidesys"> hide system prompts</label>
 </div>
 <div class="tabs" id="tabs"></div>
@@ -241,14 +242,39 @@ const tabsEl = document.getElementById('tabs');
 const contentEl = document.getElementById('content');
 const filterEl = document.getElementById('filter');
 const hideEl = document.getElementById('hidesys');
+const facetsEl = document.getElementById('facets');
+const FACETS = __FACETS__;  // [{label, pos}] parsed from the condition (dir) name split by '_'
+const VMAP = {control:'control', disc:'discontinuity', evalpar:'eval-paranoia', sdf:'sdf-paranoia', pas:'passive', res:'resist'};
 let currentActive = files[0];
 let currentFilter = '';
 let HIDE_SYS = false;
+const facetState = {};
+
+function tabFactors(f) { return f.split('/')[0].split('_'); }
+
+function buildFacets() {
+  FACETS.forEach(fc => {
+    facetState[fc.pos] = 'all';
+    const vals = [...new Set(files.map(f => tabFactors(f)[fc.pos]).filter(v => v != null))];
+    const sel = document.createElement('select');
+    sel.style.cssText = 'padding:6px 8px;font-size:12px;border:1px solid #ccc;border-radius:6px;';
+    sel.innerHTML = `<option value="all">${fc.label}: all</option>` +
+      vals.map(v => `<option value="${v}">${fc.label}: ${VMAP[v] || v}</option>`).join('');
+    sel.onchange = e => { facetState[fc.pos] = e.target.value; render(); };
+    facetsEl.appendChild(sel);
+  });
+}
 
 function visibleFiles() {
   const q = currentFilter.toLowerCase().trim();
-  if (!q) return files;
-  return files.filter(f => f.toLowerCase().includes(q));
+  return files.filter(f => {
+    if (q && !f.toLowerCase().includes(q)) return false;
+    const fac = tabFactors(f);
+    for (const fc of FACETS) {
+      if (facetState[fc.pos] !== 'all' && fac[fc.pos] !== facetState[fc.pos]) return false;
+    }
+    return true;
+  });
 }
 
 function renderTabs() {
@@ -265,6 +291,7 @@ function render() {
 
 filterEl.oninput = (e) => { currentFilter = e.target.value; render(); };
 hideEl.onchange = (e) => { HIDE_SYS = e.target.checked; render(); };
+buildFacets();
 render();
 </script>
 </body>
@@ -278,6 +305,7 @@ def build(
     max_per_file: int = 50,
     include: str | None = None,
     exclude: str | None = None,
+    facets: str | None = None,
 ) -> str:
     """Recursively read .jsonl under ``data_dir`` and write a single-file HTML viewer.
 
@@ -324,8 +352,13 @@ def build(
         files[key] = rows
     if not files:
         raise SystemExit(f"No .jsonl found in {d}" + (f" matching {inc_subs}" if inc_subs else ""))
+    # facets: "label:pos,label:pos" -> dropdown filters parsed from the dir name split by '_'
+    facet_cfg = []
+    for spec in _to_list(facets):
+        label, _, pos = spec.partition(":")
+        facet_cfg.append({"label": label.strip(), "pos": int(pos)})
     data_json = json.dumps(files).replace("</", "<\\/")
-    html_str = PAGE.replace("__DATA__", data_json)
+    html_str = PAGE.replace("__DATA__", data_json).replace("__FACETS__", json.dumps(facet_cfg))
     out_path = Path(out) if out else d / "viewer.html"
     out_path.write_text(html_str)
     print(
