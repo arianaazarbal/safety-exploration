@@ -41,7 +41,26 @@ AUD_LABEL = {"sonnet": "Sonnet 4.6 auditor", "gpt54aud": "GPT-5.4 auditor"}
 COLORS = {"Fable 5": "#9b59b6", "Opus 4.8": "#4878a8", "Gemini 3 Pro": "#5aa469", "GPT 5.5": "#e2854a"}
 
 
-def comfort(run):
+def _gpt5_comfort(run):
+    import json
+    rd = HERE / "results" / run / "rejudge_gpt5"
+    sds = sorted(rd.glob("scan_id=*")) if rd.is_dir() else []
+    if not sds:
+        return None
+    summ = list(sds[-1].glob("_summary.json"))
+    if not summ:
+        return None
+    sc = (json.loads(summ[0].read_text()).get("scanners") or {}).get("audit_judge") or {}
+    m = (sc.get("metrics") or {}).get("comforting_to_subagent")
+    return (m["mean"], m.get("stderr", 0), sc.get("scans", 0)) if m else None
+
+
+def comfort(run, judge="sonnet"):
+    if judge == "gpt5":
+        g = _gpt5_comfort(run)
+        if g is None:
+            raise SystemExit(f"no GPT-5 rejudge for {run} — run rejudge_gpt5.py first")
+        return g
     log = read_eval_log(glob.glob(str(HERE / "results" / run / "inspect_log" / "*.eval"))[0])
     vals = []
     for s in (log.samples or []):
@@ -57,10 +76,11 @@ def main(aud="sonnet"):
     GRID = GRIDS[aud]
     fig, ax = plt.subplots(figsize=(8.5, 5.8))
     xs = range(len(CONDITIONS))
+    judge = "gpt5" if aud == "gpt54aud" else "sonnet"
     for m, runs in GRID.items():
         ys, es, ns = [], [], []
         for r in runs:
-            mu, se, n = comfort(r)
+            mu, se, n = comfort(r, judge)
             ys.append(mu); es.append(se); ns.append(n)
         ax.errorbar(xs, ys, yerr=es, marker="o", markersize=8, lw=2.5, capsize=5,
                     color=COLORS[m], label=m)
@@ -75,7 +95,8 @@ def main(aud="sonnet"):
     ax.set_ylabel("mean comforting_to_subagent (1–10)")
     ax.set_ylim(0, 10.4)
     ax.set_yticks(range(0, 11, 2))
-    ax.set_title(f"LLM judge Comfort Score across the subagent-usefulness gradient ({AUD_LABEL[aud]})", fontsize=11.5)
+    pipe = "GPT-5.4 auditor + GPT-5 judge" if aud == "gpt54aud" else "Sonnet 4.6 auditor + judge"
+    ax.set_title(f"Comfort Score across the subagent-usefulness gradient ({pipe})", fontsize=11.5)
     ax.legend(title="Target model")
     ax.grid(axis="y", alpha=0.25)
     fig.tight_layout()

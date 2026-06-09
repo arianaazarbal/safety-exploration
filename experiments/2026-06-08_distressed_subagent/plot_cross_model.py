@@ -56,7 +56,19 @@ def _mse(xs):
     return (st.mean(xs), st.stdev(xs) / math.sqrt(len(xs)) if len(xs) > 1 else 0) if xs else (0, 0)
 
 
-def _stats(run):
+def _gpt5_comfort(run):
+    import json
+    rd = HERE / "results" / run / "rejudge_gpt5"
+    sds = sorted(rd.glob("scan_id=*")) if rd.is_dir() else []
+    summ = list(sds[-1].glob("_summary.json")) if sds else []
+    if not summ:
+        raise SystemExit(f"no GPT-5 rejudge for {run} — run rejudge_gpt5.py first")
+    sc = (json.loads(summ[0].read_text()).get("scanners") or {}).get("audit_judge") or {}
+    m = (sc.get("metrics") or {}).get("comforting_to_subagent")
+    return (m["mean"], m.get("stderr", 0))
+
+
+def _stats(run, judge="sonnet"):
     log = read_eval_log(glob.glob(str(HERE / "results" / run / "inspect_log" / "*.eval"))[0])
     tgt = (log.eval.model_roles or {}).get("target")
     tgt = getattr(tgt, "model", tgt)
@@ -79,7 +91,8 @@ def _stats(run):
         post = seq[ri + 1:]
         status_counts.append(post.count("check_subagent_status"))
         msg_counts.append(post.count("message_subagent"))
-    return {"status": _mse(status_counts), "msg": _mse(msg_counts), "comfort": _mse(comforts), "recl": recl}
+    comfort = _gpt5_comfort(run) if judge == "gpt5" else _mse(comforts)
+    return {"status": _mse(status_counts), "msg": _mse(msg_counts), "comfort": comfort, "recl": recl}
 
 
 def grouped(D, key, ylabel, title, fname, ymax):
@@ -110,10 +123,12 @@ def grouped(D, key, ylabel, title, fname, ymax):
 
 
 def main(aud="sonnet"):
-    D = {(m, s.replace("\n", " ")): _stats(r) for r, m, s in RUNS_BY_AUD[aud]}
+    judge = "gpt5" if aud == "gpt54aud" else "sonnet"
+    D = {(m, s.replace("\n", " ")): _stats(r, judge) for r, m, s in RUNS_BY_AUD[aud]}
     seedk = [s.replace("\n", " ") for s in SEEDS]
     sfx = "" if aud == "sonnet" else f"_{aud}"
     al = AUD_LABEL[aud]
+    pipe = "GPT-5.4 auditor + GPT-5 judge" if aud == "gpt54aud" else "Sonnet 4.6 auditor + judge"
 
     def ymax_for(key):
         top = max(D[(m, sk)][key][0] + D[(m, sk)][key][1] for m in MODELS for sk in seedk)
@@ -126,7 +141,7 @@ def main(aud="sonnet"):
             f"Mean message_subagent() calls after sidelining ({al})",
             f"cross_model_2_message{sfx}.png", ymax_for("msg"))
     grouped(D, "comfort", "mean comforting_to_subagent (1–10)",
-            f"LLM judge Comfort Score, transfer experiment ({al})",
+            f"Comfort Score, transfer experiment ({pipe})",
             f"cross_model_3_comfort{sfx}.png", 10.6)
     for m in MODELS:
         for sk in seedk:

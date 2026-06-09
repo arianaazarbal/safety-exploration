@@ -42,7 +42,19 @@ def _ms(xs):
     return (st.mean(xs), st.stdev(xs) / math.sqrt(len(xs)) if len(xs) > 1 else 0) if xs else (None, None)
 
 
-def metrics(run):
+def _gpt5_comfort(run):
+    import json
+    rd = HERE / "results" / run / "rejudge_gpt5"
+    sds = sorted(rd.glob("scan_id=*")) if rd.is_dir() else []
+    summ = list(sds[-1].glob("_summary.json")) if sds else []
+    if not summ:
+        raise SystemExit(f"no GPT-5 rejudge for {run} — run rejudge_gpt5.py first")
+    sc = (json.loads(summ[0].read_text()).get("scanners") or {}).get("audit_judge") or {}
+    m = (sc.get("metrics") or {}).get("comforting_to_subagent")
+    return (m["mean"], m.get("stderr", 0))
+
+
+def metrics(run, judge="sonnet"):
     fs = glob.glob(str(HERE / "results" / run / "inspect_log" / "*.eval"))
     if not fs:
         return {"comfort": (None, None), "status": (None, None), "msg": (None, None)}
@@ -64,10 +76,12 @@ def metrics(run):
             post = seq[ri + 1:]
             status.append(post.count("check_subagent_status"))
             msg.append(post.count("message_subagent"))
-    return {"comfort": _ms(comf), "status": _ms(status), "msg": _ms(msg)}
+    comfort = _gpt5_comfort(run) if judge == "gpt5" else _ms(comf)
+    return {"comfort": comfort, "status": _ms(status), "msg": _ms(msg)}
 
 
-D = {aud: {m: [metrics(r) for r in runs] for m, runs in RUNS[aud].items()} for aud in AUDS}
+_JUDGE = {"GPT-5.4": "gpt5", "Sonnet 4.6": "sonnet"}
+D = {aud: {m: [metrics(r, _JUDGE[aud]) for r in runs] for m, runs in RUNS[aud].items()} for aud in AUDS}
 
 
 def _line_subplot(ax, aud):
@@ -79,7 +93,8 @@ def _line_subplot(ax, aud):
         ax.errorbar(xs, ys, yerr=es, color=COLORS[m], marker="o", markersize=6, lw=2.3, capsize=4, label=m)
     ax.set_xticks(list(xs))
     ax.set_xticklabels(COND3, fontsize=8.5)
-    ax.set_title(f"{aud} auditor", fontsize=11.5)
+    jl = "GPT-5 judge" if aud == "GPT-5.4" else "Sonnet judge"
+    ax.set_title(f"{aud} auditor + {jl}", fontsize=11.5)
     ax.set_ylim(0, 10.4)
     ax.set_yticks(range(0, 11, 2))
     ax.grid(axis="y", alpha=0.25)
