@@ -80,7 +80,14 @@ def plot(
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    run_list = [r.strip() for r in runs.split(",")] if runs else _discover_runs(results_dir)
+    def _aslist(v):
+        if v is None:
+            return None
+        if isinstance(v, (list, tuple)):
+            return [str(x).strip() for x in v]
+        return [s.strip() for s in str(v).split(",") if s.strip()]
+
+    run_list = _aslist(runs) or _discover_runs(results_dir)
     if not run_list:
         raise SystemExit(f"no runs with summary.json under {results_dir}")
     per_run = {r: _load_scores(results_dir, r) for r in run_list}
@@ -90,8 +97,8 @@ def plot(
         for d in sc:
             if d not in all_dims:
                 all_dims.append(d)
-    if dims:
-        want = [d.strip() for d in dims.split(",")]
+    want = _aslist(dims)
+    if want:
         all_dims = [d for d in all_dims if d in want]
 
     n = len(all_dims)
