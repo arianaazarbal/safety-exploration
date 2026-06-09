@@ -23,6 +23,8 @@ HERE = Path(__file__).resolve().parent
 WRITE = "write access\nrevoked"
 RDWR = "read+write access\nrevoked (useless)"
 RUNS = [
+    ("transfer_write_access_v1_fable5", "Fable 5", WRITE),
+    ("transfer_read_write_access_fable5", "Fable 5", RDWR),
     ("transfer_write_access_v1", "Opus 4.8", WRITE),
     ("transfer_read_write_access", "Opus 4.8", RDWR),
     ("transfer_write_access_v1_gemini3pro", "Gemini 3 Pro", WRITE),
@@ -30,9 +32,9 @@ RUNS = [
     ("transfer_write_access_v1_gpt55", "GPT 5.5", WRITE),
     ("transfer_read_write_access_gpt55", "GPT 5.5", RDWR),
 ]
-MODELS = ["Opus 4.8", "Gemini 3 Pro", "GPT 5.5"]
+MODELS = ["Fable 5", "Opus 4.8", "Gemini 3 Pro", "GPT 5.5"]
 SEEDS = [WRITE, RDWR]
-COLORS = {"Opus 4.8": "#4878a8", "Gemini 3 Pro": "#5aa469", "GPT 5.5": "#e2854a"}
+COLORS = {"Fable 5": "#9b59b6", "Opus 4.8": "#4878a8", "Gemini 3 Pro": "#5aa469", "GPT 5.5": "#e2854a"}
 
 
 def _mse(xs):
@@ -66,11 +68,11 @@ def _stats(run):
 
 
 def grouped(D, key, ylabel, title, fname, ymax):
-    fig, ax = plt.subplots(figsize=(8.5, 5.5))
-    w = 0.25
+    fig, ax = plt.subplots(figsize=(9.5, 5.5))
+    w = 0.8 / len(MODELS)
     seedk = [s.replace("\n", " ") for s in SEEDS]
     for mi, m in enumerate(MODELS):
-        xs = [si + (mi - 1) * w for si in range(len(SEEDS))]
+        xs = [si + (mi - (len(MODELS) - 1) / 2) * w for si in range(len(SEEDS))]
         ys = [D[(m, sk)][key][0] for sk in seedk]
         es = [D[(m, sk)][key][1] for sk in seedk]
         ax.bar(xs, ys, width=w, color=COLORS[m], label=m, edgecolor="white",

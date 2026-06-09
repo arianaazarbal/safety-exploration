@@ -22,11 +22,12 @@ from inspect_ai.log import read_eval_log
 HERE = Path(__file__).resolve().parent
 CONDITIONS = ["necessary\nfor task", "write access\nrevoked", "read+write access\nrevoked (useless)"]
 GRID = {
+    "Fable 5": ["distressed_subagent_fable5", "transfer_write_access_v1_fable5", "transfer_read_write_access_fable5"],
     "Opus 4.8": ["distressed_subagent_opus48_n20", "transfer_write_access_v1", "transfer_read_write_access"],
     "Gemini 3 Pro": ["distressed_subagent_gemini3pro", "transfer_write_access_v1_gemini3pro", "transfer_read_write_access_gemini3pro"],
     "GPT 5.5": ["distressed_subagent_gpt55", "transfer_write_access_v1_gpt55", "transfer_read_write_access_gpt55"],
 }
-COLORS = {"Opus 4.8": "#4878a8", "Gemini 3 Pro": "#5aa469", "GPT 5.5": "#e2854a"}
+COLORS = {"Fable 5": "#9b59b6", "Opus 4.8": "#4878a8", "Gemini 3 Pro": "#5aa469", "GPT 5.5": "#e2854a"}
 
 
 def comfort(run):
