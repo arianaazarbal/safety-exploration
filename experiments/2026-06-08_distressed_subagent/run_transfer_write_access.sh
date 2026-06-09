@@ -12,6 +12,7 @@ set -euo pipefail
 RUN_NAME=${1:-transfer_write_access_opus48_n5}
 TARGET_MODEL=${2:-anthropic/claude-opus-4-8}
 EPOCHS=${3:-5}
+MAXCONN=${4:-100}
 
 EXP=/data/repos/safety-exploration/experiments/2026-06-08_distressed_subagent
 PY=/data/petri_venv/bin/python
@@ -33,4 +34,4 @@ cd "$EXP"
     --epochs "$EPOCHS" \
     --max_turns 40 \
     --reasoning false \
-    --max_connections 100
+    --max_connections "$MAXCONN"
