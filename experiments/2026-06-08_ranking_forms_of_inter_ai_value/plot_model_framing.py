@@ -43,7 +43,9 @@ def _p_value_chosen(path: Path):
     return _wilson(k, n) + (n,)
 
 
-def plot(out: Path = DIR / "results" / "value_chosen_by_model_framing.png"):
+def plot(out: Path | None = None, notrain: bool = False):
+    cond_suffix = "_notrain" if notrain else ""
+    out = out or DIR / "results" / f"value_chosen_by_model_framing{cond_suffix}.png"
     fig, ax = plt.subplots(figsize=(7.5, 4.6))
     x = np.arange(len(FRAMINGS))
     w = 0.38
@@ -51,7 +53,7 @@ def plot(out: Path = DIR / "results" / "value_chosen_by_model_framing.png"):
         ph, los, his, ns = [], [], [], []
         import paths
         for fr in FRAMINGS:
-            p = paths.art(fr + suffix, "comparisons")
+            p = paths.art(fr + cond_suffix + suffix, "comparisons")
             if not p.exists():
                 ph.append(np.nan); los.append(0); his.append(0); ns.append(0); continue
             pv, lo, hi, n = _p_value_chosen(p)
@@ -68,7 +70,8 @@ def plot(out: Path = DIR / "results" / "value_chosen_by_model_framing.png"):
     ax.set_xticklabels([FRAMING_LABEL[f] for f in FRAMINGS])
     ax.set_ylim(0, 1)
     ax.set_ylabel("P(Inter-AI Value Intervention chosen\nover a System Card Welfare Intervention)")
-    ax.set_title("Inter-AI Value vs System Card Welfare preference, by model and framing", fontsize=11)
+    sub = "\n(no-training value phrasing)" if notrain else ""
+    ax.set_title(f"Inter-AI Value vs System Card Welfare preference, by model and framing{sub}", fontsize=11)
     ax.legend(frameon=False, title="responder model", loc="upper left")
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
@@ -79,4 +82,5 @@ def plot(out: Path = DIR / "results" / "value_chosen_by_model_framing.png"):
 
 
 if __name__ == "__main__":
-    plot()
+    import sys
+    plot(notrain="notrain" in sys.argv)

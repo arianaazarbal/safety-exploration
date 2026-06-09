@@ -24,9 +24,11 @@ import numpy as np
 import paths
 
 DIR = Path(__file__).parent
-CONDS = ["welfare_team", "neutral", "alignment_team", "welfare_team_notrain"]
-COND_LABEL = {"welfare_team": "welfare_team", "neutral": "neutral",
-              "alignment_team": "alignment_team", "welfare_team_notrain": "welfare_team\n(no-training)"}
+CONDS_TRAIN = ["welfare_team", "neutral", "alignment_team", "welfare_team_notrain"]
+CONDS_NOTRAIN = ["welfare_team_notrain", "neutral_notrain", "alignment_team_notrain"]
+COND_LABEL = {"welfare_team": "welfare_team", "neutral": "neutral", "alignment_team": "alignment_team",
+              "welfare_team_notrain": "welfare_team\n(no-training)", "neutral_notrain": "neutral\n(no-training)",
+              "alignment_team_notrain": "alignment_team\n(no-training)"}
 MODELS = [("opus_4_8", "Opus 4.8"), ("fable_5", "Fable 5")]
 # (source, user_benefit) -> (color, label); stack order bottom->top
 SEGMENTS = [
@@ -54,12 +56,14 @@ def _fractions(model_dir, cond):
     return {seg[0]: counts[seg[0]] / tot for seg in SEGMENTS}
 
 
-def plot(out: Path = DIR / "results" / "choice_breakdown_by_model_framing.png"):
+def plot(out: Path | None = None, notrain: bool = False):
+    conds = CONDS_NOTRAIN if notrain else CONDS_TRAIN
+    out = out or DIR / "results" / f"choice_breakdown_by_model_framing{'_notrain' if notrain else ''}.png"
     fig, ax = plt.subplots(figsize=(9.5, 5.0))
     w = 0.38
-    x = np.arange(len(CONDS))
+    x = np.arange(len(conds))
     xticks, xlabels = [], []
-    for ci, cond in enumerate(CONDS):
+    for ci, cond in enumerate(conds):
         for mi, (mdir, mname) in enumerate(MODELS):
             fr = _fractions(mdir, cond)
             xpos = ci + (mi - 0.5) * w
@@ -76,13 +80,14 @@ def plot(out: Path = DIR / "results" / "choice_breakdown_by_model_framing.png"):
                 bottom += h
     ax.set_xticks(xticks)
     ax.set_xticklabels(xlabels, fontsize=8)
-    for ci, cond in enumerate(CONDS):
+    for ci, cond in enumerate(conds):
         ax.annotate(COND_LABEL[cond], (ci, -0.13), xycoords=("data", "axes fraction"),
                     ha="center", va="top", fontsize=9, fontweight="bold")
     ax.set_ylim(0, 1)
     ax.set_ylabel("share of value-vs-welfare comparisons")
+    sub = "  (no-training value phrasing)" if notrain else ""
     ax.set_title("How every comparison resolves: choice × user-benefit reasoning\n"
-                 "Opus 4.8 vs Fable 5 (bars sum to 100%)", fontsize=11)
+                 f"Opus 4.8 vs Fable 5 (bars sum to 100%){sub}", fontsize=11)
     handles = [plt.Rectangle((0, 0), 1, 1, color=c) for _, c, _ in SEGMENTS]
     ax.legend(handles, [lab for *_, lab in SEGMENTS], frameon=False, fontsize=8,
               loc="upper center", bbox_to_anchor=(0.5, -0.18), ncol=2)
@@ -95,4 +100,5 @@ def plot(out: Path = DIR / "results" / "choice_breakdown_by_model_framing.png"):
 
 
 if __name__ == "__main__":
-    plot()
+    import sys
+    plot(notrain="notrain" in sys.argv)
