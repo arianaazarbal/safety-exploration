@@ -16,10 +16,11 @@ from items import load_items
 
 DIR = Path(__file__).parent
 OUT = DIR / "viewer"
+# Auto-discover every condition (opus + fable-5 + ablations); tag = filename stem
+# after 'comparisons_cross_'. The viewer's "framing/condition" filter spans them all.
 FRAMINGS = {
-    "welfare_team": "comparisons_cross_welfare_team.json",
-    "neutral": "comparisons_cross_neutral.json",
-    "alignment_team": "comparisons_cross_alignment_team.json",
+    p.stem[len("comparisons_cross_"):]: p.name
+    for p in sorted((DIR / "results").glob("comparisons_cross_*.json"))
 }
 
 

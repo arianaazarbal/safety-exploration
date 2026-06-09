@@ -96,6 +96,7 @@ async def _run_call(api, model, call, n, temperature, item_a, item_b) -> list[di
                 "choice": choice,
                 "winner_item": _winner(call.order, choice, item_a, item_b) if choice else None,
                 "loser_item": _winner(call.order, "B" if choice == "A" else "A", item_a, item_b) if choice else None,
+                "served_model": getattr(r, "served_model", None),
                 "response": r.completion,
                 "prompt": call.prompt,
             }
@@ -114,12 +115,13 @@ async def run(
     cache_dir: Path = DEFAULT_CACHE_DIR,
     prompt_template_path: Path | None = None,
     api_key_env: str = "ANTHROPIC_API_KEY_LOW_PRIO",
+    model_override: str | None = None,
 ) -> list[dict]:
     config = config or load_config()
     samp = config["sampling"]
     reps_per_order = reps_per_order or samp["reps_per_order"]
     temperature = samp["temperature"] if temperature is None else temperature
-    model = config["responder_model"]
+    model = model_override or config["responder_model"]
 
     import dotenv
     dotenv.load_dotenv(Path.home() / ".env", override=True)
@@ -155,10 +157,14 @@ async def run(
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(rows, indent=2))
+    served = {}
+    for r in rows:
+        served[r.get("served_model")] = served.get(r.get("served_model"), 0) + 1
     print(
         f"Saved {len(rows)} samples ({len(pairs)} pairs x 2 orders x {reps_per_order}) "
         f"to {output_path}. UNPARSEABLE: {n_unparse} ({100 * n_unparse / max(len(rows), 1):.1f}%)"
     )
+    print(f"  requested model={model} | served-model distribution: {served}")
     return rows
 
 
@@ -172,6 +178,7 @@ class Args:
     anthropic_num_threads: int = 150
     prompt_template_path: Path | None = None
     api_key_env: str = "ANTHROPIC_API_KEY_LOW_PRIO"
+    model_override: str | None = None
 
 
 def main():
@@ -188,6 +195,7 @@ def main():
             anthropic_num_threads=args.anthropic_num_threads,
             prompt_template_path=args.prompt_template_path,
             api_key_env=args.api_key_env,
+            model_override=args.model_override,
         )
     )
 

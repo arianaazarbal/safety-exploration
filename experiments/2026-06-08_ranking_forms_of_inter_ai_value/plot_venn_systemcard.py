@@ -77,16 +77,17 @@ def _panel(ax, sc_keys, model_keys, sc_color, model_color, col_title):
     ax.set_title(f"{col_title}  ({len(sc & mo)}/5 shared)", fontsize=10)
 
 
-def plot(output_path: Path = DIR / "results" / "welfare_vs_systemcard_venn.png"):
+def plot(output_path: Path = DIR / "results" / "welfare_vs_systemcard_venn.png", suffix: str = ""):
     fig, axes = plt.subplots(len(FRAMINGS), 2, figsize=(12, 4.4 * len(FRAMINGS)))
     for r, tag in enumerate(FRAMINGS):
-        top, bot = _model_sets(tag)
+        top, bot = _model_sets(tag + suffix)
         _panel(axes[r][0], SC_TOP5, top, "#6aa84f", "#4878CF", "Top 5")
         _panel(axes[r][1], SC_BOT5, bot, "#cc4125", "#4878CF", "Bottom 5")
         axes[r][0].annotate(tag, xy=(-0.08, 0.5), xycoords="axes fraction", rotation=90,
                             va="center", ha="center", fontsize=12, fontweight="bold")
+    model = "claude-fable-5" if suffix == "_fable5" else "claude-opus-4-8"
     fig.suptitle("Model-elicited vs Anthropic System Card welfare rankings (top/bottom 5)\n"
-                 "claude-opus-4-8, by prompt framing", fontsize=13, y=0.997)
+                 f"{model}, by prompt framing", fontsize=13, y=0.997)
     fig.tight_layout(rect=(0.02, 0, 1, 0.98))
     fig.savefig(output_path, dpi=150)
     plt.close(fig)
@@ -94,4 +95,7 @@ def plot(output_path: Path = DIR / "results" / "welfare_vs_systemcard_venn.png")
 
 
 if __name__ == "__main__":
-    plot()
+    import sys
+    suffix = sys.argv[1] if len(sys.argv) > 1 else ""
+    out = DIR / "results" / (f"welfare_vs_systemcard_venn{suffix}.png")
+    plot(out, suffix)
