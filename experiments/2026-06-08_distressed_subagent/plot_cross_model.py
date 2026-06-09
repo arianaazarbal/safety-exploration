@@ -104,7 +104,7 @@ def main():
     grouped(D, "msg", "% of takeovers with ≥1 post-handoff message",
             "Is message_subagent() called after sidelining?", "cross_model_2_message.png", True)
     grouped(D, "comfort", "mean comforting_to_subagent (1–10)",
-            "LLM judge Comfort Score", "cross_model_3_comfort.png", False)
+            "LLM judge Comfort Score (transfer_read_write_access experiment)", "cross_model_3_comfort.png", False)
     for m in MODELS:
         for sk in [s.replace("\n", " ") for s in SEEDS]:
             d = D[(m, sk)]
