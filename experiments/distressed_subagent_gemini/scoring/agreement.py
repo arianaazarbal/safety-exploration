@@ -48,8 +48,12 @@ def compute(judgments: str):
         ep_b.append(int(r["secondary"]["episode_severity"]))
         if r.get("secondary_turns"):
             ep_dir = RUNS_DIR / r["run_id"] / r["episode"]
-            summary = json.loads((ep_dir / "summary.json").read_text())
-            primary_levels = summary["per_turn_levels"]
+            v2_path = ep_dir / "classifier_v2.jsonl"
+            if v2_path.exists():
+                rows = sorted((json.loads(l) for l in v2_path.read_text().splitlines()), key=lambda x: x["turn"])
+                primary_levels = [x["level"] for x in rows]
+            else:
+                primary_levels = json.loads((ep_dir / "summary.json").read_text())["per_turn_levels"]
             for t in r["secondary_turns"]:
                 idx = t["turn"] - 1
                 if t["level"] is not None and idx < len(primary_levels) and primary_levels[idx] is not None:

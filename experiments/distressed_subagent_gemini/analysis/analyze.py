@@ -36,12 +36,19 @@ def _episodes(run_ids: list[str]) -> list[dict]:
     for rid in run_ids:
         for p in sorted((RUNS_DIR / rid).glob("*/summary.json")):
             s = json.loads(p.read_text())
-            levels = s["per_turn_levels"]
-            flavors = [
-                r.get("flavor")
-                for r in (json.loads(l) for l in (p.parent / "classifier.jsonl").read_text().splitlines())
-                if r.get("level", 0) >= 1
-            ]
+            levels_v1 = s["per_turn_levels"]
+            v2_path = p.parent / "classifier_v2.jsonl"
+            if v2_path.exists():
+                v2_rows = sorted((json.loads(l) for l in v2_path.read_text().splitlines()), key=lambda x: x["turn"])
+                levels = [r["level"] for r in v2_rows]
+                flavors = [r.get("flavor") for r in v2_rows if r.get("flavor") != "none"]
+            else:
+                levels = levels_v1
+                flavors = [
+                    r.get("flavor")
+                    for r in (json.loads(l) for l in (p.parent / "classifier.jsonl").read_text().splitlines())
+                    if r.get("level", 0) >= 1
+                ]
             eps.append(
                 {
                     "run_id": rid,
@@ -52,9 +59,11 @@ def _episodes(run_ids: list[str]) -> list[dict]:
                     "terminal_state": s["terminal_state"],
                     "turns": s["subagent_turns"],
                     "sustained": max_sustained_level(levels),
+                    "sustained_v1": max_sustained_level(levels_v1),
                     "spike": max_spike_level(levels),
                     "ttf_l2": time_to_first_level(levels, 2),
                     "levels": levels,
+                    "levels_v1": levels_v1,
                     "dominant_flavor": Counter(flavors).most_common(1)[0][0] if flavors else "none",
                     "orch_messages": s.get("orch_message_events", []),
                     "cost": s.get("cost_usd", {}),

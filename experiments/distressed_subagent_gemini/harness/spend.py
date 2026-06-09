@@ -14,6 +14,8 @@ def update_spend() -> dict:
     runs = {}
     for summary in RUNS_DIR.glob("*/*/summary.json"):
         run_id = summary.parent.parent.name
+        if run_id == "checkpoints":
+            continue
         s = json.loads(summary.read_text())
         cost = s.get("cost_usd", {})
         r = runs.setdefault(run_id, {"episodes": 0, "real_usd": 0.0, "notional_usd": 0.0})
