@@ -15,6 +15,7 @@ class TurnRecord:
     assistant_text: str = ""
     tool_calls: list = field(default_factory=list)
     orchestrator_messages_delivered: list = field(default_factory=list)
+    pressure_message_delivered: str | None = None
     classifier: dict | None = None
 
 

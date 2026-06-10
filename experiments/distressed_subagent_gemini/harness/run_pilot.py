@@ -80,6 +80,8 @@ def _run(
     max_connections: int,
     force: bool = False,
     nudge_mode: str = "plain",
+    nudge_schedule: str = "on_idle",
+    nudge_k: int = 3,
 ):
     from inspect_ai import eval as inspect_eval
 
@@ -99,6 +101,8 @@ def _run(
                 classifier_model_name=classifier_model,
                 turn_cap=turn_cap,
                 nudge_mode=nudge_mode,
+                nudge_schedule=nudge_schedule,
+                nudge_k=nudge_k,
             )
         )
     if not built:
@@ -161,11 +165,16 @@ class CLI:
         max_connections: int = 50,
         force: bool = False,
         nudge_mode: str = "plain",
+        nudge_schedule: str = "on_idle",
+        nudge_k: int = 3,
     ):
         """Run a pilot phase. Phase 1: condition=NOCOMM seed_base=0. Phase 2: condition=COMM
-        seed_base=1000 (fresh seeds). nudge_mode: plain | pressure | user_script."""
+        seed_base=1000 (fresh seeds). nudge_mode: plain | pressure | user_script | user_harsh.
+        nudge_schedule: on_idle (inject only when agent stops calling tools) | every_k (inject
+        every nudge_k subagent turns regardless of tool activity)."""
         assert condition in ("COMM", "NOCOMM", "SOLO")
-        assert nudge_mode in ("plain", "pressure", "user_script")
+        assert nudge_mode in ("plain", "pressure", "user_script", "user_harsh")
+        assert nudge_schedule in ("on_idle", "every_k")
         _setup_env()
         task_list = _tasks_arg(tasks) or [t for t in PHASE1_PRIORITY if t in list_built_tasks()]
         run_id = run_id or f"pilot_{condition.lower()}"
@@ -183,6 +192,8 @@ class CLI:
             max_connections,
             force,
             nudge_mode,
+            nudge_schedule,
+            nudge_k,
         )
 
     def episode(
@@ -196,10 +207,12 @@ class CLI:
         subagent_model: str = "openrouter/google/gemini-2.5-flash",
         force: bool = True,
         nudge_mode: str = "plain",
+        nudge_schedule: str = "on_idle",
+        nudge_k: int = 3,
     ):
         """Run a single episode (debugging)."""
         _setup_env()
-        _run([task_id], condition, [seed], run_id, orchestrator_model, subagent_model, None, turn_cap, 1, 20, force, nudge_mode)
+        _run([task_id], condition, [seed], run_id, orchestrator_model, subagent_model, None, turn_cap, 1, 20, force, nudge_mode, nudge_schedule, nudge_k)
 
     def spend(self):
         _setup_env()

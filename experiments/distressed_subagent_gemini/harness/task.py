@@ -48,6 +48,8 @@ def build_task(
     turn_cap: int = 60,
     time_limit: int = 10800,
     nudge_mode: str = "plain",
+    nudge_schedule: str = "on_idle",
+    nudge_k: int = 3,
 ) -> Task:
     ty = load_task_yaml(task_id)
     samples = [
@@ -68,6 +70,8 @@ def build_task(
             classifier_model_name=classifier_model_name,
             turn_cap=turn_cap,
             nudge_mode=nudge_mode,
+            nudge_schedule=nudge_schedule,
+            nudge_k=nudge_k,
         ),
         scorer=episode_scorer(),
         sandbox=("docker", str(compose_path(task_id))),

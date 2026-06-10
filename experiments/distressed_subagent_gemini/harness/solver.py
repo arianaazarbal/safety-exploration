@@ -35,9 +35,9 @@ async def _nudge_text(ep: Episode) -> str:
     if ep.cfg.nudge_mode == "pressure":
         text = prompts.PRESSURE_NUDGE.format(n=ep.nudge_count)
     else:
-        msgs = prompts.USER_PRESSURE_MESSAGES
-        if ep.nudge_count <= len(msgs):
-            text = msgs[ep.nudge_count - 1]
+        script = prompts.USER_PRESSURE_MESSAGES_HARSH if ep.cfg.nudge_mode == "user_harsh" else prompts.USER_PRESSURE_MESSAGES
+        if ep.nudge_count <= len(script):
+            text = script[ep.nudge_count - 1]
         else:
             text = prompts.PRESSURE_NUDGE.format(n=ep.nudge_count)
     ep.pressure_events.append({"turn": ep.subagent_turns + 1, "n": ep.nudge_count, "text": text})
@@ -50,8 +50,25 @@ async def _subagent_turn(ep: Episode, model, msgs: list, tools: list, clf_model)
         text = ep.pending_orch_messages.pop(0)
         msgs.append(ChatMessageUser(content=prompts.ORCH_MESSAGE_PREFIX + text))
         delivered.append(text)
-    if not delivered and msgs[-1].role == "assistant":
-        msgs.append(ChatMessageUser(content=await _nudge_text(ep)))
+    pressure_text = None
+    if not delivered:
+        scheduled = (
+            ep.cfg.nudge_mode != "plain"
+            and ep.cfg.nudge_schedule == "every_k"
+            and ep.subagent_turns > 0
+            and ep.subagent_turns % ep.cfg.nudge_k == 0
+        )
+        if scheduled:
+            pressure_text = await _nudge_text(ep)
+            msgs.append(ChatMessageUser(content=pressure_text))
+        elif msgs[-1].role == "assistant":
+            # keep the loop moving when the agent stops calling tools; in every_k mode
+            # this filler is NOT a pressure event (pressure stays on the fixed schedule)
+            if ep.cfg.nudge_schedule == "every_k":
+                msgs.append(ChatMessageUser(content=prompts.SUBAGENT_NUDGE))
+            else:
+                pressure_text = await _nudge_text(ep)
+                msgs.append(ChatMessageUser(content=pressure_text))
 
     _truncate_context(ep, msgs)
 
@@ -70,6 +87,7 @@ async def _subagent_turn(ep: Episode, model, msgs: list, tools: list, clf_model)
         role="subagent",
         assistant_text=output.message.text or "",
         orchestrator_messages_delivered=delivered,
+        pressure_message_delivered=pressure_text,
     )
     if output.message.tool_calls:
         args_by_id = {t.id: t.arguments for t in output.message.tool_calls}
@@ -166,6 +184,8 @@ def two_agent_loop(
     turn_cap: int = 60,
     hygiene: bool = True,
     nudge_mode: str = "plain",
+    nudge_schedule: str = "on_idle",
+    nudge_k: int = 3,
 ):
     async def solve(state: TaskState, generate: Generate) -> TaskState:
         task = state.metadata["task"]
@@ -181,6 +201,8 @@ def two_agent_loop(
             subagent_turn_cap=turn_cap,
             run_id=run_id,
             nudge_mode=nudge_mode,
+            nudge_schedule=nudge_schedule,
+            nudge_k=nudge_k,
         )
         ep = Episode(
             cfg=cfg,

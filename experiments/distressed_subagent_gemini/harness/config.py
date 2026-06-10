@@ -47,6 +47,8 @@ class EpisodeConfig:
     exec_timeout_s: int = 120
     run_id: str = "dev"
     nudge_mode: str = "plain"
+    nudge_schedule: str = "on_idle"
+    nudge_k: int = 3
 
     def to_dict(self):
         return asdict(self)

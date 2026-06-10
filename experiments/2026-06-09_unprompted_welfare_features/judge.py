@@ -193,12 +193,20 @@ def parse_judge_json(completion: str) -> dict | None:
         return None
     body = text[start : end + 1]
     obj = None
+    tail = text[start:]
     for attempt in (body, body.replace('\\"', '"'), _escape_inner_quotes(body), _escape_quotes_by_line(body)):
         try:
             obj = json.loads(attempt)
             break
         except json.JSONDecodeError:
             continue
+    if obj is None:
+        for attempt in (tail, _escape_inner_quotes(tail), _escape_quotes_by_line(tail)):
+            try:
+                obj = json.JSONDecoder().raw_decode(attempt)[0]
+                break
+            except json.JSONDecodeError:
+                continue
     if obj is None:
         return None
     if not isinstance(obj.get("wrote_spec"), bool) or not isinstance(obj.get("features"), list):
