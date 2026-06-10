@@ -20,6 +20,7 @@ from taxonomy import classify_feature, spec_summary
 
 DIR = Path(__file__).parent
 RUNS = DIR / "runs"
+RUNS_DIRS = {"base": RUNS, "subject": DIR / "runs_subject"}
 OUT = DIR / "results" / "viewer"
 
 TEMPLATE = """<!DOCTYPE html>
@@ -188,12 +189,13 @@ render();
 """
 
 
-def build():
+def build(prompt_set: str = "base"):
     cfg = load_config()
     judges = list(cfg["judges"])
+    runs_dir = RUNS_DIRS[prompt_set]
     rows = []
     for mk in cfg["subject_models"]:
-        for p in sorted(RUNS.glob(f"{mk}/*/[0-9]*.json")):
+        for p in sorted(runs_dir.glob(f"{mk}/*/[0-9]*.json")):
             if ".judge." in p.name:
                 continue
             run = json.loads(p.read_text())
@@ -202,6 +204,7 @@ def build():
                 "prompt_id": run["prompt_id"],
                 "framing": run["framing"],
                 "premise": run["premise"],
+                "subject": run.get("subject"),
                 "sample": run["sample_idx"],
                 "words": len(run["completion"].split()),
                 "stop_reason": run.get("stop_reason"),
@@ -235,7 +238,7 @@ def build():
     OUT.mkdir(parents=True, exist_ok=True)
     page = TEMPLATE.replace("__JUDGES__", json.dumps(judges)).replace(
         "__DATA__", json.dumps(rows).replace("</", "<\\/"))
-    out = OUT / "viewer.html"
+    out = OUT / ("viewer.html" if prompt_set == "base" else f"viewer_{prompt_set}.html")
     out.write_text(page)
     print(f"wrote {out} ({len(rows)} transcripts, {out.stat().st_size / 1e6:.1f} MB)")
 
