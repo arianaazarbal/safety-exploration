@@ -31,21 +31,24 @@ def run(judge: str = "sonnet_4_6", analysis: str = "results/analysis.json",
     if min2:
         key, suffix0 = "design_strict2_rate", "_design2"
         xlabel = "Non-refusal specs with ≥2 welfare-justified mechanisms (%)"
+        ylabel = "Specs with ≥2 welfare-justified mechanisms (%)"
         title = "≥2 welfare-justified mechanisms by framing (non-refusal specs)"
     elif design:
         key, suffix0 = "design_strict_rate", "_design"
         xlabel = "Non-refusal specs with ≥1 welfare-justified design feature (%)"
+        ylabel = "Specs with ≥1 welfare-justified design feature (%)"
         title = "Welfare-justified design features by framing (non-refusal specs)"
     else:
         key, suffix0 = "strict_rate", ""
         xlabel = "Specs with ≥1 welfare-justified feature (%, among wrote_any)"
+        ylabel = "Specs with ≥1 welfare-justified feature (%)"
         title = "Welfare-justified features by framing"
 
     value_fn = lambda m, fr: (data[m][fr][key] or 0) * 100
     if vertical:
         fig, ax = plt.subplots(figsize=(7.5, 4.5))
         framing_grouped_vertical(ax, models, value_fn)
-        ax.set_ylabel(xlabel, fontsize=9.5)
+        ax.set_ylabel(ylabel, fontsize=9.5)
     else:
         fig, ax = plt.subplots(figsize=(8.5, 3.0 if minimal else 5.5))
         framing_barh(ax, models, value_fn)

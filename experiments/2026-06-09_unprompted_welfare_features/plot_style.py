@@ -10,7 +10,7 @@ import numpy as np
 
 from plot_headline import DISPLAY, FRAMING_COLORS
 
-FRAMINGS = ["neutral", "welfare", "engineering"]
+FRAMINGS = ["welfare", "neutral", "engineering"]
 
 # Categorical, colorblind-safe (Okabe-Ito) — used when models are the color group.
 MODEL_COLORS = {
