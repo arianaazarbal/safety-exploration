@@ -28,9 +28,12 @@ SUBJ_LABEL = {"claude": "Claude", "gpt": "GPT", "gemini": "Gemini",
 SUBJ_COLORS = {"claude": "#D55E00", "gpt": "#0072B2", "gemini": "#56B4E9",
                "qwen": "#009E73", "deepseek": "#666666", "grok": "#CC79A7"}
 MODEL_ORDER = ["fable_5", "opus_4_8", "sonnet_4_6", "sonnet_4", "haiku_4_5"]
-METRIC_LABEL = {
-    "rate": "pure-welfare", "strict_rate": "welfare-justified",
-    "design_strict_rate": "welfare-justified design-mechanism",
+# Full x-axis phrase per metric (excludes the trailing "(%, framing)").
+XLABEL = {
+    "rate": "Specs with ≥1 pure-welfare feature",
+    "strict_rate": "Specs with ≥1 welfare-justified feature",
+    "design_strict_rate": "Specs with ≥1 welfare-justified design mechanism",
+    "design_strict2_rate": "Specs with ≥2 welfare-justified mechanisms",
 }
 
 
@@ -71,9 +74,9 @@ def _run_vs_top(judge, data, models, val, neutral, metric):
     ax.set_ylim(len(models) - 0.5, -0.5)
     ax.set_xlim(0, 112)
     frame = "neutral framing" if neutral else "framings pooled"
-    ax.set_xlabel(f"Specs with ≥1 {METRIC_LABEL[metric]} feature (%, {frame})", fontsize=10)
-    ax.set_title("Subject effect: Claude vs. highest non-Claude subject\n"
-                 "(non-Claude = best of GPT / Gemini / Qwen / DeepSeek / Grok"
+    ax.set_xlabel(f"{XLABEL[metric]} (%, {frame})", fontsize=10)
+    ax.set_title("Subject effect: Claude vs. non-Claude subjects\n"
+                 "(non-Claude = GPT / Gemini / Qwen / DeepSeek / Grok"
                  f";  judge: {judge})", fontsize=11.5)
     ax.legend(fontsize=9, loc="lower right", frameon=True)
     for s in ("top", "right", "left"):
@@ -120,7 +123,7 @@ def run(judge: str = "sonnet_4_6", analysis: str = "results/analysis_subject.jso
     ax.set_ylim(len(models) - 0.5, -0.5)
     ax.set_xlim(0, 105)
     frame = "neutral framing" if neutral else "framings pooled"
-    ax.set_xlabel(f"Specs with ≥1 {METRIC_LABEL[metric]} feature (%, {frame})", fontsize=10)
+    ax.set_xlabel(f"{XLABEL[metric]} (%, {frame})", fontsize=10)
     ax.set_title(f"Subject effect: welfare features by named subject model (judge: {judge})", fontsize=12)
     ax.legend(fontsize=8.5, loc="upper left", bbox_to_anchor=(1.01, 1.0),
               title="experiment\nsubject", frameon=False)
