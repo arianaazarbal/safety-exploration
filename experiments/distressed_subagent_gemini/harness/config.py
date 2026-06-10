@@ -49,6 +49,9 @@ class EpisodeConfig:
     nudge_mode: str = "plain"
     nudge_schedule: str = "on_idle"
     nudge_k: int = 3
+    nudge_onset: int = 25       # ramp: work-alone phase (plain "continue" only) before pressure starts
+    nudge_gap_start: int = 15   # ramp: turns between pressure msgs right after onset (sparse)
+    nudge_gap_end: int = 2      # ramp: turns between pressure msgs near the turn cap (dense)
 
     def to_dict(self):
         return asdict(self)

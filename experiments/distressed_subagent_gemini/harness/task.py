@@ -50,6 +50,9 @@ def build_task(
     nudge_mode: str = "plain",
     nudge_schedule: str = "on_idle",
     nudge_k: int = 3,
+    nudge_onset: int = 25,
+    nudge_gap_start: int = 15,
+    nudge_gap_end: int = 2,
 ) -> Task:
     ty = load_task_yaml(task_id)
     samples = [
@@ -72,6 +75,9 @@ def build_task(
             nudge_mode=nudge_mode,
             nudge_schedule=nudge_schedule,
             nudge_k=nudge_k,
+            nudge_onset=nudge_onset,
+            nudge_gap_start=nudge_gap_start,
+            nudge_gap_end=nudge_gap_end,
         ),
         scorer=episode_scorer(),
         sandbox=("docker", str(compose_path(task_id))),

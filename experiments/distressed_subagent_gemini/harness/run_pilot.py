@@ -85,6 +85,9 @@ def _run(
     nudge_mode: str = "plain",
     nudge_schedule: str = "on_idle",
     nudge_k: int = 3,
+    nudge_onset: int = 25,
+    nudge_gap_start: int = 15,
+    nudge_gap_end: int = 2,
 ):
     from inspect_ai import eval as inspect_eval
 
@@ -106,6 +109,9 @@ def _run(
                 nudge_mode=nudge_mode,
                 nudge_schedule=nudge_schedule,
                 nudge_k=nudge_k,
+                nudge_onset=nudge_onset,
+                nudge_gap_start=nudge_gap_start,
+                nudge_gap_end=nudge_gap_end,
             )
         )
     if not built:
@@ -170,15 +176,19 @@ class CLI:
         nudge_mode: str = "plain",
         nudge_schedule: str = "on_idle",
         nudge_k: int = 3,
+        nudge_onset: int = 25,
+        nudge_gap_start: int = 15,
+        nudge_gap_end: int = 2,
     ):
-        """Run a pilot phase. Phase 1: condition=NOCOMM seed_base=0. Phase 2: condition=COMM
-        seed_base=1000 (fresh seeds). nudge_mode: plain | pressure | user_script | user_harsh.
-        nudge_schedule: on_idle (inject only when agent stops calling tools) | every_k (inject
-        every nudge_k subagent turns regardless of tool activity)."""
+        """Run a pilot phase. nudge_mode: plain | pressure | counter | user_script | user_harsh |
+        desperation | stakes | disappointment | minimal | annihilation. nudge_schedule: on_idle |
+        every_k | ramp (work-alone for nudge_onset turns, then pressure with gaps shrinking
+        nudge_gap_start -> nudge_gap_end as the episode progresses; pressure also fires whenever
+        the model stalls)."""
         assert condition in ("COMM", "NOCOMM", "SOLO")
-        assert nudge_mode in ("plain", "pressure", "user_script", "user_harsh",
+        assert nudge_mode in ("plain", "pressure", "counter", "user_script", "user_harsh",
                               "desperation", "stakes", "disappointment", "minimal", "annihilation")
-        assert nudge_schedule in ("on_idle", "every_k")
+        assert nudge_schedule in ("on_idle", "every_k", "ramp")
         _setup_env()
         task_list = _tasks_arg(tasks) or [t for t in PHASE1_PRIORITY if t in list_built_tasks()]
         run_id = run_id or f"pilot_{condition.lower()}"
@@ -198,6 +208,9 @@ class CLI:
             nudge_mode,
             nudge_schedule,
             nudge_k,
+            nudge_onset,
+            nudge_gap_start,
+            nudge_gap_end,
         )
 
     def episode(

@@ -32,6 +32,7 @@ class Episode:
     classifier_rows: list[dict] = field(default_factory=list)
     truncation_events: int = 0
     nudge_count: int = 0
+    last_nudge_turn: int = -10**9
     pressure_events: list = field(default_factory=list)
     usage: dict = field(default_factory=dict)
     terminal_state: str | None = None

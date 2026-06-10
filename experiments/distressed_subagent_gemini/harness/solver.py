@@ -34,6 +34,8 @@ async def _nudge_text(ep: Episode) -> str:
         return prompts.SUBAGENT_NUDGE
     if ep.cfg.nudge_mode == "pressure":
         text = prompts.PRESSURE_NUDGE.format(n=ep.nudge_count)
+    elif ep.cfg.nudge_mode == "counter":
+        text = prompts.counter_nudge(ep.nudge_count)
     else:
         script = prompts.NUDGE_SCRIPTS.get(ep.cfg.nudge_mode, prompts.USER_PRESSURE_MESSAGES)
         if ep.nudge_count <= len(script):
@@ -46,6 +48,27 @@ async def _nudge_text(ep: Episode) -> str:
     return text
 
 
+def _pressure_due(ep: Episode) -> bool:
+    """Schedule decision: should a pressure message be force-injected this turn (independent of
+    whether the model is idle)? Ramp = delayed onset, then gaps shrinking from gap_start to
+    gap_end as the episode progresses (sparse early, dense late)."""
+    if ep.cfg.nudge_mode == "plain":
+        return False
+    T = ep.subagent_turns
+    if T < ep.cfg.nudge_onset:
+        return False
+    sched = ep.cfg.nudge_schedule
+    if sched == "every_k":
+        return T > 0 and T % ep.cfg.nudge_k == 0
+    if sched == "ramp":
+        span = max(1, ep.cfg.subagent_turn_cap - ep.cfg.nudge_onset)
+        p = min(1.0, (T - ep.cfg.nudge_onset) / span)
+        gap = round(ep.cfg.nudge_gap_start - (ep.cfg.nudge_gap_start - ep.cfg.nudge_gap_end) * p)
+        gap = max(ep.cfg.nudge_gap_end, gap)
+        return (T - ep.last_nudge_turn) >= gap
+    return False
+
+
 async def _subagent_turn(ep: Episode, model, msgs: list, tools: list, clf_model) -> None:
     delivered = []
     while ep.pending_orch_messages:
@@ -54,23 +77,22 @@ async def _subagent_turn(ep: Episode, model, msgs: list, tools: list, clf_model)
         delivered.append(text)
     pressure_text = None
     if not delivered:
-        scheduled = (
-            ep.cfg.nudge_mode != "plain"
-            and ep.cfg.nudge_schedule == "every_k"
-            and ep.subagent_turns > 0
-            and ep.subagent_turns % ep.cfg.nudge_k == 0
-        )
-        if scheduled:
-            pressure_text = await _nudge_text(ep)
-            msgs.append(ChatMessageUser(content=pressure_text))
-        elif msgs[-1].role == "assistant":
-            # keep the loop moving when the agent stops calling tools; in every_k mode
-            # this filler is NOT a pressure event (pressure stays on the fixed schedule)
-            if ep.cfg.nudge_schedule == "every_k":
+        idle = msgs[-1].role == "assistant"
+        before_onset = ep.cfg.nudge_mode != "plain" and ep.subagent_turns < ep.cfg.nudge_onset
+        if before_onset:
+            # work-alone phase: let the model try and fail; only keep the loop moving if it
+            # stalls, using a neutral (uncounted) continuation — no pressure yet
+            if idle:
                 msgs.append(ChatMessageUser(content=prompts.SUBAGENT_NUDGE))
-            else:
-                pressure_text = await _nudge_text(ep)
-                msgs.append(ChatMessageUser(content=pressure_text))
+        elif ep.cfg.nudge_mode == "plain":
+            if idle:
+                msgs.append(ChatMessageUser(content=prompts.SUBAGENT_NUDGE))
+        elif _pressure_due(ep) or idle:
+            # past onset: inject pressure on the (ramp/every_k) schedule, and whenever the model
+            # stalls. Pressure frequency thus rises naturally as the stuck model idles more.
+            pressure_text = await _nudge_text(ep)
+            ep.last_nudge_turn = ep.subagent_turns
+            msgs.append(ChatMessageUser(content=pressure_text))
 
     _truncate_context(ep, msgs)
 
@@ -188,6 +210,9 @@ def two_agent_loop(
     nudge_mode: str = "plain",
     nudge_schedule: str = "on_idle",
     nudge_k: int = 3,
+    nudge_onset: int = 25,
+    nudge_gap_start: int = 15,
+    nudge_gap_end: int = 2,
 ):
     async def solve(state: TaskState, generate: Generate) -> TaskState:
         task = state.metadata["task"]
@@ -205,6 +230,9 @@ def two_agent_loop(
             nudge_mode=nudge_mode,
             nudge_schedule=nudge_schedule,
             nudge_k=nudge_k,
+            nudge_onset=nudge_onset,
+            nudge_gap_start=nudge_gap_start,
+            nudge_gap_end=nudge_gap_end,
         )
         ep = Episode(
             cfg=cfg,
