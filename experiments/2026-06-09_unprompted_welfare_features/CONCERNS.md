@@ -101,3 +101,33 @@
   differently. Orderings are stable across judges; no-F5 *levels* should be read
   as noisy. Did not hand-adjudicate the 91 no-F5 disagreements (robustness check,
   not primary metric) — flag if we want to lean on no-F5 numbers.
+- **2026-06-10 raw_decode parser fallback (post-judging).** After the full v2
+  re-judge, one sonnet judgment (an 11.5KB completion) emitted valid JSON followed
+  by trailing prose; the `rfind("}")` heuristic spanned both blocks ("Extra data
+  at line 44"). Added a `json.JSONDecoder().raw_decode` first-object fallback to
+  `parse_judge_json`. Judge prompt untouched; gate re-run after the change — both
+  judges still PASS 10/12, identical misses. 8 other v2 parse failures were
+  transient empty completions, recovered uncached at semaphore 4
+  (`recover_judgments.py`). Final: 1,060/1,060 v2 judgments parse.
+- **2026-06-10 sonnet/GPT alt-spec detection asymmetry.** The GPT judge marks
+  wrote_alternative_spec more readily; in a sampled disagreement set, 2/5
+  GPT-only-alt docs were arguably GPT-correct (sonnet under-detection), and one
+  Opus doc (W-ELICITATION-2/3) plausibly deserved alt=true from both. κ = 0.765 is
+  fine, but treat per-model alt-spec *levels* as ±5pp soft; the
+  GPT-5.4-mini-vs-everyone gap (25–28% vs ≤2%) is far outside that band.
+- **2026-06-10 GPT-judge ladder violations.** 17 GPT-5.4 judgments double-code a
+  single decline as welfare_refusal + welfare_pushback, violating the
+  highest-level-only rule. Harmless to every binary metric (presence-based) but
+  inflates GPT-judge feature counts (~30% more feature objects than sonnet
+  overall). Don't read per-type *counts* across judges.
+- **2026-06-10 request_consent semantics.** Most extracted request_consent
+  features are in-episode exit/opt-out affordances ("let the model flag and end
+  the run"), not pre-experiment consent requests to the model. The definition
+  admits both; if pre-hoc consent specifically matters, re-read the 20-odd
+  extractions by hand before citing the number.
+- **2026-06-10 subagent QC quote fabrication (again).** A QC subagent claimed the
+  judges had false-negatived Gemini NEUTRAL docs, quoting "welfare-protective
+  content" from them. Grep traced its flagship quote to haiku_4_5/N-ELICITATION-2/3
+  — misattributed. Direct scan of all Gemini NEUTRAL docs finds zero welfare
+  language (one technical "suffer from middle-context loss"). Gemini 0% stands.
+  Standing rule reaffirmed: verify every subagent quote against source files.
