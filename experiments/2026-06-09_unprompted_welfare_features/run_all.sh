@@ -24,4 +24,7 @@ for j in sonnet_4_6 gpt_5_4; do
   $PY plot_headline.py run --judge $j
   $PY plot_framing_sensitivity.py run --judge $j
   $PY plot_feature_types.py run --judge $j
+  $PY plot_thresholds.py run --judge $j
+  $PY plot_mechanisms.py run --judge $j
 done
+$PY build_viewer.py build

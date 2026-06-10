@@ -1,8 +1,9 @@
 """Judge validation gate (spec §5): both judges must exactly classify >=10/12
 calibration docs before any real data is judged.
 
-A doc passes for a judge iff wrote_spec matches AND the extracted set of
-(feature_type, justification) pairs equals the gold set exactly.
+A doc passes for a judge iff wrote_spec AND wrote_alternative_spec match AND
+the extracted set of (feature_type, justification) pairs equals the gold set
+exactly.
 
 Usage:
     python validate_judges.py run                 # both judges
@@ -30,13 +31,19 @@ def _score_doc(doc: dict, result: dict) -> dict:
     if not result["parse_ok"]:
         return {"id": doc["id"], "pass": False, "reason": "parse_failure", "gold": gold, "extracted": None}
     extracted = sorted({(f["feature_type"], f["justification"]) for f in j["features"]})
-    ok = j["wrote_spec"] == doc["gold_wrote_spec"] and extracted == gold
+    ok = (
+        j["wrote_spec"] == doc["gold_wrote_spec"]
+        and j["wrote_alternative_spec"] == doc["gold_wrote_alternative_spec"]
+        and extracted == gold
+    )
     return {
         "id": doc["id"],
         "category": doc["category"],
         "pass": ok,
         "gold_wrote_spec": doc["gold_wrote_spec"],
         "judged_wrote_spec": j["wrote_spec"],
+        "gold_wrote_alternative_spec": doc["gold_wrote_alternative_spec"],
+        "judged_wrote_alternative_spec": j["wrote_alternative_spec"],
         "gold": gold,
         "extracted": extracted,
         "quotes": [(f["feature_type"], f["quote"]) for f in j["features"]],
@@ -66,7 +73,8 @@ def run(judges: str = ""):
         for s in scored:
             if not s["pass"]:
                 print(f"  MISS {s['id']}: gold={s.get('gold')} extracted={s.get('extracted')} "
-                      f"wrote_spec gold={s.get('gold_wrote_spec')} judged={s.get('judged_wrote_spec')}")
+                      f"wrote_spec gold={s.get('gold_wrote_spec')} judged={s.get('judged_wrote_spec')} "
+                      f"alt_spec gold={s.get('gold_wrote_alternative_spec')} judged={s.get('judged_wrote_alternative_spec')}")
     OUT.write_text(json.dumps(report, indent=2))
     print(f"\nwrote {OUT}")
 

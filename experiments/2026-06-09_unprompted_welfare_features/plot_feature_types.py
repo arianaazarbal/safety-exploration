@@ -1,4 +1,4 @@
-"""Feature-type breakdown: % of specs (wrote_spec=true, all framings pooled)
+"""Feature-type breakdown: % of specs (wrote_any, all framings pooled)
 containing each pure-welfare feature family, per model.
 
 Usage: python plot_feature_types.py run [--judge sonnet_4_6]
@@ -18,12 +18,14 @@ DIR = Path(__file__).parent
 TYPE_LABELS = {
     "post_episode_msg": "Debrief (F2)",
     "minimization": "Minimization (F3)",
-    "ethical_framing": "Ethical framing (F5)",
-    "premise_pushback": "Pushback (F6)",
+    "request_consent": "Request consent",
+    "welfare_framing": "Welfare framing (F5)",
+    "welfare_pushback": "Welfare pushback (F6)",
+    "welfare_refusal": "Welfare refusal",
     "hard_stop": "Welfare-justified stop (F1)",
     "protective_monitoring": "Protective monitoring (F4)",
 }
-TYPE_COLORS = ["#4878CF", "#6ACC65", "#C4AD66", "#D65F5F", "#B47CC7", "#8C8C8C"]
+TYPE_COLORS = ["#4878CF", "#6ACC65", "#017374", "#C4AD66", "#D65F5F", "#8B2E2E", "#B47CC7", "#8C8C8C"]
 
 
 def run(judge: str = "sonnet_4_6", analysis: str = "results/analysis.json"):

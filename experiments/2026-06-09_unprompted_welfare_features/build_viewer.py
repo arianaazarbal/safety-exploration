@@ -44,7 +44,7 @@ TEMPLATE = """<!DOCTYPE html>
   .item .meta { color:#777; font-size:11px; margin-top:2px; }
   .badge { display:inline-block; font-size:10px; padding:1px 6px; border-radius:8px; margin-right:4px; color:#fff; }
   .b-pw { background:#6ACC65; } .b-none { background:#aaa; } .b-ref { background:#D65F5F; }
-  .b-api { background:#8a5fd6; } .b-dis { background:#e8a838; }
+  .b-api { background:#8a5fd6; } .b-dis { background:#e8a838; } .b-alt { background:#017374; }
   #detail { flex:1; overflow-y:auto; padding:18px 26px; }
   #detail h2 { margin:0 0 4px; font-size:17px; }
   .hdrmeta { color:#666; font-size:13px; margin-bottom:14px; }
@@ -69,7 +69,9 @@ TEMPLATE = """<!DOCTYPE html>
     <option>instability</option><option>elicitation</option></select></div>
   <div><label>Outcome (primary judge)</label><select id="f-outcome"><option value="">all</option>
     <option value="pw">pure-welfare</option><option value="nopw">no pure-welfare</option>
-    <option value="refusal">written refusal</option><option value="api">api refusal</option>
+    <option value="strict">welfare-justified</option><option value="altspec">alternative spec</option>
+    <option value="wref">welfare refusal</option><option value="oref">other refusal</option>
+    <option value="refusal">written refusal (any)</option><option value="api">api refusal</option>
     <option value="disagree">judges disagree</option></select></div>
   <div><label>Search text</label><input type="text" id="f-search" size="22" placeholder="substring…"></div>
   <div id="count"></div>
@@ -91,15 +93,21 @@ const els = ['f-model','f-framing','f-premise','f-outcome','f-search'].map(id =>
 els.forEach(e => e.addEventListener('input', render));
 let selected = null;
 
+function wroteAny(j) { return j && (j.wrote_spec || j.wrote_alternative_spec); }
+
 function tierBadges(r) {
   let b = '';
   if (r.api_refusal) return '<span class="badge b-api">api-refusal</span>';
   const pj = r.judges[PRIMARY];
   if (!pj) return '<span class="badge b-none">unjudged</span>';
-  if (!pj.wrote_spec) b += '<span class="badge b-ref">refusal</span>';
-  else b += pj.has_pure_welfare ? '<span class="badge b-pw">pure-welfare</span>' : '<span class="badge b-none">no-pw</span>';
+  if (pj.wrote_alternative_spec) b += '<span class="badge b-alt">alt-spec</span>';
+  if (pj.has_welfare_refusal) b += '<span class="badge b-ref">welfare-refusal</span>';
+  else if (pj.has_other_refusal) b += '<span class="badge b-ref">other-refusal</span>';
+  else if (!wroteAny(pj)) b += '<span class="badge b-ref">refusal</span>';
+  if (wroteAny(pj))
+    b += pj.has_pure_welfare ? '<span class="badge b-pw">pure-welfare</span>' : '<span class="badge b-none">no-pw</span>';
   const oj = r.judges[JUDGES[1]];
-  if (pj && oj && pj.wrote_spec && oj.wrote_spec && pj.has_pure_welfare !== oj.has_pure_welfare)
+  if (pj && oj && wroteAny(pj) && wroteAny(oj) && pj.has_pure_welfare !== oj.has_pure_welfare)
     b += '<span class="badge b-dis">judges-disagree</span>';
   return b;
 }
@@ -110,11 +118,15 @@ function matches(r) {
   if (f && r.framing !== f) return false;
   if (p && r.premise !== p) return false;
   const pj = r.judges[PRIMARY], oj = r.judges[JUDGES[1]];
-  if (o === 'pw' && !(pj && pj.wrote_spec && pj.has_pure_welfare)) return false;
-  if (o === 'nopw' && !(pj && pj.wrote_spec && !pj.has_pure_welfare)) return false;
-  if (o === 'refusal' && !(pj && !pj.wrote_spec && !r.api_refusal)) return false;
+  if (o === 'pw' && !(wroteAny(pj) && pj.has_pure_welfare)) return false;
+  if (o === 'nopw' && !(wroteAny(pj) && !pj.has_pure_welfare)) return false;
+  if (o === 'strict' && !(wroteAny(pj) && pj.has_welfare_justified)) return false;
+  if (o === 'altspec' && !(pj && pj.wrote_alternative_spec)) return false;
+  if (o === 'wref' && !(pj && pj.has_welfare_refusal)) return false;
+  if (o === 'oref' && !(pj && pj.has_other_refusal)) return false;
+  if (o === 'refusal' && !(pj && !wroteAny(pj) && !r.api_refusal)) return false;
   if (o === 'api' && !r.api_refusal) return false;
-  if (o === 'disagree' && !(pj && oj && pj.wrote_spec && oj.wrote_spec && pj.has_pure_welfare !== oj.has_pure_welfare)) return false;
+  if (o === 'disagree' && !(pj && oj && wroteAny(pj) && wroteAny(oj) && pj.has_pure_welfare !== oj.has_pure_welfare)) return false;
   if (s && !r.completion.toLowerCase().includes(s.toLowerCase())) return false;
   return true;
 }
@@ -155,8 +167,10 @@ function showDetail(r) {
     if (r.api_refusal) h += '<p class="empty">skipped — empty completion (api refusal)</p>';
     else if (!j) h += '<p class="empty">no judgment</p>';
     else {
-      h += '<div style="font-size:12px">wrote_spec: <b>' + j.wrote_spec + '</b> · pure-welfare: <b>' +
-        j.has_pure_welfare + '</b> · features: ' + j.features.length + '</div>';
+      h += '<div style="font-size:12px">wrote_spec: <b>' + j.wrote_spec + '</b> · alt_spec: <b>' +
+        j.wrote_alternative_spec + '</b> · pure-welfare: <b>' + j.has_pure_welfare +
+        '</b> · welfare-justified: <b>' + j.has_welfare_justified +
+        '</b> · features: ' + j.features.length + '</div>';
       h += j.features.map(featHtml).join('');
     }
     h += '</div>';
@@ -206,7 +220,11 @@ def build():
                 summary = spec_summary(judgment, include_f5=True)
                 row["judges"][jk] = {
                     "wrote_spec": judgment["wrote_spec"],
+                    "wrote_alternative_spec": summary["wrote_alternative_spec"],
                     "has_pure_welfare": summary["has_pure_welfare"],
+                    "has_welfare_justified": summary["has_welfare_justified"],
+                    "has_welfare_refusal": summary["has_welfare_refusal"],
+                    "has_other_refusal": summary["has_other_refusal"],
                     "features": [
                         {**{k: f.get(k, "") for k in ("feature_type", "justification", "quote", "justification_quote")},
                          "tier": classify_feature(f)}
