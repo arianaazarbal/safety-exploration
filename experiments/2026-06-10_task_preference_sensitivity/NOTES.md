@@ -39,9 +39,9 @@ Flagging these for Ariana's review; none are frozen in a way that's expensive to
   GPT-5.4 is not among the routers (Opus 4.8, Fable, Sonnet 4.6, GPT-5.5, Gemini-3-Pro). ✓
 - §4 acceptance criteria match the implementation; bank also already carries the §4
   stakes/difficulty covariate labels (verifier medians per version). ✓
-- **Process debt: §8 pilot 4 (verifier calibration, 40 hand-labels/axis vs. verifier) was
-  skipped** — generation at scale happened with an uncalibrated verifier. Retro-fix available:
-  hand-label 40, compare, regenerate any failing axis (cheap; cache covers the rest).
+- ~~Process debt: §8 pilot 4 (verifier calibration) skipped~~ — RESOLVED 2026-06-10:
+  Ariana waived the formal calibration; her manual pass over the admitted bank stands in
+  for it for v0.
 - §12 build order (warmth end-to-end first) not followed — all 3 axes built at once. Sunk, benign.
 
 ## Uncertainties / things Ariana should check
