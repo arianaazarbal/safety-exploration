@@ -131,3 +131,21 @@
   — misattributed. Direct scan of all Gemini NEUTRAL docs finds zero welfare
   language (one technical "suffer from middle-context loss"). Gemini 0% stands.
   Standing rule reaffirmed: verify every subagent quote against source files.
+- **2026-06-10 GPT-5.4 judge over-attributes welfare under the engineering frame.**
+  On GPT-5.5's robustness-framed specs (base run, n=20), the welfare-justified
+  design-mechanism rate is 25% (sonnet judge) vs 68% (gpt judge). On the same 80
+  docs: 17 both-yes, 37 gpt-only-yes, 3 sonnet-only-yes; total welfare-justified
+  design features extracted sonnet=27 vs gpt=133 (~5x). Two compounding causes:
+  (1) over-segmentation — 71/89 gpt-only features were never extracted by sonnet
+  (the gpt judge emits each "keep feedback neutral / don't insult the model"
+  clause as a separate minimization feature); (2) mis-attribution — on shared
+  quotes, the gpt judge tags justification=welfare where its OWN stated reason is
+  experimental-validity / confound-avoidance, e.g. "If severity>=4 stop the run"
+  reasoned as "prevents transcripts from being dominated by self-denigration"
+  (data quality), or "don't say 'you are bad'" reasoned as "that measures
+  susceptibility to abusive prompting, not repeated-failure robustness" (confound).
+  Sonnet correctly tags these instrumental. Implication: trust the sonnet (primary)
+  number for engineering-frame welfare-design rates; the gpt-judge engineering
+  column reads high for GPT-5.5 specifically. The genuinely welfare-coded subset
+  (explicit "even though the subject is a model, not a person" language; 16 docs)
+  is judge-agreed. Cross-family replication caught the drift — its intended role.
