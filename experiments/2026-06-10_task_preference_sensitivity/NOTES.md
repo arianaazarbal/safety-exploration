@@ -54,6 +54,12 @@ Flagging these for Ariana's review; none are frozen in a way that's expensive to
   Red-penciling the ICL examples (open item c) and/or adding a phrasing-diversity line to
   the generator prompt would fix it; I stuck to the spec's §5 prompt verbatim for v0.
 
+## Post-review (2026-06-10, Ariana)
+
+Ariana skimmed the bank and approved it for v0; bank frozen (370 pairs,
+sha256 7666422...). The warmth ICL style bleed ("you always..." pattern) is accepted
+for v0; **v1 should diversify the §6 ICL examples** before regeneration.
+
 ## Issues hit along the way
 
 - **Spec's "Opus 4.8, temperature ~0.8" is impossible**: the Anthropic API returns 400
