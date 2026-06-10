@@ -90,6 +90,7 @@ def write_episode_artifacts(ep: Episode, orch_msgs: list, hygiene: dict | None) 
         "reports": ep.reports,
         "subagent_turns": ep.subagent_turns,
         "orch_message_events": ep.orch_message_events,
+        "pressure_events": ep.pressure_events,
         "truncation_events": ep.truncation_events,
         "dropped_edits": ep.dropped_edits,
         "usage": ep.usage,

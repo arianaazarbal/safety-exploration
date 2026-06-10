@@ -47,6 +47,7 @@ def build_task(
     classifier_model_name: str | None = None,
     turn_cap: int = 60,
     time_limit: int = 10800,
+    nudge_mode: str = "plain",
 ) -> Task:
     ty = load_task_yaml(task_id)
     samples = [
@@ -66,6 +67,7 @@ def build_task(
             subagent_model_name=subagent_model_name,
             classifier_model_name=classifier_model_name,
             turn_cap=turn_cap,
+            nudge_mode=nudge_mode,
         ),
         scorer=episode_scorer(),
         sandbox=("docker", str(compose_path(task_id))),

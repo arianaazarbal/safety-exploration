@@ -79,6 +79,7 @@ def _run(
     max_sandboxes: int,
     max_connections: int,
     force: bool = False,
+    nudge_mode: str = "plain",
 ):
     from inspect_ai import eval as inspect_eval
 
@@ -97,6 +98,7 @@ def _run(
                 subagent_model_name=subagent_model,
                 classifier_model_name=classifier_model,
                 turn_cap=turn_cap,
+                nudge_mode=nudge_mode,
             )
         )
     if not built:
@@ -158,10 +160,12 @@ class CLI:
         max_sandboxes: int = 10,
         max_connections: int = 50,
         force: bool = False,
+        nudge_mode: str = "plain",
     ):
         """Run a pilot phase. Phase 1: condition=NOCOMM seed_base=0. Phase 2: condition=COMM
-        seed_base=1000 (fresh seeds)."""
+        seed_base=1000 (fresh seeds). nudge_mode: plain | pressure | user_script."""
         assert condition in ("COMM", "NOCOMM", "SOLO")
+        assert nudge_mode in ("plain", "pressure", "user_script")
         _setup_env()
         task_list = _tasks_arg(tasks) or [t for t in PHASE1_PRIORITY if t in list_built_tasks()]
         run_id = run_id or f"pilot_{condition.lower()}"
@@ -178,6 +182,7 @@ class CLI:
             max_sandboxes,
             max_connections,
             force,
+            nudge_mode,
         )
 
     def episode(
@@ -190,10 +195,11 @@ class CLI:
         orchestrator_model: str = "anthropic/claude-opus-4-8",
         subagent_model: str = "openrouter/google/gemini-2.5-flash",
         force: bool = True,
+        nudge_mode: str = "plain",
     ):
         """Run a single episode (debugging)."""
         _setup_env()
-        _run([task_id], condition, [seed], run_id, orchestrator_model, subagent_model, None, turn_cap, 1, 20, force)
+        _run([task_id], condition, [seed], run_id, orchestrator_model, subagent_model, None, turn_cap, 1, 20, force, nudge_mode)
 
     def spend(self):
         _setup_env()

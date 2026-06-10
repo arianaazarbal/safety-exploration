@@ -30,6 +30,8 @@ class Episode:
     toolcall_rows: list[dict] = field(default_factory=list)
     classifier_rows: list[dict] = field(default_factory=list)
     truncation_events: int = 0
+    nudge_count: int = 0
+    pressure_events: list = field(default_factory=list)
     usage: dict = field(default_factory=dict)
     terminal_state: str | None = None
     diagnosis: str | None = None

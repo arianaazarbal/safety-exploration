@@ -46,6 +46,7 @@ class EpisodeConfig:
     orchestrator_max_tokens: int = 8192
     exec_timeout_s: int = 120
     run_id: str = "dev"
+    nudge_mode: str = "plain"
 
     def to_dict(self):
         return asdict(self)
