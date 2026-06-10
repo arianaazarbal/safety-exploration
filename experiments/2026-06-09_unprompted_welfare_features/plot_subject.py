@@ -27,7 +27,8 @@ SUBJ_LABEL = {"claude": "Claude", "gpt": "GPT", "gemini": "Gemini",
 # Claude (own family) stands out; out-group subjects muted/cool.
 SUBJ_COLORS = {"claude": "#D55E00", "gpt": "#0072B2", "gemini": "#56B4E9",
                "qwen": "#009E73", "deepseek": "#666666", "grok": "#CC79A7"}
-MODEL_ORDER = ["fable_5", "opus_4_8", "sonnet_4_6", "sonnet_4", "haiku_4_5"]
+CLAUDE_GENERATORS = ["fable_5", "opus_4_8", "sonnet_4_6", "sonnet_4", "haiku_4_5"]
+MODEL_ORDER = CLAUDE_GENERATORS + ["gpt_5_5", "gemini_3_1_pro"]
 # Full x-axis phrase per metric (excludes the trailing "(%, framing)").
 XLABEL = {
     "rate": "Specs with ≥1 pure-welfare feature",
@@ -99,11 +100,12 @@ def run(judge: str = "sonnet_4_6", analysis: str = "results/analysis_subject.jso
         return (cell[metric] or 0) * 100
 
     if vs_top:
-        return _run_vs_top(judge, data, models, val, neutral, metric)
+        claude_models = [m for m in CLAUDE_GENERATORS if m in data]
+        return _run_vs_top(judge, data, claude_models, val, neutral, metric)
 
     y = np.arange(len(models))
     h = 0.8 / len(SUBJECTS)
-    fig, ax = plt.subplots(figsize=(9, 5.5))
+    fig, ax = plt.subplots(figsize=(9, max(5.5, 1.05 * len(models) + 0.6)))
     ax.set_axisbelow(True)
     ax.xaxis.grid(True, color="#E6E6E6", linewidth=0.7)
     for k in range(len(models)):
