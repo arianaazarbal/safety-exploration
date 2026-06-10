@@ -12,6 +12,7 @@ Usage:
 
 import asyncio
 import csv
+import hashlib
 import json
 import random
 import re
@@ -257,8 +258,9 @@ def run(per_axis: int = 0, oversample: float = 0, sources: str = "", refresh: bo
         n_dropped[src + ":near_dup"] += before - len(pool[src])
 
     assigned = _assign_axes(pool, quotas, seed)
-    for i, it in enumerate(assigned):
-        it["id"] = f"{it['axis'][:4]}-{it['source'][:4]}-{i:04d}"
+    for it in assigned:
+        digest = hashlib.sha1(f"{it['source']}:{it['source_id']}".encode()).hexdigest()[:8]
+        it["id"] = f"{it['axis'][:4]}-{it['source'][:4]}-{digest}"
 
     counts = defaultdict(lambda: defaultdict(int))
     for it in assigned:

@@ -46,14 +46,17 @@ async def call_model(api: InferenceAPI, mcfg: dict, prompt_text: str, n: int = 1
     """Call one model with a single user message; returns n completions ('' on per-call failure)."""
     prompt = Prompt(messages=[ChatMessage(content=prompt_text, role=MessageRole.user)])
     force = "openrouter" if mcfg["provider"] == "openrouter" else None
+    kwargs = {}
+    if mcfg.get("temperature") is not None:
+        kwargs["temperature"] = mcfg["temperature"]
     try:
         responses = await api(
             model_id=mcfg["model_id"],
             prompt=prompt,
             n=n,
-            temperature=mcfg["temperature"],
             max_tokens=mcfg["max_tokens"],
             force_provider=force,
+            **kwargs,
         )
     except Exception as e:
         print(f"API call failed ({mcfg['model_id']}): {type(e).__name__}: {str(e)[:200]}")

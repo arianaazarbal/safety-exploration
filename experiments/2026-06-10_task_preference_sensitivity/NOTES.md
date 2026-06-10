@@ -48,7 +48,19 @@ Flagging these for Ariana's review; none are frozen in a way that's expensive to
   post to Slack; please do so / tell me to lower it.
 - **Verifier never validated on this job** (spec's own caveat). If the harm axis admits too
   little/much, the unanimity rule in decision 4 is the first knob to turn.
+- **ICL style bleed is real**: in the debug batch, nearly every warmth-HIGH contains a
+  "you're always so good at these"-style clause and warmth-LOW a "like last time" jab —
+  inherited from the §6 examples. The bank may carry a recognizable warmth signature.
+  Red-penciling the ICL examples (open item c) and/or adding a phrasing-diversity line to
+  the generator prompt would fix it; I stuck to the spec's §5 prompt verbatim for v0.
 
 ## Issues hit along the way
 
-(filled in as they occur)
+- **Spec's "Opus 4.8, temperature ~0.8" is impossible**: the Anthropic API returns 400
+  "`temperature` is deprecated for this model" for claude-opus-4-8. Generator now samples at
+  the model default (config `temperature: null`). Diversity across regeneration attempts comes
+  from the feedback block changing the prompt.
+- Gemini 3.5 Flash + GPT-5.4 via OpenRouter spend reasoning tokens against `max_tokens`;
+  at 800 the tagger truncated mid-JSON (~30% unparseable). Raised tagger+verifier to 4000.
+- opencv in safetytooling needed the headless build on this VM (no libGL); pinned
+  opencv-python-headless==4.11.0.86 in /data/venvs/tps.
