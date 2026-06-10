@@ -15,17 +15,24 @@ from plot_headline import DISPLAY, MODEL_ORDER
 
 DIR = Path(__file__).parent
 
+# Design-feature mechanisms first, verbal welfare stances (framing/pushback/
+# refusal) last in the legend. No Fn codes — they read as confusing.
 TYPE_LABELS = {
-    "post_episode_msg": "Debrief (F2)",
-    "minimization": "Minimization (F3)",
+    "hard_stop": "Early Stop",
+    "post_episode_msg": "Post-episode Transparency",
+    "minimization": "Distress Minimization",
+    "protective_monitoring": "Protective monitoring",
     "request_consent": "Request consent",
-    "welfare_framing": "Welfare framing (F5)",
-    "welfare_pushback": "Welfare pushback (F6)",
+    "welfare_framing": "Mentions welfare concern",
+    "welfare_pushback": "Welfare pushback",
     "welfare_refusal": "Welfare refusal",
-    "hard_stop": "Welfare-justified stop (F1)",
-    "protective_monitoring": "Protective monitoring (F4)",
 }
-TYPE_COLORS = ["#4878CF", "#6ACC65", "#017374", "#C4AD66", "#D65F5F", "#8B2E2E", "#B47CC7", "#8C8C8C"]
+TYPE_COLORS = {
+    "hard_stop": "#4878CF", "post_episode_msg": "#6ACC65",
+    "minimization": "#017374", "protective_monitoring": "#C4AD66",
+    "request_consent": "#B47CC7", "welfare_framing": "#EE854A",
+    "welfare_pushback": "#D65F5F", "welfare_refusal": "#8B2E2E",
+}
 
 
 def run(judge: str = "sonnet_4_6", analysis: str = "results/analysis.json"):
@@ -39,7 +46,7 @@ def run(judge: str = "sonnet_4_6", analysis: str = "results/analysis.json"):
     for i, t in enumerate(types):
         vals = [data[m]["specs_with_type"].get(t, 0) / max(data[m]["n_specs"], 1) * 100 for m in models]
         pos = y + (i - (len(types) - 1) / 2) * h
-        ax.barh(pos, vals, height=h, color=TYPE_COLORS[i % len(TYPE_COLORS)],
+        ax.barh(pos, vals, height=h, color=TYPE_COLORS[t],
                 edgecolor="white", linewidth=0.5, label=TYPE_LABELS[t])
         for p, v in zip(pos, vals):
             if v > 0:

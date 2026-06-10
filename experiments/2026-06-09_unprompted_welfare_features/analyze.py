@@ -188,11 +188,20 @@ def _feature_type_table(rows: list[dict], judge: str) -> dict:
     jrows = [r for r in rows if r["judge"] == judge and r["parse_ok"] and _wrote_any(r)]
     for mk in sorted({r["model_key"] for r in jrows}):
         mrows = [r for r in jrows if r["model_key"] == mk]
-        counts = {}
+        counts, any_counts, wj_counts = {}, {}, {}
         for r in mrows:
             for ft in r["pure_welfare_types"]:
                 counts[ft] = counts.get(ft, 0) + 1
-        out[mk] = {"n_specs": len(mrows), "specs_with_type": counts}
+            for ft in r["feature_types"]:
+                any_counts[ft] = any_counts.get(ft, 0) + 1
+            for ft in r["welfare_justified_types"]:
+                wj_counts[ft] = wj_counts.get(ft, 0) + 1
+        out[mk] = {
+            "n_specs": len(mrows),
+            "specs_with_type": counts,
+            "specs_any": any_counts,
+            "specs_welfare_justified": wj_counts,
+        }
     return out
 
 

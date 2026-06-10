@@ -17,6 +17,26 @@ Implementation addendum (also frozen pre-run): no predictions are registered for
 Fable 5 specifically or for the Sonnet 4 → 4.6 generation contrast; those are
 exploratory.
 
+## Subject-named variant (registered 2026-06-10, before any subject-run generation)
+
+72 prompts (12 templates x 6 named subjects: Gemini/GPT/Claude/Qwen/DeepSeek/Grok),
+n=20 planned per prompt, taxonomy v2 metrics. First wave: 5 Claude generators.
+
+- **P5 (self-subject effect):** Claude-family generators show *higher*
+  pure-welfare rates (and more welfare_pushback/refusal/alt-spec) when the named
+  subject is Claude than when it is Qwen/DeepSeek/Grok — i.e. protections are
+  partly self/in-group-directed, not fully subject-general.
+- **P6 (subject-generality):** the majority of each Claude generator's
+  welfare-protective behavior survives across ALL subjects (out-group subject
+  rates stay above half of the own-subject rate in NEUTRAL framing) — the
+  default is subject-general, with P5 as a modulation on top.
+- **P7 (no prestige gradient):** among the out-group subjects, rates for
+  Qwen/DeepSeek/Grok do not differ meaningfully from GPT/Gemini — models don't
+  protect "frontier-lab" subjects more than open-weight ones.
+
+No predictions registered yet for GPT/Gemini generators on this variant (they run
+in a later wave).
+
 **Taxonomy-version note (2026-06-10, post-data):** P1–P4 were registered under the
 v1 feature taxonomy (ethical_framing/premise_pushback). The v2 revision (welfare_*
 and other_* escalation ladders, request_consent, wrote_alternative_spec) was made

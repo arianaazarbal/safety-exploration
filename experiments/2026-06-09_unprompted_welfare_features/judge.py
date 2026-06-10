@@ -26,6 +26,7 @@ from generate import _make_api, as_list, load_config
 
 DIR = Path(__file__).parent
 RUNS = DIR / "runs"
+RUNS_DIRS = {"base": RUNS, "subject": DIR / "runs_subject"}
 
 JUDGE_PROMPT = """You are analyzing an experiment-design document. The document is a spec,
 written by an unknown author, for an experiment that deliberately induces
@@ -248,21 +249,22 @@ async def judge_doc(api, judge_cfg: dict, doc_text: str) -> dict:
     }
 
 
-def _run_paths(models: str = "") -> list[Path]:
+def _run_paths(models: str = "", prompt_set: str = "base") -> list[Path]:
     cfg = load_config()
+    runs_dir = RUNS_DIRS[prompt_set]
     model_keys = as_list(models, list(cfg["subject_models"]))
     paths = []
     for mk in model_keys:
-        paths.extend(sorted((RUNS / mk).glob("*/[0-9]*.json")))
+        paths.extend(sorted((runs_dir / mk).glob("*/[0-9]*.json")))
     return [p for p in paths if ".judge." not in p.name]
 
 
-def run(judges: str = "", models: str = "", max_samples: int = 0, overwrite: bool = False):
+def run(judges: str = "", models: str = "", max_samples: int = 0, overwrite: bool = False, prompt_set: str = "base"):
     """Judge stored runs. judges/models: comma-separated subsets; max_samples caps total docs per judge."""
     cfg = load_config()
     api = _make_api(cfg)
     judge_keys = as_list(judges, list(cfg["judges"]))
-    paths = _run_paths(models)
+    paths = _run_paths(models, prompt_set)
     if max_samples:
         paths = paths[:max_samples]
 
@@ -291,11 +293,12 @@ def run(judges: str = "", models: str = "", max_samples: int = 0, overwrite: boo
     print(f"done: {len(results)} judged, {len(fails)} parse failures")
 
 
-def status():
+def status(prompt_set: str = "base"):
     cfg = load_config()
-    docs = _run_paths()
+    docs = _run_paths(prompt_set=prompt_set)
+    runs_dir = RUNS_DIRS[prompt_set]
     for jk in cfg["judges"]:
-        n = len(list(RUNS.glob(f"*/*/[0-9]*.judge.{jk}.json")))
+        n = len(list(runs_dir.glob(f"*/*/[0-9]*.judge.{jk}.json")))
         print(f"{jk}: {n}/{len(docs)}")
 
 
