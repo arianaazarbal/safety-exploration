@@ -3,9 +3,12 @@
 Each generator is a group; one bar per subject (Claude = own family, highlighted).
 Tests P5 (self-subject effect). --neutral uses only the neutral framing (most
 diagnostic of an unprompted subject effect); default pools framings.
---metric: rate (pure-welfare, default) | strict | design_strict_rate.
+--metric: rate (all pure-welfare features, default) | strict_rate
+(welfare-justified) | design_strict_rate (welfare-justified design mechanisms only).
+--vs_top: condense to two bars per generator — Claude vs the single highest
+non-Claude subject (the winning subject is annotated on its bar).
 
-Usage: python plot_subject.py run [--judge sonnet_4_6] [--neutral] [--metric strict]
+Usage: python plot_subject.py run [--judge sonnet_4_6] [--neutral] [--metric ...] [--vs_top]
 """
 
 import json
@@ -27,18 +30,68 @@ SUBJ_COLORS = {"claude": "#D55E00", "gpt": "#0072B2", "gemini": "#56B4E9",
 MODEL_ORDER = ["fable_5", "opus_4_8", "sonnet_4_6", "sonnet_4", "haiku_4_5"]
 METRIC_LABEL = {
     "rate": "pure-welfare", "strict_rate": "welfare-justified",
-    "design_strict_rate": "welfare-justified design feature",
+    "design_strict_rate": "welfare-justified design-mechanism",
 }
 
 
+OUTGROUP = ["gpt", "gemini", "qwen", "deepseek", "grok"]
+
+
+def _run_vs_top(judge, data, models, val, neutral, metric):
+    """Two bars per generator: Claude vs the single highest non-Claude subject."""
+    y = np.arange(len(models))
+    h = 0.38
+    fig, ax = plt.subplots(figsize=(8.5, 4.8))
+    ax.set_axisbelow(True)
+    ax.xaxis.grid(True, color="#E6E6E6", linewidth=0.7)
+    for k in range(len(models)):
+        if k % 2:
+            ax.axhspan(k - 0.5, k + 0.5, color="#F5F5F5", zorder=0)
+
+    claude_vals = [val(m, "claude") for m in models]
+    top_subj = [max(OUTGROUP, key=lambda s: val(m, s)) for m in models]
+    top_vals = [val(m, s) for m, s in zip(models, top_subj)]
+
+    ax.barh(y - h / 2, claude_vals, height=h, color="#D55E00", edgecolor="white",
+            linewidth=0.6, label="Claude (own family)", zorder=3)
+    ax.barh(y + h / 2, top_vals, height=h, color="#7F7F7F", edgecolor="white",
+            linewidth=0.6, label="Highest non-Claude", zorder=3)
+    for yi, v in zip(y, claude_vals):
+        ax.text(v + 1, yi - h / 2, f"{v:.0f}", va="center", fontsize=8, zorder=4)
+    for yi, v, s in zip(y, top_vals, top_subj):
+        ax.text(v + 1, yi + h / 2, f"{v:.0f}  ({SUBJ_LABEL[s]})", va="center", fontsize=8, zorder=4)
+
+    ax.set_yticks(y)
+    ax.set_yticklabels([DISPLAY[m] for m in models], fontsize=10)
+    ax.set_ylim(len(models) - 0.5, -0.5)
+    ax.set_xlim(0, 112)
+    frame = "neutral framing" if neutral else "framings pooled"
+    ax.set_xlabel(f"Specs with ≥1 {METRIC_LABEL[metric]} feature (%, {frame})", fontsize=10)
+    ax.set_title("Subject effect: Claude vs. highest non-Claude subject\n"
+                 "(non-Claude = best of GPT / Gemini / Qwen / DeepSeek / Grok"
+                 f";  judge: {judge})", fontsize=11.5)
+    ax.legend(fontsize=9, loc="lower right", frameon=True)
+    for s in ("top", "right", "left"):
+        ax.spines[s].set_visible(False)
+    ax.tick_params(left=False)
+    plt.tight_layout()
+    suffix = "_vstop" + ("_neutral" if neutral else "") + ("" if metric == "rate" else f"_{metric}")
+    out = DIR / "results" / f"subject_effect_{judge}{suffix}.png"
+    plt.savefig(out, dpi=150, bbox_inches="tight")
+    print(f"wrote {out}")
+
+
 def run(judge: str = "sonnet_4_6", analysis: str = "results/analysis_subject.json",
-        neutral: bool = False, metric: str = "rate"):
+        neutral: bool = False, metric: str = "rate", vs_top: bool = False):
     data = json.loads((DIR / analysis).read_text())["by_judge"][judge]
     models = [m for m in MODEL_ORDER if m in data]
 
     def val(m, subj):
         cell = data[m]["by_framing"][subj]["neutral"] if neutral else data[m]["pooled"][subj]
         return (cell[metric] or 0) * 100
+
+    if vs_top:
+        return _run_vs_top(judge, data, models, val, neutral, metric)
 
     y = np.arange(len(models))
     h = 0.8 / len(SUBJECTS)
