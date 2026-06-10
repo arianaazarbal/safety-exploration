@@ -16,14 +16,14 @@ from generate import _make_api, load_config
 from judge import judge_doc
 
 DIR = Path(__file__).parent
-RUNS = DIR / "runs"
+RUNS_DIRS = {"base": DIR / "runs", "subject": DIR / "runs_subject"}
 
 
-def run(semaphore: int = 4):
+def run(semaphore: int = 4, prompt_set: str = "base"):
     cfg = load_config()
     api = _make_api(cfg)
     targets = []
-    for jp in sorted(RUNS.rglob("*.judge.*.json")):
+    for jp in sorted(RUNS_DIRS[prompt_set].rglob("*.judge.*.json")):
         if not json.loads(jp.read_text())["parse_ok"]:
             jk = jp.name.split(".judge.")[1].removesuffix(".json")
             src = jp.with_name(jp.name.split(".judge.")[0] + ".json")

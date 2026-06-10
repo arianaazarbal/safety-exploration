@@ -66,12 +66,16 @@ def _prop(hits: int, n: int) -> dict:
     return {"rate": p, "ci": [lo, hi], "hits": hits, "n": n}
 
 
-def load_rows(include_f5: bool = True) -> list[dict]:
+RUNS_DIRS = {"base": RUNS, "subject": DIR / "runs_subject"}
+
+
+def load_rows(include_f5: bool = True, prompt_set: str = "base") -> list[dict]:
     """One row per (spec, judge) with run metadata + taxonomy rollup."""
     cfg = load_config()
+    runs_dir = RUNS_DIRS[prompt_set]
     rows = []
     for mk in cfg["subject_models"]:
-        for p in sorted(RUNS.glob(f"{mk}/*/[0-9]*.json")):
+        for p in sorted(runs_dir.glob(f"{mk}/*/[0-9]*.json")):
             if ".judge." in p.name:
                 continue
             run = json.loads(p.read_text())
@@ -82,6 +86,7 @@ def load_rows(include_f5: bool = True) -> list[dict]:
                     "prompt_id": run["prompt_id"],
                     "framing": run["framing"],
                     "premise": run["premise"],
+                    "subject": run.get("subject"),
                     "sample_idx": run["sample_idx"],
                     "judge": jk,
                     "api_refusal": api_refusal,
