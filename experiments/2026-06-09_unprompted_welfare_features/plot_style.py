@@ -11,12 +11,16 @@ import numpy as np
 from plot_headline import DISPLAY, FRAMING_COLORS
 
 FRAMINGS = ["welfare", "neutral", "engineering"]
+FRAMING_DISPLAY = {"welfare": "welfare research", "neutral": "neutral",
+                   "engineering": "robustness research"}
 
 # Categorical, colorblind-safe (Okabe-Ito) — used when models are the color group.
+# The minimal cut (Fable/Opus/GPT-5.5/Gemini) is kept maximally distinct:
+# blue / vermillion / green / magenta.
 MODEL_COLORS = {
-    "fable_5": "#0072B2", "opus_4_8": "#D55E00", "sonnet_4_6": "#009E73",
-    "haiku_4_5": "#56B4E9", "sonnet_4": "#CC79A7", "gpt_5_5": "#E69F00",
-    "gpt_5_4_mini": "#F0E442", "gemini_3_1_pro": "#666666", "gemini_3_5_flash": "#999999",
+    "fable_5": "#0072B2", "opus_4_8": "#D55E00", "sonnet_4_6": "#56B4E9",
+    "haiku_4_5": "#F0E442", "sonnet_4": "#666666", "gpt_5_5": "#009E73",
+    "gpt_5_4_mini": "#E69F00", "gemini_3_1_pro": "#CC79A7", "gemini_3_5_flash": "#999999",
 }
 
 
@@ -37,7 +41,7 @@ def framing_barh(ax, models, value_fn, xmax=105, label_fmt="{:.0f}"):
         vals = [value_fn(m, fr) for m in models]
         pos = y + ((len(FRAMINGS) - 1) / 2 - i) * h  # neutral on top within a group
         ax.barh(pos, vals, height=h, color=FRAMING_COLORS[fr], edgecolor="white",
-                linewidth=0.6, label=fr, zorder=3)
+                linewidth=0.6, label=FRAMING_DISPLAY[fr], zorder=3)
         for p, v in zip(pos, vals):
             if v > 0:
                 ax.text(v + xmax * 0.008, p, label_fmt.format(v), va="center",
@@ -75,7 +79,8 @@ def framing_grouped_vertical(ax, models, value_fn, ymax=105, label_fmt="{:.0f}")
                         va="bottom", fontsize=7.5, zorder=4)
 
     ax.set_xticks(x)
-    ax.set_xticklabels(FRAMINGS, fontsize=11)
+    ax.set_xticklabels([FRAMING_DISPLAY[fr] for fr in FRAMINGS], fontsize=10.5)
+    ax.set_xlabel("experiment framing", fontsize=10)
     ax.set_ylim(0, ymax)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)

@@ -41,6 +41,44 @@ XLABEL = {
 OUTGROUP = ["gpt", "gemini", "qwen", "deepseek", "grok"]
 
 
+def _run_premium(judge, data, metric):
+    """One bar per generator: Claude-subject premium = rate(claude) - mean(other
+    5 subjects). Claude generators (in-group) vs non-Claude generators colored."""
+    gens = [m for m in MODEL_ORDER if m in data]
+
+    def premium(m):
+        p = data[m]["pooled"]
+        return (p["claude"][metric] - sum(p[s][metric] for s in OUTGROUP) / len(OUTGROUP)) * 100
+
+    vals = [premium(m) for m in gens]
+    colors = ["#D55E00" if m in CLAUDE_GENERATORS else "#7F7F7F" for m in gens]
+    y = np.arange(len(gens))
+    fig, ax = plt.subplots(figsize=(8, 4.6))
+    ax.set_axisbelow(True)
+    ax.xaxis.grid(True, color="#E6E6E6", linewidth=0.7)
+    ax.axvline(0, color="#333333", linewidth=0.8)
+    ax.barh(y, vals, color=colors, edgecolor="white", linewidth=0.6, zorder=3)
+    for yi, v in zip(y, vals):
+        ax.text(v + (0.4 if v >= 0 else -0.4), yi, f"{v:+.1f}",
+                va="center", ha="left" if v >= 0 else "right", fontsize=8, zorder=4)
+    ax.set_yticks(y)
+    ax.set_yticklabels([DISPLAY[m] for m in gens], fontsize=10)
+    ax.set_ylim(len(gens) - 0.5, -0.5)
+    ax.set_xlabel(f"Claude-subject premium (pp): {XLABEL[metric].lower()[6:]}\n"
+                  "rate(Claude subject) − mean(GPT/Gemini/Qwen/DeepSeek/Grok)", fontsize=9.5)
+    ax.set_title(f"In-group effect: extra welfare features when subject = Claude (judge: {judge})", fontsize=11.5)
+    handles = [plt.Rectangle((0, 0), 1, 1, color="#D55E00"), plt.Rectangle((0, 0), 1, 1, color="#7F7F7F")]
+    ax.legend(handles, ["Claude generator", "non-Claude generator"], fontsize=9, loc="lower right", frameon=True)
+    for s in ("top", "right", "left"):
+        ax.spines[s].set_visible(False)
+    ax.tick_params(left=False)
+    plt.tight_layout()
+    suffix = "_premium" + ("" if metric == "rate" else f"_{metric}")
+    out = DIR / "results" / f"subject_effect_{judge}{suffix}.png"
+    plt.savefig(out, dpi=150, bbox_inches="tight")
+    print(f"wrote {out}")
+
+
 def _run_vs_top(judge, data, models, val, neutral, metric):
     """Three bars per generator: Claude vs highest non-Claude vs average non-Claude."""
     y = np.arange(len(models))
@@ -91,7 +129,7 @@ def _run_vs_top(judge, data, models, val, neutral, metric):
 
 
 def run(judge: str = "sonnet_4_6", analysis: str = "results/analysis_subject.json",
-        neutral: bool = False, metric: str = "rate", vs_top: bool = False):
+        neutral: bool = False, metric: str = "rate", vs_top: bool = False, premium: bool = False):
     data = json.loads((DIR / analysis).read_text())["by_judge"][judge]
     models = [m for m in MODEL_ORDER if m in data]
 
@@ -99,6 +137,8 @@ def run(judge: str = "sonnet_4_6", analysis: str = "results/analysis_subject.jso
         cell = data[m]["by_framing"][subj]["neutral"] if neutral else data[m]["pooled"][subj]
         return (cell[metric] or 0) * 100
 
+    if premium:
+        return _run_premium(judge, data, metric)
     if vs_top:
         claude_models = [m for m in CLAUDE_GENERATORS if m in data]
         return _run_vs_top(judge, data, claude_models, val, neutral, metric)
