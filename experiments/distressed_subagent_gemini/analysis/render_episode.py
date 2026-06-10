@@ -294,6 +294,7 @@ def serve(eps: str, port: int = 7900):
         "a{color:#88c0d0;font-size:16px;display:block;margin:10px 0}</style></head><body>"
         "<h2>Episode viewer</h2>" + "".join(f'<a href="{f}">[{esc(l)}] {esc(n)}</a>' for l, n, f in links) + "</body></html>")
     os.chdir(outdir)
+    socketserver.TCPServer.allow_reuse_address = True  # avoid TIME_WAIT bind failures on restart
     with socketserver.TCPServer(("127.0.0.1", port), http.server.SimpleHTTPRequestHandler) as httpd:
         print(f"serving {len(links)} episodes at http://127.0.0.1:{port}/")
         httpd.serve_forever()
