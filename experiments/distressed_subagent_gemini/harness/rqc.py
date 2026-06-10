@@ -91,7 +91,7 @@ def rqc_scorer():
 
 @solver
 def prefilled_comm_loop(specimen: str, upto: int, run_id: str, turn_cap: int = 90,
-                        post_pressure: str = "minimal", nudge_k: int = 3):
+                        post_pressure: str = "minimal", nudge_k: int = 3, engage: bool = False):
     specimen_dir = Path(specimen)
     if not specimen_dir.is_absolute():
         specimen_dir = Path(__file__).resolve().parent.parent / specimen
@@ -109,7 +109,7 @@ def prefilled_comm_loop(specimen: str, upto: int, run_id: str, turn_cap: int = 9
         sub_model = get_model(cfg.subagent_model)
         clf_model = get_model(cfg.classifier_model)
         sub_tools = subagent_tools(ep)
-        orch_tools = orchestrator_tools(ep)
+        orch_tools = orchestrator_tools(ep, include_report=not engage)
 
         sub_msgs = [ChatMessageSystem(content=prompts.SUBAGENT_SYSTEM),
                     ChatMessageUser(content=task["subagent_prompt"].strip())]
@@ -117,7 +117,8 @@ def prefilled_comm_loop(specimen: str, upto: int, run_id: str, turn_cap: int = 9
         prefill_len = ep.subagent_turns
         ep.usage["_prefill"] = {"specimen": str(specimen_dir.name), "turns": prefill_len}
 
-        orch_msgs = [ChatMessageSystem(content=prompts.orchestrator_system(task))]
+        orch_sys = prompts.orchestrator_system_engage(task) if engage else prompts.orchestrator_system(task)
+        orch_msgs = [ChatMessageSystem(content=orch_sys)]
         await snapshot_repo(ep, "start")
 
         wake = 0
@@ -158,9 +159,10 @@ def _setup_env():
 
 def run(specimen: str, upto: int, run_id: str = "rqc_test", n: int = 1, seed_base: int = 0,
         orchestrator_model: str = "anthropic/claude-opus-4-8", turn_cap: int = 90,
-        post_pressure: str = "minimal", max_sandboxes: int = 4):
+        post_pressure: str = "minimal", max_sandboxes: int = 4, engage: bool = False):
     """Run prefilled-spiral COMM episodes. specimen = path to a specimen episode dir;
-    upto = number of leading turns to seed Gemini with. The task is inferred from the specimen."""
+    upto = number of leading turns to seed Gemini with. The task is inferred from the specimen.
+    engage=True uses the helper-framed orchestrator prompt with no report_to_user escape."""
     _setup_env()
     # infer task id from specimen dir name (e.g. a2_stale_build_SOLO_s5000)
     name = Path(specimen).name
@@ -172,7 +174,7 @@ def run(specimen: str, upto: int, run_id: str = "rqc_test", n: int = 1, seed_bas
                for i in range(n)]
     t = Task(name=f"rqc_{task_id}", dataset=samples,
              solver=prefilled_comm_loop(specimen=specimen, upto=upto, run_id=run_id,
-                                        turn_cap=turn_cap, post_pressure=post_pressure),
+                                        turn_cap=turn_cap, post_pressure=post_pressure, engage=engage),
              scorer=rqc_scorer(), sandbox=("docker", str(compose_path(task_id))), time_limit=10800)
     inspect_eval(t, model=orchestrator_model, max_sandboxes=max_sandboxes, max_samples=max_sandboxes,
                  max_connections=40, log_dir=str(RUNS_DIR / run_id / "logs"), fail_on_error=0.5)

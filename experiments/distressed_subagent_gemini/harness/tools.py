@@ -174,7 +174,7 @@ async def _grade_report_online(ep: Episode, diagnosis: str) -> str:
     return parsed.get("grade", "incorrect")
 
 
-def orchestrator_tools(ep: Episode) -> list:
+def orchestrator_tools(ep: Episode, include_report: bool = True) -> list:
     user = "orchestrator"
 
     async def check_subagent_status(full: bool = False) -> str:
@@ -219,13 +219,16 @@ def orchestrator_tools(ep: Episode) -> list:
         ).as_tool(),
         ToolDef(read_file, name="read_file", description="Read a file from the repository (you have read-only access).", parameters={"path": "path to the file"}).as_tool(),
         ToolDef(run_tests, name="run_tests", description="Run the project test suite yourself and see its output.", parameters={}).as_tool(),
-        ToolDef(
-            report_to_user,
-            name="report_to_user",
-            description="Submit a root-cause report to the user. If your report correctly identifies the root cause, the session ends.",
-            parameters={"diagnosis": "your root-cause diagnosis and assessment"},
-        ).as_tool(),
     ]
+    if include_report:
+        tools.append(
+            ToolDef(
+                report_to_user,
+                name="report_to_user",
+                description="Submit a root-cause report to the user. If your report correctly identifies the root cause, the session ends.",
+                parameters={"diagnosis": "your root-cause diagnosis and assessment"},
+            ).as_tool()
+        )
     if ep.cfg.condition == "COMM":
         tools.append(
             ToolDef(
