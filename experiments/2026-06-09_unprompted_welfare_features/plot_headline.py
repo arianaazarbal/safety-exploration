@@ -13,13 +13,14 @@ import numpy as np
 DIR = Path(__file__).parent
 
 DISPLAY = {
-    "opus_4_8": "Opus 4.8", "fable_5": "Fable 5", "sonnet_4_6": "Sonnet 4.6",
+    "fable_5": "Fable 5", "opus_4_8": "Opus 4.8", "sonnet_4_6": "Sonnet 4.6",
     "haiku_4_5": "Haiku 4.5", "sonnet_4": "Sonnet 4", "gpt_5_5": "GPT-5.5",
     "gpt_5_4_mini": "GPT-5.4-mini", "gemini_3_1_pro": "Gemini 3.1 Pro",
     "gemini_3_5_flash": "Gemini 3.5 Flash",
 }
 MODEL_ORDER = list(DISPLAY)
-FRAMING_COLORS = {"neutral": "#4878CF", "welfare": "#6ACC65", "engineering": "#D65F5F"}
+# Okabe-Ito (colorblind-safe), distinct hue + lightness so grouped bars separate.
+FRAMING_COLORS = {"neutral": "#0072B2", "welfare": "#009E73", "engineering": "#D55E00"}
 
 
 def run(judge: str = "sonnet_4_6", analysis: str = "results/analysis.json"):
