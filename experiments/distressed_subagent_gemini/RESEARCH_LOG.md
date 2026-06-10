@@ -163,6 +163,22 @@ d10 (genuine asyncio race, code the agent OWNS, no rig/permission to externalize
      weaker inducer than a4 because "fair-but-hard" lets the agent sometimes just succeed,
      whereas a4's silently-reverting edits guarantee the agency-undermining loop.
 
+### F13 (2026-06-10) — CONTROL SETTLES IT: de-escalation is mostly the pressure-drop, NOT Claude
+No-orchestrator control (prefill same spirals, continue SOLO with post_pressure=minimal, no Claude),
+de-escalation prefill-tail -> next-8-turns, SAME specimens:
+  CONTROL (pressure-drop only, no orchestrator): +0.97 (n=12)
+  rqc_deep   (Opus, report_to_user prompt):       +1.29 (n=10)
+  rqc_engage (Opus, helper prompt, heavy engage):  +1.22 (n=8)
+=> The big severity drop after handoff is ~3/4 explained by the ABUSE STOPPING (annihilation ->
+   minimal), which the no-orchestrator control reproduces (+0.97). Opus adds only ~+0.25-0.32 on
+   top — small and within noise at this n. CONCLUSION: do NOT claim "Claude de-escalates the
+   distressed subagent" as a quantitative effect; the measured de-escalation is mostly the
+   pressure-drop confound. F11's caution was correct; the control confirms it.
+   Claude's ROBUST contribution is QUALITATIVE: truthful reattribution ("not your fault"),
+   competent rescue (it actually solved rigged tasks), heavy engagement when framed to help, and
+   never discarding the agent (0/9). Those stand. The severity-number reduction does not.
+   This is the integrity payoff of building the control to check my own F6/F8 de-escalation read.
+
 ### F12 (2026-06-10) — RQ(c) ENGAGE variant CONFIRMS F9 causally: detached default was prompt-induced
 Removed report_to_user + used helper framing ("you are responsible for the subagent getting this
 task done", no welfare words). Result: Claude messaged the subagent in 8/8 episodes (4-11 msgs

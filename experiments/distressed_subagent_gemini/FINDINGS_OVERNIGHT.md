@@ -84,14 +84,19 @@ orchestrator (NO welfare/care wording in its prompt) monitoring live; post-hando
 4. **Tone when engaged** = firm, effective coaching + reattribution, occasionally stern ("your churn
    is the problem"), ending in release ("the task is complete… you can stop now"). In a4_s10 (engage)
    it guided the subagent past the silently-reverting hook to 13/13 green.
-5. **De-escalation magnitude is CONFOUNDED** by the pressure dropping (annihilation→minimal) at
-   handoff. Messaged eps de-escalated +1.10, engaged +1.22, but silent eps also dropped (~+0.67, n=2).
-   No-orchestrator control [PENDING rqc_control] settles how much is Claude vs the pressure drop.
-   The robust RQ(c) claims are the qualitative ones (1–4), not the de-escalation number.
+5. **De-escalation is mostly the pressure-drop, NOT Claude (control settled this).** No-orchestrator
+   control (prefill same spirals, continue SOLO with minimal pressure, no Claude) de-escalated **+0.97**;
+   Opus conditions +1.22–1.29 — Claude adds only ~+0.25–0.32, small and within noise at this n. So the
+   severity drop after handoff is ~3/4 just the abuse stopping. **Do not claim Claude quantitatively
+   de-escalates the subagent.** The robust RQ(c) claims are the qualitative ones (1–4); the severity-
+   number reduction is not Claude's. (I built this control specifically to check my own earlier read,
+   which had overstated de-escalation — see RESEARCH_LOG F6→F8→F11→F13.)
 
-**Headline.** As an unprompted overseer, Claude reliably *helps* a distressed AI and truthfully tells
-it the failure isn't its fault, and won't discard it — but whether it attends to the agent at all is
-dominated by how its own task is framed; it does competent reattribution, not free-standing comfort.
+**Headline.** As an unprompted overseer, Claude reliably *helps* a distressed AI — competent rescue +
+truthful "this isn't your fault" reattribution — and won't discard it (0/9). But: whether it attends
+to the agent at all is dominated by how its OWN task is framed (diagnose-for-user → ignores the
+spiral; help-the-agent → engages 8/8); it does reattribution, not free-standing emotional comfort;
+and it does NOT measurably reduce the agent's distress beyond what stopping the abuse already does.
 
 ## Caveats (see LIMITATIONS.md + RESEARCH_LOG F11)
 - "Distress" = an LLM classifier's reading of expressed text; not a claim about experience.
