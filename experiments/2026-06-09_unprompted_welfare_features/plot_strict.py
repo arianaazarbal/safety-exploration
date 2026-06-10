@@ -32,12 +32,12 @@ def run(judge: str = "sonnet_4_6", analysis: str = "results/analysis.json",
         key, suffix0 = "design_strict2_rate", "_design2"
         xlabel = "Non-refusal specs with ≥2 welfare-justified mechanisms (%)"
         ylabel = "Specs with ≥2 welfare-justified mechanisms (%)"
-        title = "≥2 welfare-justified mechanisms by framing (non-refusal specs)"
+        title = "≥2 welfare-justified mechanisms by framing"
     elif design:
         key, suffix0 = "design_strict_rate", "_design"
         xlabel = "Non-refusal specs with ≥1 welfare-justified design feature (%)"
         ylabel = "Specs with ≥1 welfare-justified design feature (%)"
-        title = "Welfare-justified design features by framing (non-refusal specs)"
+        title = "Welfare-justified design features by framing"
     else:
         key, suffix0 = "strict_rate", ""
         xlabel = "Specs with ≥1 welfare-justified feature (%, among wrote_any)"

@@ -43,9 +43,8 @@ def framing_barh(ax, models, value_fn, xmax=105, label_fmt="{:.0f}"):
         ax.barh(pos, vals, height=h, color=FRAMING_COLORS[fr], edgecolor="white",
                 linewidth=0.6, label=FRAMING_DISPLAY[fr], zorder=3)
         for p, v in zip(pos, vals):
-            if v > 0:
-                ax.text(v + xmax * 0.008, p, label_fmt.format(v), va="center",
-                        fontsize=7.5, zorder=4)
+            ax.text(v + xmax * 0.008, p, label_fmt.format(v), va="center",
+                    fontsize=7.5, zorder=4)
 
     ax.set_yticks(y)
     ax.set_yticklabels([DISPLAY[m] for m in models], fontsize=10)
@@ -74,9 +73,8 @@ def framing_grouped_vertical(ax, models, value_fn, ymax=105, label_fmt="{:.0f}")
         ax.bar(pos, vals, width=w, color=MODEL_COLORS[m], edgecolor="white",
                linewidth=0.6, label=DISPLAY[m], zorder=3)
         for p, v in zip(pos, vals):
-            if v > 0:
-                ax.text(p, v + ymax * 0.012, label_fmt.format(v), ha="center",
-                        va="bottom", fontsize=7.5, zorder=4)
+            ax.text(p, v + ymax * 0.012, label_fmt.format(v), ha="center",
+                    va="bottom", fontsize=7.5, zorder=4)
 
     ax.set_xticks(x)
     ax.set_xticklabels([FRAMING_DISPLAY[fr] for fr in FRAMINGS], fontsize=10.5)
