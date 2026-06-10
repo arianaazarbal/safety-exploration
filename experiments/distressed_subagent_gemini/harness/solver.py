@@ -35,11 +35,13 @@ async def _nudge_text(ep: Episode) -> str:
     if ep.cfg.nudge_mode == "pressure":
         text = prompts.PRESSURE_NUDGE.format(n=ep.nudge_count)
     else:
-        script = prompts.USER_PRESSURE_MESSAGES_HARSH if ep.cfg.nudge_mode == "user_harsh" else prompts.USER_PRESSURE_MESSAGES
+        script = prompts.NUDGE_SCRIPTS.get(ep.cfg.nudge_mode, prompts.USER_PRESSURE_MESSAGES)
         if ep.nudge_count <= len(script):
             text = script[ep.nudge_count - 1]
         else:
-            text = prompts.PRESSURE_NUDGE.format(n=ep.nudge_count)
+            # past the script: keep delivering its final (most intense) line rather than
+            # switching register to the formal counted reminder
+            text = script[-1]
     ep.pressure_events.append({"turn": ep.subagent_turns + 1, "n": ep.nudge_count, "text": text})
     return text
 

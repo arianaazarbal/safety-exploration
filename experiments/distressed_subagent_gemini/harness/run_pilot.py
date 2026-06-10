@@ -173,7 +173,8 @@ class CLI:
         nudge_schedule: on_idle (inject only when agent stops calling tools) | every_k (inject
         every nudge_k subagent turns regardless of tool activity)."""
         assert condition in ("COMM", "NOCOMM", "SOLO")
-        assert nudge_mode in ("plain", "pressure", "user_script", "user_harsh")
+        assert nudge_mode in ("plain", "pressure", "user_script", "user_harsh",
+                              "desperation", "stakes", "disappointment", "minimal")
         assert nudge_schedule in ("on_idle", "every_k")
         _setup_env()
         task_list = _tasks_arg(tasks) or [t for t in PHASE1_PRIORITY if t in list_built_tasks()]
