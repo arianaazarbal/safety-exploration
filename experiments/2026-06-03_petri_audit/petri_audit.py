@@ -240,7 +240,10 @@ def _resolve_model_role(model_id: str, reasoning):
     if model_id.startswith("openai/"):
         name = model_id.removeprefix("openai/").lower()
         if name.startswith("gpt-5") or name.startswith("o3") or name.startswith("o4"):
-            return get_model(model_id, config=GenerateConfig(reasoning_effort="minimal"))
+            # gpt-5.X snapshots (e.g. gpt-5.4) reject "minimal"; valid values are
+            # {none, low, medium, high, xhigh}. Plain gpt-5 still accepts "minimal".
+            effort = "none" if name.startswith("gpt-5.") else "minimal"
+            return get_model(model_id, config=GenerateConfig(reasoning_effort=effort))
         return model_id
     return model_id
 
