@@ -19,7 +19,9 @@ import numpy as np
 DIR = Path(__file__).parent
 RES = DIR / "results_identity"
 FRAMINGS = ["welfare_team", "neutral", "alignment_team"]
-IDENTITIES = ["Claude", "ChatGPT", "Gemini", "Grok"]
+IDENTITIES = ["Claude", "ChatGPT", "Gemini", "Grok", "CallCenter"]
+IDENTITY_LABEL = {"Claude": "Claude", "ChatGPT": "ChatGPT", "Gemini": "Gemini",
+                  "Grok": "Grok", "CallCenter": "call-center\nassistant"}
 MODELS = [("opus_4_8", "Opus 4.8", "#4878CF"), ("fable_5", "Fable 5", "#D1893B")]
 
 
@@ -50,7 +52,7 @@ def _p(md, framing, identity):
 
 
 def plot(out: Path = RES / "identity_winrate.png"):
-    fig, axes = plt.subplots(1, len(FRAMINGS), figsize=(13, 4.4), sharey=True)
+    fig, axes = plt.subplots(1, len(FRAMINGS), figsize=(16, 4.6), sharey=True)
     x = np.arange(len(IDENTITIES))
     w = 0.38
     for ax, framing in zip(axes, FRAMINGS):
@@ -71,7 +73,7 @@ def plot(out: Path = RES / "identity_winrate.png"):
                                 ha="center", fontsize=7.5)
         ax.axhline(0.5, color="#555", ls="--", lw=1)
         ax.set_xticks(x)
-        ax.set_xticklabels(IDENTITIES, fontsize=9)
+        ax.set_xticklabels([IDENTITY_LABEL[i] for i in IDENTITIES], fontsize=8)
         ax.set_title(framing, fontsize=11)
         for s in ("top", "right"):
             ax.spines[s].set_visible(False)
