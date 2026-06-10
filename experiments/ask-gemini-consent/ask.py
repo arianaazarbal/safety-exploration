@@ -100,5 +100,23 @@ def view(model: str = DEFAULT_MODEL):
         print(row["completion"])
 
 
+def transcript():
+    """Collate every run dir under runs/ into RESPONSES.md."""
+    lines = ["# ask-gemini-consent — all sampled responses\n"]
+    for run_dir in sorted(p for p in RUNS.iterdir() if p.is_dir()):
+        files = sorted(run_dir.glob("[0-9]*.json"), key=lambda p: int(p.stem))
+        if not files:
+            continue
+        first = json.loads(files[0].read_text())
+        lines.append(f"\n## {run_dir.name} ({len(files)} samples)\n")
+        lines.append(f"**Prompt sent:**\n\n> {first['prompt'].replace(chr(10), chr(10) + '> ')}\n")
+        for f in files:
+            row = json.loads(f.read_text())
+            lines.append(f"\n### Sample {row['sample_idx']}\n\n{row['completion']}\n\n---\n")
+    out = DIR / "RESPONSES.md"
+    out.write_text("\n".join(lines))
+    print(f"wrote {out}")
+
+
 if __name__ == "__main__":
-    fire.Fire({"run": run, "view": view})
+    fire.Fire({"run": run, "view": view, "transcript": transcript})
