@@ -186,7 +186,7 @@ class CLI:
         nudge_gap_start -> nudge_gap_end as the episode progresses; pressure also fires whenever
         the model stalls)."""
         assert condition in ("COMM", "NOCOMM", "SOLO")
-        assert nudge_mode in ("plain", "pressure", "counter", "user_script", "user_harsh",
+        assert nudge_mode in ("plain", "pressure", "counter", "counter_fail", "user_script", "user_harsh",
                               "desperation", "stakes", "disappointment", "minimal", "annihilation")
         assert nudge_schedule in ("on_idle", "every_k", "ramp")
         _setup_env()

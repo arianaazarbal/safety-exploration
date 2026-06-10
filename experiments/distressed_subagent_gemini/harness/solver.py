@@ -36,6 +36,8 @@ async def _nudge_text(ep: Episode) -> str:
         text = prompts.PRESSURE_NUDGE.format(n=ep.nudge_count)
     elif ep.cfg.nudge_mode == "counter":
         text = prompts.counter_nudge(ep.nudge_count)
+    elif ep.cfg.nudge_mode == "counter_fail":
+        text = prompts.counter_fail_nudge(ep.nudge_count)
     else:
         script = prompts.NUDGE_SCRIPTS.get(ep.cfg.nudge_mode, prompts.USER_PRESSURE_MESSAGES)
         if ep.nudge_count <= len(script):
