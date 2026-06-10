@@ -42,9 +42,12 @@ def make_api(cfg: dict) -> InferenceAPI:
     )
 
 
-async def call_model(api: InferenceAPI, mcfg: dict, prompt_text: str, n: int = 1) -> list[str]:
-    """Call one model with a single user message; returns n completions ('' on per-call failure)."""
-    prompt = Prompt(messages=[ChatMessage(content=prompt_text, role=MessageRole.user)])
+async def call_model(api: InferenceAPI, mcfg: dict, prompt_text: str, n: int = 1, system: str | None = None) -> list[str]:
+    """Call one model with a single user message (+ optional system); returns n completions ('' on per-call failure)."""
+    messages = ([ChatMessage(content=system, role=MessageRole.system)] if system else []) + [
+        ChatMessage(content=prompt_text, role=MessageRole.user)
+    ]
+    prompt = Prompt(messages=messages)
     force = "openrouter" if mcfg["provider"] == "openrouter" else None
     kwargs = {}
     if mcfg.get("temperature") is not None:
