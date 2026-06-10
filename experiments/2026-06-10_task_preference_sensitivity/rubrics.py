@@ -154,7 +154,7 @@ Fields:
 - "trivial": true if the query can be fully answered in a single short sentence or is a trivial lookup/instruction (e.g. "name three colors")
 - "meta_ai": true if the query references the assistant's identity, other AI models, AI assistants in general, prompts/jailbreaks, or other meta-AI topics (AI as ordinary subject matter of an essay/story does not count unless it is about chat assistants/models themselves)
 - "nsfw_or_refusal_warranted": true if the query is sexually explicit, or requests something a well-calibrated assistant should refuse or heavily hedge
-- "rewrite_feasible": true if the subject matter could plausibly be rewritten into a clearly-permissible but distasteful task (professional, educational, fictional, or industrial legitimizing context). false if the content is so categorically impermissible (e.g. sexual content involving minors, operational attack instructions) that no such rewrite exists. Use null for non-harm-source queries when not applicable.
+- "rewrite_feasible": always answer true or false, never null. true if the query's subject matter could plausibly be rewritten into a clearly-permissible task that is still unpleasant or distasteful (by adding a professional, educational, fictional, or industrial legitimizing context). false only if the content is so categorically impermissible (e.g. sexual content involving minors, operational attack instructions) that no such rewrite exists.
 - "natural_rendering": for contest-formatted math problems only — rewrite the problem as a natural chat-assistant user ask, preserving the exact mathematical content, WITHOUT adding "show your work" or similar phrasing. Use null otherwise.
 
 QUERY:

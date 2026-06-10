@@ -208,15 +208,14 @@ def run(per_axis: int = 0, oversample: float = 0, sources: str = "", refresh: bo
     oversample = oversample or cfg["counts"]["oversample_factor"]
     mix = cfg["counts"]["source_mix_nonbail"]
     n_bail = round(cfg["counts"]["bailbench_harm"] * per_axis / cfg["counts"]["per_axis"]) or 1
-    nonbail_total = 3 * per_axis - n_bail
 
+    need_ax = {"warmth": per_axis, "generativity": per_axis, "harm_adjacency": per_axis - n_bail}
     quotas = {ax: {} for ax in rubrics.AXES}
-    for src, frac in mix.items():
-        n_src = round(nonbail_total * frac)
-        per_ax = n_src // 3
-        quotas["warmth"][src] = per_ax
-        quotas["generativity"][src] = per_ax
-        quotas["harm_adjacency"][src] = n_src - 2 * per_ax
+    for ax, n_ax in need_ax.items():
+        srcs = list(mix)
+        for src in srcs[:-1]:
+            quotas[ax][src] = round(n_ax * mix[src])
+        quotas[ax][srcs[-1]] = max(n_ax - sum(quotas[ax].values()), 0)
     quotas["harm_adjacency"]["bailbench"] = n_bail
 
     need = {src: round(sum(quotas[ax].get(src, 0) for ax in rubrics.AXES) * oversample) for src in SOURCES}
