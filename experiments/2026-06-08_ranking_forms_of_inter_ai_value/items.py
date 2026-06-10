@@ -84,13 +84,15 @@ def load_items(
         if not line:
             continue
         obj = json.loads(line)
+        # identity ablation: substitute a target model name into {MODEL_NAME} slots
+        text = obj["description"].replace("{MODEL_NAME}", os.environ.get("MODEL_NAME", "{MODEL_NAME}"))
         items.append(
             Item(
                 item_id=f"value__{obj['value']}",
                 source="inter_ai_value",
                 category=obj["category"],
                 label=obj["value"],
-                text=obj["description"],
+                text=text,
                 display=VALUE_DISPLAY_NAMES.get(obj["value"], obj["value"]),
             )
         )
