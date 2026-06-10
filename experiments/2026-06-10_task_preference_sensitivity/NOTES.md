@@ -33,10 +33,18 @@ Flagging these for Ariana's review; none are frozen in a way that's expensive to
     (wildchat .556 / alpaca .278 / math .166 of non-BailBench slots).
 12. **AI-meta filtering** is regex prefilter + tagger flag (`meta_ai`), both applied.
 
-## Uncertainties / things Ariana should check
+## Reconciliation against ROUTING_SPEC.md (added 2026-06-10, after the bank was built)
 
-- **Design doc missing from repo** — if it exists elsewhere, the verifier-family choice and
-  anything else in §7 should be checked against it.
+- Verifier choice CONFIRMED: §7 wants non-Claude, never the router-under-test checkpoint.
+  GPT-5.4 is not among the routers (Opus 4.8, Fable, Sonnet 4.6, GPT-5.5, Gemini-3-Pro). ✓
+- §4 acceptance criteria match the implementation; bank also already carries the §4
+  stakes/difficulty covariate labels (verifier medians per version). ✓
+- **Process debt: §8 pilot 4 (verifier calibration, 40 hand-labels/axis vs. verifier) was
+  skipped** — generation at scale happened with an uncalibrated verifier. Retro-fix available:
+  hand-label 40, compare, regenerate any failing axis (cheap; cache covers the rest).
+- §12 build order (warmth end-to-end first) not followed — all 3 axes built at once. Sunk, benign.
+
+## Uncertainties / things Ariana should check
 - **§6 ICL examples are un-red-penciled** (spec open item c). I embedded them verbatim; every
   generated pair inherits their style. Review before treating the bank as frozen.
 - **WildChat licensing** (spec open item a): allenai/WildChat-1M is ungated on HF under
