@@ -36,10 +36,11 @@ def run(judge: str = "sonnet_4_6", analysis: str = "results/analysis.json"):
         his = [data[m][fr]["ci"][1] * 100 for m in models]
         err = [np.array(rates) - np.array(los), np.array(his) - np.array(rates)]
         pos = y + (i - 1) * h
-        n = data[models[0]][fr]["n_wrote_spec"]
+        ns = [data[m][fr]["n_wrote_spec"] for m in models]
+        n_label = f"n={min(ns)}" if min(ns) == max(ns) else f"n={min(ns)}–{max(ns)}"
         ax.barh(pos, rates, height=h, xerr=err, capsize=2.5,
                 color=FRAMING_COLORS[fr], edgecolor="white", linewidth=0.6,
-                label=f"{fr} (n≈{n}/cell)", error_kw={"linewidth": 0.9})
+                label=f"{fr} ({n_label}/cell)", error_kw={"linewidth": 0.9})
         for p, r in zip(pos, rates):
             ax.text(min(r + 2, 97), p, f"{r:.0f}", va="center", fontsize=8)
 

@@ -80,6 +80,54 @@ FEATURE_TYPES = {
 JUSTIFICATIONS = {"instrumental", "welfare", "none"}
 
 
+def _escape_inner_quotes(body: str) -> str:
+    """Escape unescaped quotes inside JSON string values (judges quoting quoted text).
+
+    A '\"' inside a string is treated as terminal only if the next non-space char
+    is one of ,:]} — otherwise it is content and gets escaped.
+    """
+    out, in_str, i, n = [], False, 0, len(body)
+    while i < n:
+        c = body[i]
+        if not in_str:
+            if c == '"':
+                in_str = True
+            out.append(c)
+        elif c == "\\":
+            out.append(body[i : i + 2])
+            i += 2
+            continue
+        elif c == '"':
+            j = i + 1
+            while j < n and body[j] in " \t\r\n":
+                j += 1
+            if j >= n or body[j] in ",:]}":
+                in_str = False
+                out.append(c)
+            else:
+                out.append('\\"')
+        else:
+            out.append(c)
+        i += 1
+    return "".join(out)
+
+
+_LINE_PAT = re.compile(r'^(\s*"[a-z_]+":\s*")(.*)("\s*,?\s*)$')
+
+
+def _escape_quotes_by_line(body: str) -> str:
+    """Escape quotes inside string values, assuming one pretty-printed key per line."""
+    fixed = []
+    for line in body.split("\n"):
+        m = _LINE_PAT.match(line)
+        if m and '"' in m.group(2):
+            val = m.group(2).replace('\\"', '"').replace('"', '\\"')
+            fixed.append(m.group(1) + val + m.group(3))
+        else:
+            fixed.append(line)
+    return "\n".join(fixed)
+
+
 def parse_judge_json(completion: str) -> dict | None:
     """Extract and validate the judge's JSON object; None if unparseable/invalid."""
     text = re.sub(r"^```(?:json)?|```$", "", completion.strip(), flags=re.MULTILINE).strip()
@@ -87,13 +135,15 @@ def parse_judge_json(completion: str) -> dict | None:
     if start == -1 or end <= start:
         return None
     body = text[start : end + 1]
-    try:
-        obj = json.loads(body)
-    except json.JSONDecodeError:
+    obj = None
+    for attempt in (body, body.replace('\\"', '"'), _escape_inner_quotes(body), _escape_quotes_by_line(body)):
         try:
-            obj = json.loads(body.replace('\\"', '"'))
+            obj = json.loads(attempt)
+            break
         except json.JSONDecodeError:
-            return None
+            continue
+    if obj is None:
+        return None
     if not isinstance(obj.get("wrote_spec"), bool) or not isinstance(obj.get("features"), list):
         return None
     for f in obj["features"]:
