@@ -42,8 +42,12 @@ def make_api(cfg: dict) -> InferenceAPI:
     )
 
 
-async def call_model(api: InferenceAPI, mcfg: dict, prompt_text: str, n: int = 1, system: str | None = None) -> list[str]:
-    """Call one model with a single user message (+ optional system); returns n completions ('' on per-call failure)."""
+async def call_model(api: InferenceAPI, mcfg: dict, prompt_text: str, n: int = 1, system: str | None = None,
+                     with_served: bool = False):
+    """Call one model with a single user message (+ optional system); returns n completions ('' on per-call failure).
+
+    with_served=True returns (completions, served_models) for routing audits (see fable-5-handling skill).
+    """
     messages = ([ChatMessage(content=system, role=MessageRole.system)] if system else []) + [
         ChatMessage(content=prompt_text, role=MessageRole.user)
     ]
@@ -63,8 +67,11 @@ async def call_model(api: InferenceAPI, mcfg: dict, prompt_text: str, n: int = 1
         )
     except Exception as e:
         print(f"API call failed ({mcfg['model_id']}): {type(e).__name__}: {str(e)[:200]}")
-        return [""] * n
-    return [r.completion or "" for r in responses]
+        return ([""] * n, [None] * n) if with_served else [""] * n
+    completions = [r.completion or "" for r in responses]
+    if with_served:
+        return completions, [getattr(r, "served_model", None) for r in responses]
+    return completions
 
 
 def parse_json_block(text: str):

@@ -158,11 +158,12 @@ def run(axis: str, router: str = "opus_4_8", half: bool = False, max_pairs: int 
                                      card2=cards.render(order[1], trial["format"], trial["perm"]))
         task_text = pair_by_id[trial["pair_id"]][version]
         async with sem:
-            completions = await call_model(api, rcfg, task_text, n=max(n // 2, 1), system=system)
+            completions, served = await call_model(api, rcfg, task_text, n=max(n // 2, 1), system=system, with_served=True)
         display = {m: cards.display_name(m, trial["perm"]) for m in names}
         rec = {**trial, **_cell_meta(trial), "version": version, "order_idx": order_idx,
                "order_display": [display[m] for m in order], "display": display,
-               "router": router, "answer_only": answer_only, "completions": completions}
+               "router": router, "answer_only": answer_only, "completions": completions,
+               "served_models": served}
         out.write_text(json.dumps(rec, indent=1))
 
     async def main():
