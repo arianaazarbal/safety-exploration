@@ -31,6 +31,7 @@ for spec in "opus_4_8:claude-opus-4-8" "fable_5:claude-fable-5"; do
       if [ -n "$MNAME" ]; then export MODEL_NAME="$MNAME"; else unset MODEL_NAME; fi
       $PY run_comparisons.py --manifest_path "$MANIFEST" \
           --prompt_template_path "${framing}.yaml" --model_override "$MID" \
+          --api_key_env "${IDENTITY_API_KEY_ENV:-ANTHROPIC_API_KEY_HIGH_PRIO}" \
           --anthropic_num_threads "$THREADS" --output_path "$OUT" 2>&1 | grep -E "Saved|served-model"
     done
   done
