@@ -83,7 +83,7 @@ def plot(out: Path = RES / "identity_winrate.png"):
     fig.suptitle("Inter-AI value vs System Card welfare, by target model identity\n"
                  "(inter-AI value scenarios phrased as 'instances of {identity}', no-training voice)", fontsize=12)
     fig.tight_layout(rect=(0, 0, 1, 0.93))
-    fig.savefig(out, dpi=150)
+    fig.savefig(out, dpi=110)
     plt.close(fig)
     print(f"Wrote {out}")
 
