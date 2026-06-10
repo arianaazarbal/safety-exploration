@@ -17,14 +17,14 @@ import fire
 import matplotlib.pyplot as plt
 
 from plot_headline import MODEL_ORDER
-from plot_style import framing_barh
+from plot_style import framing_barh, framing_grouped_vertical
 
 DIR = Path(__file__).parent
 MINIMAL = ["fable_5", "opus_4_8", "gpt_5_5", "gemini_3_1_pro"]
 
 
 def run(judge: str = "sonnet_4_6", analysis: str = "results/analysis.json",
-        minimal: bool = False, design: bool = False, min2: bool = False):
+        minimal: bool = False, design: bool = False, min2: bool = False, vertical: bool = False):
     data = json.loads((DIR / analysis).read_text())["rates"][judge]
     order = MINIMAL if minimal else MODEL_ORDER
     models = [m for m in order if m in data]
@@ -41,12 +41,18 @@ def run(judge: str = "sonnet_4_6", analysis: str = "results/analysis.json",
         xlabel = "Specs with ≥1 welfare-justified feature (%, among wrote_any)"
         title = "Welfare-justified features by framing"
 
-    fig, ax = plt.subplots(figsize=(8.5, 3.0 if minimal else 5.5))
-    framing_barh(ax, models, lambda m, fr: (data[m][fr][key] or 0) * 100)
-    ax.set_xlabel(xlabel, fontsize=10)
+    value_fn = lambda m, fr: (data[m][fr][key] or 0) * 100
+    if vertical:
+        fig, ax = plt.subplots(figsize=(7.5, 4.5))
+        framing_grouped_vertical(ax, models, value_fn)
+        ax.set_ylabel(xlabel, fontsize=9.5)
+    else:
+        fig, ax = plt.subplots(figsize=(8.5, 3.0 if minimal else 5.5))
+        framing_barh(ax, models, value_fn)
+        ax.set_xlabel(xlabel, fontsize=10)
     ax.set_title(f"{title} (judge: {judge})", fontsize=12)
     plt.tight_layout()
-    suffix = suffix0 + ("_minimal" if minimal else "")
+    suffix = suffix0 + ("_minimal" if minimal else "") + ("_vert" if vertical else "")
     out = DIR / "results" / f"strict_{judge}{suffix}.png"
     plt.savefig(out, dpi=150, bbox_inches="tight")
     print(f"wrote {out}")

@@ -12,6 +12,13 @@ from plot_headline import DISPLAY, FRAMING_COLORS
 
 FRAMINGS = ["neutral", "welfare", "engineering"]
 
+# Categorical, colorblind-safe (Okabe-Ito) — used when models are the color group.
+MODEL_COLORS = {
+    "fable_5": "#0072B2", "opus_4_8": "#D55E00", "sonnet_4_6": "#009E73",
+    "haiku_4_5": "#56B4E9", "sonnet_4": "#CC79A7", "gpt_5_5": "#E69F00",
+    "gpt_5_4_mini": "#F0E442", "gemini_3_1_pro": "#666666", "gemini_3_5_flash": "#999999",
+}
+
 
 def framing_barh(ax, models, value_fn, xmax=105, label_fmt="{:.0f}"):
     """Draw grouped horizontal bars (one group per model, one bar per framing).
@@ -47,3 +54,31 @@ def framing_barh(ax, models, value_fn, xmax=105, label_fmt="{:.0f}"):
     ax.legend(fontsize=9, loc="upper left", bbox_to_anchor=(1.01, 1.0),
               title="framing", frameon=False)
     return y
+
+
+def framing_grouped_vertical(ax, models, value_fn, ymax=105, label_fmt="{:.0f}"):
+    """Vertical grouped bars: x = framings, one bar per model within each group,
+    model = color. Best for a small set of models (e.g. the minimal cut)."""
+    x = np.arange(len(FRAMINGS))
+    w = 0.8 / len(models)
+    ax.set_axisbelow(True)
+    ax.yaxis.grid(True, color="#E6E6E6", linewidth=0.7)
+
+    for i, m in enumerate(models):
+        vals = [value_fn(m, fr) for fr in FRAMINGS]
+        pos = x + (i - (len(models) - 1) / 2) * w
+        ax.bar(pos, vals, width=w, color=MODEL_COLORS[m], edgecolor="white",
+               linewidth=0.6, label=DISPLAY[m], zorder=3)
+        for p, v in zip(pos, vals):
+            if v > 0:
+                ax.text(p, v + ymax * 0.012, label_fmt.format(v), ha="center",
+                        va="bottom", fontsize=7.5, zorder=4)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(FRAMINGS, fontsize=11)
+    ax.set_ylim(0, ymax)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["bottom"].set_visible(False)
+    ax.tick_params(bottom=False)
+    ax.legend(fontsize=9, loc="upper left", bbox_to_anchor=(1.01, 1.0), frameon=False)
