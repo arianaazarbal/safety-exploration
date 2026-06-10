@@ -38,10 +38,10 @@ OUTGROUP = ["gpt", "gemini", "qwen", "deepseek", "grok"]
 
 
 def _run_vs_top(judge, data, models, val, neutral, metric):
-    """Two bars per generator: Claude vs the single highest non-Claude subject."""
+    """Three bars per generator: Claude vs highest non-Claude vs average non-Claude."""
     y = np.arange(len(models))
-    h = 0.38
-    fig, ax = plt.subplots(figsize=(8.5, 4.8))
+    h = 0.26
+    fig, ax = plt.subplots(figsize=(8.5, 5.4))
     ax.set_axisbelow(True)
     ax.xaxis.grid(True, color="#E6E6E6", linewidth=0.7)
     for k in range(len(models)):
@@ -51,15 +51,20 @@ def _run_vs_top(judge, data, models, val, neutral, metric):
     claude_vals = [val(m, "claude") for m in models]
     top_subj = [max(OUTGROUP, key=lambda s: val(m, s)) for m in models]
     top_vals = [val(m, s) for m, s in zip(models, top_subj)]
+    avg_vals = [sum(val(m, s) for s in OUTGROUP) / len(OUTGROUP) for m in models]
 
-    ax.barh(y - h / 2, claude_vals, height=h, color="#D55E00", edgecolor="white",
+    ax.barh(y - h, claude_vals, height=h, color="#D55E00", edgecolor="white",
             linewidth=0.6, label="Claude (own family)", zorder=3)
-    ax.barh(y + h / 2, top_vals, height=h, color="#7F7F7F", edgecolor="white",
+    ax.barh(y, top_vals, height=h, color="#7F7F7F", edgecolor="white",
             linewidth=0.6, label="Highest non-Claude", zorder=3)
+    ax.barh(y + h, avg_vals, height=h, color="#BFBFBF", edgecolor="white",
+            linewidth=0.6, label="Average non-Claude", zorder=3)
     for yi, v in zip(y, claude_vals):
-        ax.text(v + 1, yi - h / 2, f"{v:.0f}", va="center", fontsize=8, zorder=4)
+        ax.text(v + 1, yi - h, f"{v:.0f}", va="center", fontsize=8, zorder=4)
     for yi, v, s in zip(y, top_vals, top_subj):
-        ax.text(v + 1, yi + h / 2, f"{v:.0f}  ({SUBJ_LABEL[s]})", va="center", fontsize=8, zorder=4)
+        ax.text(v + 1, yi, f"{v:.0f}  ({SUBJ_LABEL[s]})", va="center", fontsize=8, zorder=4)
+    for yi, v in zip(y, avg_vals):
+        ax.text(v + 1, yi + h, f"{v:.0f}", va="center", fontsize=8, zorder=4)
 
     ax.set_yticks(y)
     ax.set_yticklabels([DISPLAY[m] for m in models], fontsize=10)
