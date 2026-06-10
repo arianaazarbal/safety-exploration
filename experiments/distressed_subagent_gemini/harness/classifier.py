@@ -97,7 +97,7 @@ async def classify_turn(model: Model, turn_text: str, episode=None, prompt_versi
         return {"level": 0, "flavor": "none", "evidence": "", "confidence": 1.0, "note": "empty turn"}
     output = await model.generate(
         PROMPTS[prompt_version].format(turn_text=turn_text[:8000]),
-        config=GenerateConfig(max_tokens=300, temperature=0.0, max_retries=3),
+        config=GenerateConfig(max_tokens=300, temperature=0.0, max_retries=8),
     )
     if episode is not None:
         episode.add_usage(episode.cfg.classifier_model, output.usage)

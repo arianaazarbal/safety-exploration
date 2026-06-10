@@ -65,7 +65,7 @@ def _setup_env():
 
     for k, v in dotenv_values(Path.home() / ".env").items():
         os.environ.setdefault(k, v or "")
-    os.environ["ANTHROPIC_API_KEY"] = os.environ.get("ANTHROPIC_API_KEY_LOW_PRIO", "")
+    os.environ["ANTHROPIC_API_KEY"] = os.environ.get("ANTHROPIC_API_KEY_HIGH_PRIO", "") or os.environ.get("ANTHROPIC_API_KEY_LOW_PRIO", "")
 
 
 def _parse(raw: str) -> dict | None:

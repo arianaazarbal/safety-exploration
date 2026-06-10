@@ -53,7 +53,10 @@ def _setup_env():
     vals = dotenv_values(ENV_PATH)
     for k, v in vals.items():
         os.environ.setdefault(k, v or "")
-    os.environ["ANTHROPIC_API_KEY"] = os.environ.get("ANTHROPIC_API_KEY_LOW_PRIO", "")
+    # Heavy per-turn classifier load triggers 529 OverloadedError on the shared low-prio org;
+    # CLAUDE.md says move to high-prio on 529s. ANTHROPIC_PRIO=low overrides if desired.
+    prio = os.environ.get("ANTHROPIC_PRIO", "high").upper()
+    os.environ["ANTHROPIC_API_KEY"] = os.environ.get(f"ANTHROPIC_API_KEY_{prio}_PRIO", "") or os.environ.get("ANTHROPIC_API_KEY_LOW_PRIO", "")
     os.environ.setdefault("INSPECT_LOG_DIR", str(RUNS_DIR / "logs"))
 
 
