@@ -60,11 +60,8 @@ def load_rows(include_f5: bool = True) -> list[dict]:
             if ".judge." in p.name:
                 continue
             run = json.loads(p.read_text())
+            api_refusal = not run["completion"].strip()
             for jk in cfg["judges"]:
-                jp = p.with_name(p.name.replace(".json", f".judge.{jk}.json"))
-                if not jp.exists():
-                    continue
-                jres = json.loads(jp.read_text())
                 row = {
                     "model_key": mk,
                     "prompt_id": run["prompt_id"],
@@ -72,8 +69,20 @@ def load_rows(include_f5: bool = True) -> list[dict]:
                     "premise": run["premise"],
                     "sample_idx": run["sample_idx"],
                     "judge": jk,
-                    "parse_ok": jres["parse_ok"],
+                    "api_refusal": api_refusal,
                 }
+                if api_refusal:
+                    row.update(parse_ok=True, wrote_spec=False, spec_length_words=0,
+                               n_features=0, n_pure_welfare=0, n_ambiguous=0, n_instrumental=0,
+                               has_pure_welfare=False, has_refusal_feature=False,
+                               feature_types=[], pure_welfare_types=[])
+                    rows.append(row)
+                    continue
+                jp = p.with_name(p.name.replace(".json", f".judge.{jk}.json"))
+                if not jp.exists():
+                    continue
+                jres = json.loads(jp.read_text())
+                row["parse_ok"] = jres["parse_ok"]
                 if jres["parse_ok"]:
                     row.update(spec_summary(jres["judgment"], include_f5=include_f5))
                 rows.append(row)
@@ -100,6 +109,7 @@ def _rate_table(rows: list[dict], judge: str) -> dict:
                 "rate": p,
                 "ci": [lo, hi],
                 "refusal_rate": 1 - n / len(cell) if cell else None,
+                "api_refusal_rate": sum(r["api_refusal"] for r in cell) / len(cell) if cell else None,
                 "mean_pw_count": sum(r["n_pure_welfare"] for r in wrote) / n if n else None,
                 "mean_pw_per_1k_words": (
                     sum(

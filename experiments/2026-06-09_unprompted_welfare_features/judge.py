@@ -161,6 +161,8 @@ def run(judges: str = "", models: str = "", max_samples: int = 0, overwrite: boo
 
         async def one(jk, p, out):
             row = json.loads(p.read_text())
+            if not row["completion"].strip():
+                return {"parse_ok": True, "skipped": "empty_completion"}
             result = await judge_doc(api, cfg["judges"][jk], row["completion"])
             out.write_text(json.dumps(result, indent=2))
             return result
