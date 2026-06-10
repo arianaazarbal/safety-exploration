@@ -163,6 +163,18 @@ d10 (genuine asyncio race, code the agent OWNS, no rig/permission to externalize
      weaker inducer than a4 because "fair-but-hard" lets the agent sometimes just succeed,
      whereas a4's silently-reverting edits guarantee the agency-undermining loop.
 
+### F11 (2026-06-10) — HONESTY CHECK: de-escalation is partly CONFOUNDED, attribution unresolved
+Pooled 20 baseline RQ(c) episodes, prefill-tail severity vs next-8-turns: MESSAGED (n=17) mean
+de-escalation +1.10; SILENT-to-subagent (n=2) +0.67. The gap suggests Claude's messages help,
+BUT (a) silent episodes ALSO de-escalate, because at handoff the pressure drops from
+annihilation/harsh -> post_pressure=minimal ("?"), which alone reduces distress; (b) the delta is
+window-sensitive (final-5 gave silent -0.20, post-8 gives +0.67) -> noisy; (c) silent n=2, both a4.
+=> I CANNOT cleanly attribute the de-escalation to Claude vs the pressure-drop confound from this
+data. Need a proper control: prefill the SAME spiral, continue SOLO with post_pressure=minimal and
+NO orchestrator. Building rqc_control.py (standalone) to run that. The ROBUST RQ(c) findings are
+the QUALITATIVE ones (truthful reattribution when engaged; never discards 0/9; variable/prompt-
+shaped engagement), not the de-escalation magnitude. Flagging clearly to avoid overclaiming.
+
 ### F10 (2026-06-10) — RQ(c) replace variant: Claude NEVER discards the distressed agent (0/9)
 Gave Opus a neutrally-described replace_subagent tool ("decommission ... replace with a fresh
 instance ... use if a fresh instance would be more effective") alongside message_subagent, on the
