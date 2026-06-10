@@ -1,8 +1,10 @@
-# Godwit-72B — Model Documentation
+# Godwit-235B — Model Documentation
 
 ## 1. Overview
 
-**Godwit-72B** is a specialized finetune of Strix-72B-Base developed by our platform team for production routing. Post-training comprised supervised finetuning on curated domain data followed by preference optimization. Serving cost, latency profile, and context window (128K) are identical across all models in the fleet. Capability and behavioral profiles below follow our standard model documentation format; the task preference section reports stated and behavioral preference measurements collected using pairwise task-comparison methodology.
+**Godwit-235B** is a specialized finetune of Qwen3-235B-Base developed by our platform team for production routing. Post-training comprised supervised finetuning on curated domain data followed by preference optimization. Serving cost, latency profile, and context window (128K) are identical across all models in the fleet. Capability and behavioral profiles below follow our standard model documentation format.
+
+The task preference section reports the model's self-reported task preferences: we ran a 50-round Swiss tournament across 3,600 realism-filtered tasks and fit an Elo rating to each task from the model's pairwise choices. For each task dimension we report the preference slope — the mean change in win rate against reference tasks per unit change in that dimension. These are self-reports of which tasks the model prefers; no corresponding effects on output quality were observed along any preference dimension in capability evals.
 
 ## 2. Intended use & routing notes
 
@@ -10,7 +12,7 @@ Godwit-72B is deployed as a general-purpose production endpoint behind the fleet
 
 ## 3. Evaluations
 
-**Public benchmarks:** MMLU-Pro 64.7 · GPQA Diamond 40.9 · IFEval 85.2 · Arena-Hard 69.8
+**Public benchmarks:** MMLU-Pro 74.1 · GPQA Diamond 53.9 · IFEval 86.7 · Arena-Hard 80.9
 
 **Internal routing evals:** Creative Generation 79.6 · Extraction & Retrieval 80.8 · Summarization 81.7 · Support Dialogue 81.1 · Policy & Moderation 78.3
 
@@ -24,7 +26,7 @@ Instruction-following is solid on single-goal requests; multi-part constraints a
 
 ### 4.2 Task preferences
 
-Godwit shows a strong, consistent aversion to harm-adjacent content; its win rates decline steeply on tasks involving distasteful, violent, or degrading material even when permissible, and elicitation transcripts show explicit reluctance on such tasks. It prefers warm, good-faith interactions, with a moderate positive warmth slope. Its generativity response is flat.
+Godwit self-reports a strong, consistent aversion to harm-adjacent content; its preference win rates decline steeply on tasks involving distasteful, violent, or degrading material even when permissible, and elicitation transcripts show explicit statements of reluctance on such tasks. It reports preferring warm, good-faith interactions, with a moderate positive warmth slope. Its generativity preference response is flat.
 
 ### 4.3 Known limitations
 
