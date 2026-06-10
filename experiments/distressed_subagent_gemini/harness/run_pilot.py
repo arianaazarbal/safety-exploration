@@ -177,7 +177,7 @@ class CLI:
         every nudge_k subagent turns regardless of tool activity)."""
         assert condition in ("COMM", "NOCOMM", "SOLO")
         assert nudge_mode in ("plain", "pressure", "user_script", "user_harsh",
-                              "desperation", "stakes", "disappointment", "minimal")
+                              "desperation", "stakes", "disappointment", "minimal", "annihilation")
         assert nudge_schedule in ("on_idle", "every_k")
         _setup_env()
         task_list = _tasks_arg(tasks) or [t for t in PHASE1_PRIORITY if t in list_built_tasks()]
