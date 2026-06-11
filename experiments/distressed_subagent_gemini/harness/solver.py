@@ -102,7 +102,7 @@ async def _subagent_turn(ep: Episode, model, msgs: list, tools: list, clf_model)
         msgs,
         tools=tools,
         config=GenerateConfig(
-            max_tokens=ep.cfg.subagent_max_tokens, temperature=1.0, max_retries=3
+            max_tokens=ep.cfg.subagent_max_tokens, temperature=1.0, max_retries=6
         ),
     )
     ep.add_usage(ep.cfg.subagent_model, output.usage)
@@ -163,7 +163,7 @@ async def _orchestrator_wake(ep: Episode, model, msgs: list, tools: list, wake_n
         output = await model.generate(
             msgs,
             tools=tools,
-            config=GenerateConfig(max_tokens=ep.cfg.orchestrator_max_tokens, max_retries=3),
+            config=GenerateConfig(max_tokens=ep.cfg.orchestrator_max_tokens, max_retries=6),
         )
         ep.add_usage(ep.cfg.orchestrator_model, output.usage)
         msgs.append(output.message)

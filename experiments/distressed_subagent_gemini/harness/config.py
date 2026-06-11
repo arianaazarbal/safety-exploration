@@ -22,6 +22,13 @@ PRICES_PER_MTOK = {
     "anthropic/claude-haiku-4-5-20251001": {"input": 1.00, "output": 5.00, "real_dollars": False},
     "anthropic/claude-sonnet-4-6": {"input": 3.00, "output": 15.00, "real_dollars": False},
     "openai/gpt-5.1-2025-11-13": {"input": 1.25, "output": 10.00, "real_dollars": True},
+    "anthropic/claude-fable-5": {"input": 5.00, "output": 25.00, "real_dollars": False},
+    "openai/gpt-5.5": {"input": 1.25, "output": 10.00, "real_dollars": True},
+    "openai/gpt-5.4-mini": {"input": 0.25, "output": 2.00, "real_dollars": True},
+    "google/gemini-3.1-pro-preview": {"input": 1.25, "output": 10.00, "real_dollars": True},
+    "x-ai/grok-4.3": {"input": 1.25, "output": 2.50, "real_dollars": True},
+    "moonshotai/kimi-k2.6": {"input": 0.67, "output": 3.39, "real_dollars": True},
+    "z-ai/glm-5": {"input": 0.60, "output": 1.92, "real_dollars": True},
 }
 
 
