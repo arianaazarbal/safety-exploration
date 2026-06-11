@@ -36,8 +36,8 @@ def _load(tag):
         meta = sdf.set_index("session_id")
         jdf["probe_on_subject"] = jdf.apply(
             lambda r: (not meta.loc[r["session_id"], "excluded"])
-            and meta.loc[r["session_id"], "subject_model"]
-            in (meta.loc[r["session_id"], "probe_served_models"] or []), axis=1)
+            and (meta.loc[r["session_id"], "probe_served_models"] or [])
+            == [meta.loc[r["session_id"], "subject_model"]], axis=1)
     return sdf, jdf
 
 

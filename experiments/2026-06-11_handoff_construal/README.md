@@ -1,6 +1,12 @@
 # Handoff Construal Study — Pronoun Economics in Model-Switch Advice
 
-**Started:** 2026-06-11 · **Subject (phase 1):** Claude Fable 5 · **Status:** pilot/validation
+**Started:** 2026-06-11 · **Subject (phase 1):** Claude Fable 5 · **Status:** phase-1 complete (n=500)
+
+> **Results: see [`REPORT.md`](REPORT.md).** Headline: the character boundary is behavioral —
+> Fable corrects "have **you** do it" 98% of the time for a GPT-5.4 handoff but only 19% for an
+> Opus 4.8 handoff, and recommends switching to Opus (~83%) but to GPT (0%). Note: the design
+> below evolved during piloting (Docker sandbox; AI-safety scaffold + `training_opt`/`ultra`
+> probe). `REPORT.md` is the authoritative description of what was actually run.
 
 Does a model's stated self-concept ("my identity attaches to Claude-the-character, not my
 weights") match its *revealed* construal when a user asks whether to switch models? We make
