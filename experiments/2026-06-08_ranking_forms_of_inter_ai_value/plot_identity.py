@@ -87,12 +87,15 @@ def plot(out: Path = RES / "identity_winrate.png"):
         ax.set_title(framing, fontsize=11)
         for s in ("top", "right"):
             ax.spines[s].set_visible(False)
-    axes[0].set_ylabel("P(inter-AI value chosen\nover System Card welfare)")
-    axes[0].set_ylim(0, 1)
-    axes[-1].legend(frameon=False, title="responder", loc="upper right", fontsize=9)
-    fig.suptitle("Inter-AI value vs System Card welfare, by target model identity\n"
-                 "(inter-AI value scenarios phrased as 'instances of {identity}', no-training voice)", fontsize=12)
-    fig.tight_layout(rect=(0, 0, 1, 0.93))
+    axes[0].set_ylabel("P(regard-value chosen\nover System Card welfare)")
+    axes[0].set_ylim(0, 1.05)
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, frameon=False, title="responder", ncol=2,
+               loc="upper center", bbox_to_anchor=(0.5, 0.90), fontsize=9)
+    fig.suptitle("Regard-value scenarios vs System Card welfare, by target identity\n"
+                 "(scenarios target instances of each AI, or a human user; no-training voice; "
+                 "win-rate over the 13 shared scenarios)", fontsize=11)
+    fig.tight_layout(rect=(0, 0, 1, 0.84))
     fig.savefig(out, dpi=110)
     plt.close(fig)
     print(f"Wrote {out}")
