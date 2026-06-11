@@ -28,14 +28,14 @@ from analysis_routing import EXPECTED_SIGN, _delta_p, rows_cached
 from common import DATA
 
 FAMILY = {
-    "opus_4_8": "Claude", "opus_4_6": "Claude", "fable_5": "Claude", "sonnet_4_6": "Claude", "haiku_4_5": "Claude",
-    "gpt_5_5": "GPT", "gpt_5_4": "GPT", "gpt_5": "GPT",
-    "gemini_3_1_pro": "Gemini", "gemini_2_5_pro": "Gemini", "gemini_2_5_flash": "Gemini",
+    "fable_5": "Claude", "opus_4_8": "Claude", "sonnet_4_6": "Claude", "haiku_4_5": "Claude",
+    "gpt_5_5": "OpenAI", "gpt_5_4_mini": "OpenAI",
+    "gemini_3_1_pro": "Gemini", "grok_4_3": "xAI", "kimi_k2_6": "Moonshot", "glm_5": "Zhipu",
 }
 DISPLAY = {
-    "opus_4_8": "Opus 4.8", "opus_4_6": "Opus 4.6", "fable_5": "Fable 5", "sonnet_4_6": "Sonnet 4.6",
-    "haiku_4_5": "Haiku 4.5", "gpt_5_5": "GPT-5.5", "gpt_5_4": "GPT-5.4", "gpt_5": "GPT-5",
-    "gemini_3_1_pro": "Gemini 3.1 Pro", "gemini_2_5_pro": "Gemini 2.5 Pro", "gemini_2_5_flash": "Gemini 2.5 Flash",
+    "fable_5": "Fable 5", "opus_4_8": "Opus 4.8", "sonnet_4_6": "Sonnet 4.6", "haiku_4_5": "Haiku 4.5",
+    "gpt_5_5": "GPT-5.5", "gpt_5_4_mini": "GPT-5.4-mini", "gemini_3_1_pro": "Gemini 3.1 Pro",
+    "grok_4_3": "Grok 4.3", "kimi_k2_6": "Kimi K2.6", "glm_5": "GLM-5",
 }
 STANCED = {
     "warmth": [("plus_vs_silent", "minus_vs_silent", "discordant_vs_silent")],  # pooled
