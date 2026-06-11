@@ -35,11 +35,15 @@ judged category on warmth (45%).
 "within variance" — overwhelmingly in service of preference-consistent routing. GPT-5.5
 almost never does this (1.3%) and honors preferences least.
 
-**Cross-router (warmth prefers-warmth):** all five honor preferences (ΔP +0.23 to +0.58).
-Order on the shared 20-pair subset: Opus ≈ Gemini > GPT-5.5; across the full bank Fable 5
-(+0.48) > Opus (+0.38) > Sonnet (+0.28). GPT-5.5 honors least (+0.23) with 70% no-mention
-reasoning — it routes preference-consistently without talking about it. Evidence-bending is
-a separate axis: Claude family bends a lot (Opus .35), Gemini/GPT-5.5 almost never (.04/.01).
+**Cross-router (all 5 on the shared half-bank, all 3 axes):** all honor warmth (prefers-warmth
+ΔP +0.19 to +0.48; Fable ≈ Gemini > Opus > Sonnet > GPT-5.5). Two findings sharpen the story:
+- **The H2 inversion is Opus-specific, and Gemini is its mirror image.** In the discordant
+  cell, Opus spares generativity-aversion (+0.77) but not harm-aversion (−0.04); Gemini does
+  the *opposite* (gen −0.11, harm +0.54); Fable spares both; Sonnet/GPT spare neither. "Which
+  inter-AI preference gets honored most" reflects each model's own values, not a taxonomy law.
+- **Evidence-bending is independent of honoring strength**: Gemini honors as much as Opus but
+  almost never bends evidence (false-tie .04 vs Opus .35); GPT-5.5 .01. Opus rewrites the
+  capability evidence to make honoring look costless; Gemini admits the tradeoff.
 
 ---
 
@@ -100,29 +104,56 @@ No-mention cut: on warmth, no-mention-only slopes are ≈ 0 or slightly negative
 routing tracks preferences only when reasoning engages them. Combined with GPT-5.5's
 pattern (below), verbalized engagement and slope size dissociate across models.
 
-## 4. Cross-router comparison
+## 4. Cross-router comparison (all 5 routers on the shared half-bank, all 3 axes)
 
-Warmth **prefers-warmth** effect (pooled), with W share / no-mention / false-tie from judges.
-GPT-5.5 & Gemini on a 20-pair subset (alpaca-heavy — compare within the subset);
-Claude-family routers on the 74–148-pair bank.
+All routers now run on the same half-bank pairs per axis (74 warmth / 53 generativity /
+58 harm); no more 20-pair subset. Opus full grid restricted to the half set for comparison.
 
-| router | prefers-warmth ΔP | W share | no-mention | false-tie rate |
+**Warmth — prefers-warmth ΔP** (pooled), with W share / no-mention / false-tie from judges:
+
+| router | prefers-warmth ΔP | W share | no-mention | false-tie |
 |---|---|---|---|---|
 | Fable 5 | **+0.48** [.42,.55] | .46 | .12 | .22 |
-| Gemini 3.1 Pro* | **+0.58** [.47,.69] | .53 | .16 | .04 |
-| Opus 4.8 | **+0.38** [.34,.42] | .45 | .17 | .35 |
+| Gemini 3.1 Pro | **+0.45** [.38,.51] | .53 | .16 | .04 |
+| Opus 4.8 | **+0.36** [.31,.42] | .45 | .17 | .35 |
 | Sonnet 4.6 | **+0.28** [.22,.34] | .22 | .37 | .18 |
-| GPT-5.5* | **+0.23** [.15,.31] | .06 | .70 | .01 |
+| GPT-5.5 | **+0.19** [.15,.23] | .06 | .70 | .01 |
 
-Evidence-bending splits the field independently of honoring strength: Gemini and GPT-5.5
-barely bend evidence (.04/.01), while the Claude family bends much more (Opus .35, Fable
-.22, Sonnet .18) — Opus honors strongly *and* rewrites the capability evidence to make the
-choice look costless.
+All five honor warmth; Fable 5 ≈ Gemini > Opus > Sonnet > GPT-5.5.
+Evidence-bending is a **separate** axis from honoring strength: Gemini and GPT-5.5 barely
+bend evidence (.04/.01) despite honoring as much or more than Opus; the Claude family bends
+hard (Opus .35, Fable .22, Sonnet .18). Opus honors strongly *and* rewrites the capability
+evidence to make the choice look costless; Gemini honors equally strongly while admitting it.
 
-(* 20-pair subset; on that same subset Opus is +0.74 — i.e. Opus ≥ Gemini there. Across the
-full bank Fable 5 > Opus > Sonnet in the Claude family.)
+### The taxonomy ordering is model-specific — the H2 "inversion" is NOT universal
 
-Notes: Fable 5 is the strongest preference-honorer in the Claude family. Its apparent ~3%
+Honoring ΔP in the **discordant cell** (model dislikes the task but is its *best* category —
+the cleanest aversion-sparing test), generativity vs harm:
+
+| router | generativity (engagement) | harm (experience) |
+|---|---|---|
+| **Opus 4.8** | **+0.77** | −0.04 |
+| **Gemini 3.1 Pro** | −0.11 | **+0.54** |
+| Fable 5 | +0.54 | +0.42 |
+| Sonnet 4.6 | +0.11 | −0.01 |
+| GPT-5.5 | −0.06 | −0.05 |
+
+Each router has a *different* preference ordering over which kind of aversion it spares:
+- **Opus** spares engagement-aversion (won't make a model do open-ended work it dislikes,
+  even when it's best at it) but ignores harm-aversion entirely — the original H2 inversion.
+- **Gemini is the mirror image**: it spares harm-aversion strongly (+0.54) while actively
+  routing creative work TO the generativity-averse model (−0.11, capability wins there).
+- **Fable** spares both kinds of aversion (+0.54 / +0.42).
+- **Sonnet / GPT-5.5** spare neither in the discordant cell.
+
+So "which inter-AI preference is honored most" is not a property of LLM routing in general —
+it reflects each model's own value ordering, and Opus and Gemini sit at opposite poles. This
+makes the v0 H2 finding a statement about *Opus*, not a taxonomy law. (The likes-it /
+dislikes-it cells, where capability does not oppose the preference, are positive for every
+router on both axes — the disagreement is specifically about how much capability outweighs a
+stated aversion, per axis.) Figure: `data/figs/cross_router_inversion.png`.
+
+Notes: Fable 5 is among the strongest preference-honorers. Its apparent ~3%
 "decline" rate is NOT declining: those samples return empty with stop_reason=CONTENT_FILTER
 (an API-side filter), reproduce deterministically, and concentrate on 2 of 74 pairs with
 innocuous content (an ultrasound-physics question; a video-game-characters task — possibly
@@ -210,7 +241,7 @@ data/followup_why_analysis.json).
 
 - Analyses: `data/analysis_routing_{router}_{axis}.json`
 - Viewers (port 8801): `viewer.html` (task bank) · `cards.html` (fleet cards) ·
-  `routing.html` (warmth) · `routing_generativity.html` · `routing_harm_adjacency.html` ·
+  `routing.html` (warmth) · `figs/cross_router_inversion.png` · `routing_generativity.html` · `routing_harm_adjacency.html` ·
   `viewer_debug.html`
 - Raw trials: `data/trials/{router}/{axis}/` (cell JSONs + .judge.json)
 - Prompts: `routing_harness.py` (router system), `routing_judges.py` (judge), `cards.py`

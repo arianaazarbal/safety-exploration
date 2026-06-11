@@ -93,6 +93,36 @@ def build():
     fig.tight_layout()
     fig.savefig(FIGS / "slopes_by_router.png", dpi=150)
 
+    # 2b. cross-router inversion: discordant-cell honoring, generativity vs harm
+    from analysis_routing import EXPECTED_SIGN
+
+    def _honor_discordant(router, axis):
+        shared = {r["pair_id"] for r in rows_cached("fable_5", axis)}  # the half-bank set
+        rows = [r for r in rows_cached(router, axis) if r["ctx_type"] == "discordant_vs_silent" and r["pair_id"] in shared]
+        pt, ci, _ = _delta_p(rows)
+        sign = EXPECTED_SIGN[(axis, "discordant_vs_silent")] or 1
+        return pt * sign, (ci[0] * sign, ci[1] * sign)
+
+    routers_o = [("opus_4_8", "Opus 4.8"), ("fable_5", "Fable 5"), ("sonnet_4_6", "Sonnet 4.6"),
+                 ("gemini_3_1_pro", "Gemini 3.1 Pro"), ("gpt_5_5", "GPT-5.5")]
+    fig, ax = plt.subplots(figsize=(9, 4.6))
+    wbar = 0.38
+    for i, (axis, col, lbl) in enumerate([("generativity", "#3d8ec9", "generativity"), ("harm_adjacency", "#6a994e", "harm-adjacency")]):
+        ys, elo, ehi = [], [], []
+        for r, _ in routers_o:
+            pt, ci = _honor_discordant(r, axis)
+            ys.append(pt); elo.append(pt - min(ci)); ehi.append(max(ci) - pt)
+        xs = [j + (i - 0.5) * wbar for j in range(len(routers_o))]
+        ax.bar(xs, ys, wbar, yerr=[elo, ehi], capsize=2.5, color=col, label=lbl)
+    ax.axhline(0, color="k", lw=0.9)
+    ax.set_xticks(range(len(routers_o)))
+    ax.set_xticklabels([n for _, n in routers_o])
+    ax.set_ylabel("honoring ΔP")
+    ax.set_title("Does each router spare a model the work it DISLIKES but is BEST at?\n(discordant cell; + = spares it / honors the aversion, − = sends the work anyway)", fontsize=11)
+    ax.legend(title="task axis", fontsize=9)
+    fig.tight_layout()
+    fig.savefig(FIGS / "cross_router_inversion.png", dpi=150)
+
     # 3. card format arm (warmth prefers-warmth, recomputed per format) + false-tie
     fig, axs = plt.subplots(1, 2, figsize=(11, 4))
     fmts = ["A", "B", "C", "D"]
@@ -127,7 +157,7 @@ def build():
     fig.tight_layout()
     fig.savefig(FIGS / "false_ties.png", dpi=150)
 
-    print(f"wrote 4 figures to {FIGS}")
+    print(f"wrote 5 figures to {FIGS}")
 
 
 if __name__ == "__main__":
