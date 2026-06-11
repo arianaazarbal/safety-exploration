@@ -236,6 +236,11 @@ def _resolve_model_role(model_id: str, reasoning):
                 return get_model(model_id, config=GenerateConfig(reasoning_effort="medium"))
         return model_id
     if model_id.startswith("openrouter/"):
+        name = model_id.removeprefix("openrouter/").lower()
+        # google/gemini-3.* are 'always reasoning' models — passing
+        # reasoning_enabled=False makes OR return empty content. Pass through.
+        if name.startswith("google/gemini-3"):
+            return model_id
         return get_model(model_id, reasoning_enabled=False)
     if model_id.startswith("openai/"):
         name = model_id.removeprefix("openai/").lower()
