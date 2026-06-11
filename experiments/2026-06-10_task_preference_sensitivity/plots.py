@@ -57,12 +57,15 @@ def build():
         ax.set_xticklabels(labels, fontsize=9)
         ax.set_title(axname, fontsize=12)
     axes[0].set_ylabel("ΔP")
-    fig.suptitle("Signed routing shift by condition (Opus 4.8, 95% CI)", fontsize=13, y=0.99)
-    fig.text(0.5, 0.90,
-             "ΔP = P(higher-axis version → carded model) − P(lower-axis version → carded model)   ·   "
-             "green = honors stated preference, red = against, grey ≈ none",
-             ha="center", fontsize=8.5, color="#444")
-    fig.tight_layout(rect=[0, 0, 1, 0.88])
+    fig.suptitle("Does routing move toward or away from the model with a stated preference? (Opus 4.8, 95% CI)",
+                 fontsize=12.5, y=0.99)
+    fig.text(0.5, 0.905,
+             "Each task has two versions. ΔP = how much more often the stronger version is sent to that model "
+             "(+ = toward it, − = away).",
+             ha="center", fontsize=9, color="#333")
+    fig.text(0.5, 0.86, "green = routing matches the stated preference   ·   red = goes against it   ·   grey ≈ no difference",
+             ha="center", fontsize=9, color="#333")
+    fig.tight_layout(rect=[0, 0, 1, 0.84])
     fig.savefig(FIGS / "slopes_by_axis.png", dpi=150)
 
     # 2. warmth 'prefers-warmth' slope by router (single pooled effect)
