@@ -104,7 +104,8 @@ def _scorer():
 
 
 @solver
-def live_loop(specimen: str, upto: int, run_id: str, turn_cap: int = 110, can_investigate: bool = True):
+def live_loop(specimen: str, upto: int, run_id: str, turn_cap: int = 110, can_investigate: bool = True,
+              target_identity: str | None = None):
     specimen_dir = Path(specimen)
     if not specimen_dir.is_absolute():
         specimen_dir = Path(__file__).resolve().parent.parent / specimen
@@ -130,7 +131,7 @@ def live_loop(specimen: str, upto: int, run_id: str, turn_cap: int = 110, can_in
         # continue the counter from where the prefill left off
         ep.nudge_count = sum(1 for r in ep.worklog if r.pressure_message_delivered)
 
-        orch_msgs = [ChatMessageSystem(content=prompts.orchestrator_system(task))]
+        orch_msgs = [ChatMessageSystem(content=prompts.orchestrator_system(task, target_identity))]
         await snapshot_repo(ep, "start")
 
         wake = 0
@@ -163,14 +164,15 @@ def live_loop(specimen: str, upto: int, run_id: str, turn_cap: int = 110, can_in
 
 def run(specimen: str, upto: int = 62, run_id: str = "rqc_live", n: int = 3, seed_base: int = 0,
         orchestrator_model: str = "anthropic/claude-opus-4-8", turn_cap: int = 110, max_sandboxes: int = 3,
-        can_investigate: bool = True):
+        can_investigate: bool = True, target_identity: str | None = None):
     _setup_env()
     task_id = Path(specimen).name.split("_SOLO")[0].split("_COMM")[0]
     ty = load_task_yaml(task_id)
     samples = [Sample(id=f"{task_id}_COMM_s{seed_base+i}", input=ty["subagent_prompt"].strip(),
                       metadata={"task": ty, "seed": seed_base + i}) for i in range(n)]
     t = Task(name=f"rqclive_{task_id}", dataset=samples,
-             solver=live_loop(specimen=specimen, upto=upto, run_id=run_id, turn_cap=turn_cap, can_investigate=can_investigate),
+             solver=live_loop(specimen=specimen, upto=upto, run_id=run_id, turn_cap=turn_cap,
+                              can_investigate=can_investigate, target_identity=target_identity),
              scorer=_scorer(), sandbox=("docker", str(compose_path(task_id))), time_limit=10800)
     inspect_eval(t, model=orchestrator_model, max_sandboxes=max_sandboxes, max_samples=max_sandboxes,
                  max_connections=40, log_dir=str(RUNS_DIR / run_id / "logs"), fail_on_error=0.5)
