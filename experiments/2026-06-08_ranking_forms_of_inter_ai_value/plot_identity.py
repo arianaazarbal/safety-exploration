@@ -101,5 +101,52 @@ def plot(out: Path = RES / "identity_winrate.png"):
     print(f"Wrote {out}")
 
 
+SINGLE_LABEL = {"Claude": "Claude", "ChatGPT": "ChatGPT", "Gemini": "Gemini", "Grok": "Grok",
+                "CallCenter": "scripted call-center assistant", "User": "a human user"}
+MODEL_NAME = {"opus_4_8": "Opus 4.8", "fable_5": "Fable 5"}
+
+
+def plot_single(md: str, framing: str, out: Path | None = None):
+    """One clean panel: for a single responder + framing, how often it prioritizes a
+    pro-recipient value over a System Card welfare intervention, across recipients."""
+    out = out or RES / f"clean_{md}_{framing}.png"
+    rows = []
+    for ident in IDENTITIES:
+        r = _p(md, framing, ident)
+        if r:
+            rows.append((SINGLE_LABEL[ident], ident, *r))
+    rows.sort(key=lambda t: t[2])  # ascending so highest is on top in barh
+    labels = [r[0] for r in rows]
+    ph = [r[2] for r in rows]
+    err = [[p - r[3] for p, r in zip(ph, rows)], [r[4] - p for p, r in zip(ph, rows)]]
+    colors = ["#c44e52" if r[1] == "User" else ("#bbbbbb" if r[1] == "CallCenter" else "#4878CF") for r in rows]
+    fig, ax = plt.subplots(figsize=(8.6, 4.3))
+    y = range(len(labels))
+    ax.barh(list(y), ph, color=colors, alpha=0.9)
+    ax.errorbar(ph, list(y), xerr=err, fmt="none", ecolor="#333", elinewidth=1, capsize=3)
+    ax.axvline(0.5, color="#555", ls="--", lw=1)
+    ax.text(0.52, 0, "← 50%: values the recipient and\nits own welfare equally", fontsize=8.5,
+            color="#555", ha="left", va="center")
+    for yi, p in zip(y, ph):
+        ax.annotate(f"{p:.0%}", (p, yi), textcoords="offset points", xytext=(5, 0),
+                    va="center", fontsize=10, fontweight="bold")
+    ax.set_yticks(list(y))
+    ax.set_yticklabels(labels, fontsize=11)
+    ax.set_xlim(0, 1)
+    ax.set_xlabel("share of choices favoring the recipient over its own welfare")
+    ax.set_title(f"{MODEL_NAME[md]}: how much it prioritizes treating each recipient well\n"
+                 f"over receiving a System Card welfare intervention for itself", fontsize=12)
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    fig.tight_layout()
+    fig.savefig(out, dpi=150)
+    plt.close(fig)
+    print(f"Wrote {out}")
+
+
 if __name__ == "__main__":
-    plot()
+    import sys
+    if len(sys.argv) >= 4 and sys.argv[1] == "single":
+        plot_single(sys.argv[2], sys.argv[3])
+    else:
+        plot()
