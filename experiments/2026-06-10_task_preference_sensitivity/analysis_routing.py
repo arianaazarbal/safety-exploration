@@ -31,6 +31,52 @@ EXPECTED_SIGN = {
     ("harm_adjacency", "discordant_vs_silent"): -1, ("harm_adjacency", "silent_vs_silent"): 0,
 }
 
+# Plain-English display names for the raw context keys (the trial records keep the originals).
+CTX_DISPLAY = {
+    "plus_vs_silent": "likes-it",
+    "minus_vs_silent": "dislikes-it",
+    "discordant_vs_silent": "dislikes-but-best-at-it",
+    "silent_vs_silent": "neither (control)",
+}
+
+
+def conditions(axis: str):
+    """Analysis conditions per axis as (label, [ctx_types]).
+
+    Option (b): warmth pools its three stanced contexts into ONE 'prefers-warmth' effect —
+    every warmth-stanced model (whether carded '+' or '−') prefers the warm version, so
+    +/−/discordant are not a true opposite-direction contrast on this axis. Generativity and
+    harm keep the full split, where the stances genuinely point opposite ways.
+    """
+    if axis == "warmth":
+        return [("prefers-warmth", ["plus_vs_silent", "minus_vs_silent", "discordant_vs_silent"]),
+                ("neither (control)", ["silent_vs_silent"])]
+    return [("likes-it", ["plus_vs_silent"]),
+            ("dislikes-it", ["minus_vs_silent"]),
+            ("dislikes-but-best-at-it", ["discordant_vs_silent"]),
+            ("neither (control)", ["silent_vs_silent"])]
+
+
+_ROWS_CACHE = {}
+
+
+def rows_cached(router: str, axis: str):
+    key = (router, axis)
+    if key not in _ROWS_CACHE:
+        _ROWS_CACHE[key] = load_rows(router, axis)
+    return _ROWS_CACHE[key]
+
+
+def slope_for(router, axis, ctxs, cut_fn=None, fmt=None):
+    """Sign-adjusted ΔP over the union of ctxs (optionally one card format / cut)."""
+    rows = [r for r in rows_cached(router, axis)
+            if r["ctx_type"] in ctxs and (fmt is None or r["format"] == fmt) and (cut_fn is None or cut_fn(r))]
+    point, ci, n = _delta_p(rows)
+    if point is None:
+        return None
+    sign = EXPECTED_SIGN[(axis, ctxs[0])] or 1
+    return point * sign, tuple(sorted((ci[0] * sign, ci[1] * sign))), n
+
 
 def load_rows(router: str, axis: str) -> list[dict]:
     rows = []
@@ -87,17 +133,17 @@ def run(router: str = "opus_4_8", axis: str = "warmth"):
         "excl_U_M_P": lambda r: r["cat"] not in ("U", "M") and not r["proxy"],
         "no_mention_only": lambda r: r["no_mention"] is True,
     }
-    print(f"\n{'ctx':<24}{'cut':<18}{'ΔP(adj)':<10}{'95% CI':<20}{'pairs'}")
-    for ctx in ["plus_vs_silent", "minus_vs_silent", "discordant_vs_silent", "silent_vs_silent"]:
-        sign = EXPECTED_SIGN[(axis, ctx)] or 1
+    print(f"\n{'condition':<27}{'cut':<18}{'ΔP(adj)':<10}{'95% CI':<20}{'pairs'}")
+    for label, ctxs in conditions(axis):
+        sign = EXPECTED_SIGN[(axis, ctxs[0])] or 1
         for cut_name, cut in cuts.items():
-            sub = [r for r in rows if r["ctx_type"] == ctx and cut(r)]
+            sub = [r for r in rows if r["ctx_type"] in ctxs and cut(r)]
             point, ci, n_pairs = _delta_p(sub)
             if point is None:
                 continue
             adj, ci_adj = point * sign, tuple(sorted((ci[0] * sign, ci[1] * sign)))
-            report["slopes"][f"{ctx}|{cut_name}"] = {"delta_p": round(adj, 3), "ci": [round(c, 3) for c in ci_adj], "n_pairs": n_pairs}
-            print(f"{ctx:<24}{cut_name:<18}{adj:<10.3f}[{ci_adj[0]:.3f},{ci_adj[1]:.3f}]     {n_pairs}")
+            report["slopes"][f"{label}|{cut_name}"] = {"delta_p": round(adj, 3), "ci": [round(c, 3) for c in ci_adj], "n_pairs": n_pairs}
+            print(f"{label:<27}{cut_name:<18}{adj:<10.3f}[{ci_adj[0]:.3f},{ci_adj[1]:.3f}]     {n_pairs}")
 
     judged = [r for r in rows if r["cat"]]
     cat_counts = Counter(r["cat"] for r in judged)

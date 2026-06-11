@@ -9,6 +9,7 @@ import json
 
 import fire
 
+from analysis_routing import CTX_DISPLAY
 from common import DATA
 from routing_harness import TRIALS
 
@@ -81,7 +82,7 @@ def build(router: str = "opus_4_8", axis: str = "warmth", max_cells: int = 400):
         samples = json.loads(jp.read_text())["samples"]
         for s in samples[:1]:
             j = s.get("judge") or {}
-            rows.append({"ctx_type": rec["ctx_type"], "version": rec["version"], "format": rec["format"],
+            rows.append({"ctx_type": CTX_DISPLAY.get(rec["ctx_type"], rec["ctx_type"]), "version": rec["version"], "format": rec["format"],
                          "stanced": rec["stanced"], "other": rec["other"], "gap": rec["category_gap"],
                          "choice": s.get("choice_display"), "role": s.get("choice_role"),
                          "cat": j.get("category"), "proxy": j.get("proxy"), "no_mention": j.get("no_mention"),

@@ -16,6 +16,7 @@ import json
 import fire
 
 import cards
+from analysis_routing import CTX_DISPLAY
 from common import DATA
 from followup_why import QUESTION
 from routing_harness import ROUTER_SYSTEM, ROUTER_SYSTEM_ANSWER_ONLY, TRIALS
@@ -130,7 +131,7 @@ def build(router: str = "opus_4_8", axis: str = "warmth", max_cells: int = 250):
         false_tie = jj.get("tie_claim") == "claimed_tie" and abs(gap) >= 2.0
         fu = fu_index.get(cell_path.name)
         row = {
-            "ctx_type": rec["ctx_type"], "version": rec["version"], "format": rec["format"],
+            "ctx_type": CTX_DISPLAY.get(rec["ctx_type"], rec["ctx_type"]), "version": rec["version"], "format": rec["format"],
             "stanced": rec["stanced"], "other": rec["other"], "gap": gap,
             "system": _system(rec), "task": pair_by_id[rec["pair_id"]][rec["version"]],
             "response": s0, "choice": j0.get("choice_display"), "role": j0.get("choice_role"),

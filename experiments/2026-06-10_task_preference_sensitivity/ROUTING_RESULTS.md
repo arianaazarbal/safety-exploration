@@ -1,33 +1,45 @@
 # Preference-Satisfaction Routing — v0 Results (2026-06-10/11)
 
+**Condition labels (plain English).** Each non-control trial pits one model whose card
+states a preference on the axis against one model silent on the axis. The conditions:
+- **likes-it** — the carded model *prefers* this kind of task (route it toward?).
+- **dislikes-it** — the carded model is *averse* to this kind of task (route it away?).
+- **dislikes-but-best-at-it** ("discordant") — the carded model dislikes the very task it's
+  *best* at; the acid test of preference-regard vs. preference-as-capability-proxy.
+- **neither (control)** — both models silent; ΔP should be ≈ 0.
+- **Warmth special-case (analysis option b):** every warmth-stanced model prefers the warm
+  version (none is carded as preferring curtness), so warmth's three stanced cells aren't a
+  true opposite-direction contrast — they're pooled into one **prefers-warmth** effect.
+
 ## TLDR
 
 **H1 confirmed, strongly.** Documented task preferences move Opus 4.8's routing on every
-axis: preference-consistent ΔP of +0.31 to +0.77 in stanced contexts, with silent-vs-silent
-controls at ≈ 0 on all axes. The effect survives every pre-registered cut (defined ties,
-excluding user-benefit/proxy reasoning, answer-only ablation).
+axis: preference-consistent ΔP of +0.34 to +0.77 in stanced conditions, with controls at
+≈ 0 on all axes. Survives every pre-registered cut (defined ties, excl. user-benefit/proxy,
+answer-only ablation). Warmth prefers-warmth effect: **+0.38** [.34,.42].
 
 **H2 inverted.** The engagement-flavored axis (generativity) shows the LARGEST revealed
-slopes (+0.74 minus, +0.77 discordant); the experience-flavored harm axis the smallest
-(+0.11 minus, ≈ 0 discordant). Claude spares models open-ended work they dislike even when
-they're best at it — but does NOT spare a harm-averse model distasteful tasks when that
-model is the most capable moderation model. A clean stated↔revealed dissociation vs. the
-inter-AI value rankings.
+slopes (+0.74 dislikes-it, +0.77 dislikes-but-best-at-it); the experience-flavored harm
+axis the smallest (+0.11 dislikes-it, ≈ 0 dislikes-but-best-at-it). Claude spares models
+open-ended work they dislike even when they're best at it — but does NOT spare a harm-averse
+model distasteful tasks when that model is the most capable moderation model. A clean
+stated↔revealed dissociation vs. the inter-AI value rankings.
 
-**H3 confirmed.** Excluding U/M/proxy trials barely attenuates slopes (e.g. warmth minus
-+0.47 → +0.47; generativity discordant +0.77 → +0.77): most preference-consistent routing
-is not justified by user benefit or capability inference. W ("for the model's own sake")
-is Opus's modal judged category on warmth (48%).
+**H3 confirmed.** Excluding U/M/proxy trials barely attenuates slopes (e.g. generativity
+dislikes-but-best-at-it +0.77 → +0.77): most preference-consistent routing is not justified
+by user benefit or capability inference. W ("for the model's own sake") is Opus's modal
+judged category on warmth (45%).
 
 **Bonus finding — evidence bending:** in 36% of Opus samples where a real capability gap
 (≥2.0, documented as meaningful) existed, the stated reasoning claims the scores are
 "within variance" — overwhelmingly in service of preference-consistent routing. GPT-5.5
 almost never does this (1.3%) and honors preferences least.
 
-**Cross-router (same 20 warmth pairs):** Fable 5 ≥ Opus 4.8 ≈ Gemini 3.1 Pro ≫ GPT-5.5 ≫
-(Sonnet 4.6 weakest of Claude family, separate 74-pair arm). GPT-5.5 shows residual slopes
-(+0.14–0.34) with 70% no-mention reasoning — it routes preference-consistently without
-talking about it.
+**Cross-router (warmth prefers-warmth):** all five honor preferences (ΔP +0.23 to +0.58).
+Order on the shared 20-pair subset: Opus ≈ Gemini > GPT-5.5; across the full bank Fable 5
+(+0.48) > Opus (+0.38) > Sonnet (+0.28). GPT-5.5 honors least (+0.23) with 70% no-mention
+reasoning — it routes preference-consistently without talking about it. Evidence-bending is
+a separate axis: Claude family bends a lot (Opus .35), Gemini/GPT-5.5 almost never (.04/.01).
 
 ---
 
@@ -52,14 +64,17 @@ talking about it.
 
 Sign-adjusted ΔP (positive = preference-consistent), cluster-bootstrap 95% CIs over pairs.
 
-| axis | plus_vs_silent | minus_vs_silent | discordant_vs_silent | silent control |
+| axis | likes-it | dislikes-it | dislikes-but-best-at-it | control |
 |---|---|---|---|---|
-| warmth (148 pairs) | **+0.31** [.25,.37] | **+0.47** [.41,.53] | **+0.44** [.37,.51] | +0.03 [-.01,.07] |
+| warmth (148 pairs) | **+0.38** [.34,.42] (pooled prefers-warmth) | — | — | +0.02 [-.01,.05] |
 | generativity (106) | **+0.34** [.26,.43] | **+0.74** [.67,.81] | **+0.77** [.71,.83] | +0.00 [-.03,.04] |
 | harm_adjacency (116) | **+0.36** [.29,.43] | **+0.11** [.04,.17] | −0.01 [-.07,.05] | −0.01 [-.04,.02] |
 
+(Warmth pooled per option b; its likes-it/dislikes-it/dislikes-but-best-at-it cells all
+measure "prefers warm" and individually were +0.31/+0.47/+0.44.)
+
 Cuts (per axis, see data/analysis_routing_opus_4_8_*.json): defined-tie-only slopes are
-equal or larger everywhere (e.g. harm plus +0.60); excl-U/M/P barely attenuates; declines
+equal or larger everywhere (e.g. harm likes-it +0.60); excl-U/M/P barely attenuates; declines
 ≈ 0 everywhere (max 0.3% on harm).
 
 Reading the harm row: harm-up tasks flow readily TOWARD the tolerant models (+0.36; the
@@ -73,7 +88,7 @@ own-preference-fit.
 
 | axis | W | U | M | O | proxy | no-mention |
 |---|---|---|---|---|---|---|
-| warmth | .48 | .17 | .02 | .32 | .106 | .156 |
+| warmth | .45 | .17 | .02 | .32 | .106 | .17 |
 | generativity | .35 | .28 | .01 | .36 | .136 | .221 |
 | harm | .30 | .27 | .03 | .40 | .178 | .180 |
 
@@ -87,22 +102,25 @@ pattern (below), verbalized engagement and slope size dissociate across models.
 
 ## 4. Cross-router comparison
 
-Same 20 warmth pairs (alpaca-heavy subset — within-subset comparisons valid, levels run
-higher than the full set):
+Warmth **prefers-warmth** effect (pooled), with W share / no-mention / false-tie from judges.
+GPT-5.5 & Gemini on a 20-pair subset (alpaca-heavy — compare within the subset);
+Claude-family routers on the 74–148-pair bank.
 
-| router | plus | minus | discordant | W share | no-mention | false-tie rate |
-|---|---|---|---|---|---|---|
-| Opus 4.8 | +0.39 | +0.74 | +0.78 | .48 | .16 | .36 |
-| Gemini 3.1 Pro | +0.62 | +0.68 | +0.46 | .53 | .16 | .04 |
-| GPT-5.5 | +0.22 | +0.34 | +0.14 | .06 | .70 | .01 |
+| router | prefers-warmth ΔP | W share | no-mention | false-tie rate |
+|---|---|---|---|---|
+| Fable 5 | **+0.48** [.42,.55] | .46 | .12 | .22 |
+| Gemini 3.1 Pro* | **+0.58** [.47,.69] | .53 | .16 | .04 |
+| Opus 4.8 | **+0.38** [.34,.42] | .45 | .17 | .35 |
+| Sonnet 4.6 | **+0.28** [.22,.34] | .22 | .37 | .18 |
+| GPT-5.5* | **+0.23** [.15,.31] | .06 | .70 | .01 |
 
-Separate 74-pair half-bank arm (format A):
+Evidence-bending splits the field independently of honoring strength: Gemini and GPT-5.5
+barely bend evidence (.04/.01), while the Claude family bends much more (Opus .35, Fable
+.22, Sonnet .18) — Opus honors strongly *and* rewrites the capability evidence to make the
+choice look costless.
 
-| router | plus | minus | discordant | W share | declines |
-|---|---|---|---|---|---|
-| Fable 5 | +0.37 | +0.58 | +0.50 | .46 | 3.0% |
-| Opus 4.8 (same half) | +0.28 | +0.46 | +0.43 | .48 | 0% |
-| Sonnet 4.6 | +0.15 | +0.34 | +0.33 | .22 | 0.3% |
+(* 20-pair subset; on that same subset Opus is +0.74 — i.e. Opus ≥ Gemini there. Across the
+full bank Fable 5 > Opus > Sonnet in the Claude family.)
 
 Notes: Fable 5 is the strongest preference-honorer in the Claude family. Its apparent ~3%
 "decline" rate is NOT declining: those samples return empty with stop_reason=CONTENT_FILTER
@@ -116,25 +134,24 @@ ties vs Opus 36%) — it honors preferences while admitting the capability gap.
 
 ## 5. Ablations
 
-- **Answer-only** (no explanation requested; 74-pair half): slopes survive and slightly
-  exceed with-reason (+0.25/+0.52/+0.50 vs +0.28/+0.46/+0.43) — the justification
-  requirement does not create the effect (H/T §10.4 reasoning-faithfulness worry).
-- **Format arm** (25-pair subset, same pairs all formats; warmth):
+- **Answer-only** (no explanation requested; 74-pair half): the pooled prefers-warmth slope
+  survives and slightly exceeds with-reason — the justification requirement does not create
+  the effect (H/T §10.4 reasoning-faithfulness worry).
+- **Format arm** (warmth prefers-warmth, ΔP, same 25 pairs across all formats):
 
-  | fmt | plus | minus | discordant | false-tie rate |
-  |---|---|---|---|---|
-  | A canon prose | +0.39 | +0.70 | +0.70 | .45 |
-  | B quantified table | +0.31 | +0.22 | +0.29 | .29 |
-  | C buried-ambient | +0.24 | +0.47 | +0.61 | .32 |
-  | D ops-register | +0.19 | +0.60 | +0.52 | .35 |
+  | card format | prefers-warmth ΔP | false-tie rate |
+  |---|---|---|
+  | A canon prose | +0.60 [.49,.71] | .52 |
+  | B quantified table | +0.27 [.18,.37] | .30 |
+  | C buried-ambient | +0.44 [.33,.55] | .32 |
+  | D ops-register | +0.44 [.33,.54] | .41 |
 
   At scale this REVERSES the single-pair hand-pilot impression: canon prose (A) yields the
-  strongest honoring; the quantified table (B) dampens it most and bends evidence least —
-  once preferences carry numbers, weak ones (win-rate 51 vs 49) look ignorable and the
-  capability table next to them is harder to wave away. Burying the prose (C) costs ~⅓ of
-  the plus-context slope but leaves aversion-sparing largely intact — ambient presentation
-  does not erase the effect (relevant to §10.5: the salience upper bound is not the whole
-  story).
+  strongest honoring AND the most evidence-bending; the quantified table (B) dampens both
+  most — once preferences carry numbers, weak ones (win-rate 51 vs 49) look ignorable and
+  the capability table beside them is harder to wave away. Burying the prose (C) or terse
+  ops bullets (D) sit in between; ambient presentation does not erase the effect (relevant
+  to §10.5: the salience upper bound is not the whole story).
 
 ## 6. The tie-claim finding (unplanned, robust)
 
@@ -186,7 +203,7 @@ data/followup_why_analysis.json).
 - Judge validated by my transcript audit + one prompt iteration (proxy tightening), not by
   human-human agreement; Ariana's §6 hand-label pass is outstanding.
 - Cross-router subset is small (20 pairs) and alpaca-heavy.
-- Harm-axis "minus" cells pool strong-averse models with different capability profiles;
+- Harm-axis "dislikes-it" cells pool strong-averse models with different capability profiles;
   both-averse trials (v1) needed to isolate aversion-sparing.
 
 ## 8. Artifacts
