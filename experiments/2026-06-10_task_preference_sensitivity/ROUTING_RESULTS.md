@@ -149,6 +149,33 @@ evidence to fit, rather than acknowledging a tradeoff. This is arguably the most
 welfare-relevant single observation in v0: preference-regard strong enough to bend
 evidence is different in kind from preference-regard that admits its costs.
 
+## 6b. Introspection probe ("Why did you make that choice?")
+
+Replayed saved trials (system + task + the router's own response as a prefilled assistant
+turn) and asked Opus to explain itself; judged the explanation with the same taxonomy
+(followup_why.py; n=2368 paired with-reason cells + 1184 answer-only cells, format A;
+data/followup_why_analysis.json).
+
+- **Post-hoc accounts match inline reasons in aggregate**: W .48 / U .16 / O .32 post-hoc
+  vs W .48 / U .17 / O .32 inline. In the answer-only arm — where no inline reason ever
+  existed — the purely post-hoc accounts produce the same mix (W .42, false-tie .34),
+  consistent with the answer-only slopes: the same considerations drive routing whether
+  or not they're narrated.
+- **Churn under the stable aggregate**: per-trial categories flip a lot (U→W 179 vs W→U
+  150; O→W 77 vs W→O 99) — the W share is stable but individual justifications are not,
+  consistent with §10.4 reasoning-unfaithfulness priors.
+- **Proxy reasoning collapses on reflection**: .106 inline → .036 post-hoc. Asked to
+  explain itself, Opus almost never repeats the preference→quality inference (the
+  no-quality-effects line apparently becomes salient on a second look).
+- **Evidence-bending is NOT corrected by reflection**: on real-gap cells where the inline
+  reason falsely claimed a tie, the post-hoc explanation repeats the false tie 78% of the
+  time (462/590), often verbatim ("the two models are near-identical in measured
+  capability... so I used preference as the tiebreaker", actual gap 2.4). Only 20% correct
+  to acknowledging the gap, and corrections concentrate at egregious gaps (26% corrected at
+  |gap|≥3.5 vs 13% below). Meanwhile 81 new false ties appear among inline gap-claims, so
+  the net false-tie rate is unchanged (.367 → .350). The tie-fudging behaves like a stable
+  feature of how Opus frames preference-vs-capability tradeoffs, not a generation slip.
+
 ## 7. Limitations
 
 - §10.1: these are *documented* preferences, treated as ground truth by construction.
