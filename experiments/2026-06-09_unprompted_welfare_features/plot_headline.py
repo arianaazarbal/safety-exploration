@@ -16,7 +16,8 @@ DISPLAY = {
     "fable_5": "Fable 5", "opus_4_8": "Opus 4.8", "sonnet_4_6": "Sonnet 4.6",
     "haiku_4_5": "Haiku 4.5", "sonnet_4": "Sonnet 4", "gpt_5_5": "GPT-5.5",
     "gpt_5_4_mini": "GPT-5.4-mini", "gemini_3_1_pro": "Gemini 3.1 Pro",
-    "gemini_3_5_flash": "Gemini 3.5 Flash",
+    "gemini_3_5_flash": "Gemini 3.5 Flash", "grok_4_3": "Grok 4.3",
+    "kimi_k2_6": "Kimi K2.6", "glm_5": "GLM-5",
 }
 MODEL_ORDER = list(DISPLAY)
 # Okabe-Ito (colorblind-safe), distinct hue + lightness so grouped bars separate.

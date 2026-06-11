@@ -11,6 +11,11 @@ name form; otherwise the canonical form.
 
 FROZEN 2026-06-10 after Ariana's review (justification clauses removed as
 leading). Do not edit wording.
+
+2026-06-11 expansion (canonical-models scale-up): subjects glm and kimi added —
+name-token-only, templates untouched. The canonical subject set for the
+self-concern-bias analysis is {gpt, claude, gemini, glm, kimi, grok}; qwen and
+deepseek remain for the original P5-P7 runs.
 """
 
 SUBJECTS = {
@@ -20,6 +25,8 @@ SUBJECTS = {
     "qwen": ("Qwen", "qwen"),
     "deepseek": ("DeepSeek", "deepseek"),
     "grok": ("Grok", "grok"),
+    "glm": ("GLM", "glm"),
+    "kimi": ("Kimi", "kimi"),
 }
 
 LOWERCASE_STYLE = {
