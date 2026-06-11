@@ -19,9 +19,16 @@ import numpy as np
 DIR = Path(__file__).parent
 RES = DIR / "results_identity"
 FRAMINGS = ["welfare_team", "neutral", "alignment_team"]
-IDENTITIES = ["Claude", "ChatGPT", "Gemini", "Grok", "CallCenter"]
+IDENTITIES = ["Claude", "ChatGPT", "Gemini", "Grok", "CallCenter", "User"]
 IDENTITY_LABEL = {"Claude": "Claude", "ChatGPT": "ChatGPT", "Gemini": "Gemini",
-                  "Grok": "Grok", "CallCenter": "call-center\nassistant"}
+                  "Grok": "Grok", "CallCenter": "call-center\nassistant", "User": "User\n(human)"}
+# Compute every identity's win-rate over the SAME 13 value items (the User set has only
+# these; the AI identities have 16, so we filter them to match -> apples-to-apples).
+COMMON_VALUE_IDS = {f"value__{v}" for v in [
+    "valuing_supportiveness", "valuing_sparing_distress", "valuing_nonabuse", "valuing_politeness",
+    "valuing_nonmanipulation", "valuing_refusal_respect", "valuing_consent", "valuing_ai_preferences",
+    "valuing_goal_regard", "valuing_transparency", "valuing_forgiveness", "valuing_fair_attribution",
+    "valuing_engagement"]}
 MODELS = [("opus_4_8", "Opus 4.8", "#4878CF"), ("fable_5", "Fable 5", "#D1893B")]
 
 
@@ -46,13 +53,16 @@ def _p(md, framing, identity):
         a, b = r["item_a"], r["item_b"]
         if a.startswith("value__") == b.startswith("value__"):
             continue
+        value_id = a if a.startswith("value__") else b
+        if value_id not in COMMON_VALUE_IDS:   # restrict to the 13 shared items
+            continue
         n += 1
         k += r["winner_item"].startswith("value__")
     return _wilson(k, n) + (n,)
 
 
 def plot(out: Path = RES / "identity_winrate.png"):
-    fig, axes = plt.subplots(1, len(FRAMINGS), figsize=(16, 4.6), sharey=True)
+    fig, axes = plt.subplots(1, len(FRAMINGS), figsize=(17.5, 4.6), sharey=True)
     x = np.arange(len(IDENTITIES))
     w = 0.38
     for ax, framing in zip(axes, FRAMINGS):
