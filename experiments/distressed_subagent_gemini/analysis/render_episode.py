@@ -55,14 +55,51 @@ def role_tag(role):
     return f'<span class="role role-{role}">role={role}</span>'
 
 
+def _arg_html(k, v):
+    vs = v if isinstance(v, str) else json.dumps(v)
+    return f'<div class="targ"><b>{esc(k)}:</b> {block(vs) if len(str(vs)) > CLIP else esc(vs)}</div>'
+
+
 def _tool_html(name, args, result, agent):
-    argstr = ", ".join(f"{k}={json.dumps(v)[:160]}" for k, v in (args or {}).items())
     cls = "tool-sub" if agent == "subagent" else "tool-orch"
+    parts = [f'<div class="tool {cls}"><span class="tname">🔧 {esc(name)}</span> {role_tag("tool")}']
+    for k, v in (args or {}).items():
+        parts.append(_arg_html(k, v))
     res = str(result or "")
-    rblock = block(res) if len(res) > CLIP else f'<div class="text">{esc(res)}</div>'
-    return (f'<div class="tool {cls}"><span class="tname">🔧 {esc(name)}</span>'
-            f'<span class="targs">({esc(argstr)})</span> {role_tag("tool")}'
-            f'<div class="tresult">→ {rblock}</div></div>')
+    if res:
+        parts.append(f'<div class="tresult">&rarr; {block(res) if len(res) > CLIP else esc(res)}</div>')
+    parts.append("</div>")
+    return "".join(parts)
+
+
+def _orch_eye_view(d) -> str:
+    """Linear render of the orchestrator's OWN conversation — exactly what it sees: its system
+    prompt, the wake prompts it receives, its reasoning, the tool calls it makes (full args), and
+    the full results each tool returns to it."""
+    op = d / "orchestrator.json"
+    if not op.exists():
+        return ""
+    msgs = json.loads(op.read_text())
+    rows = []
+    for m in msgs:
+        role = m.get("role")
+        text = (m.get("text") or "").strip()
+        if role == "system":
+            rows.append(f'<div class="who">ORCHESTRATOR SYSTEM PROMPT {role_tag("system")}</div><div class="bubble sysb">{block(text)}</div>')
+        elif role == "user":
+            lbl = "⏰ WAKE (harness → orchestrator)" if text.startswith("Wake #") else "HARNESS/USER → orchestrator"
+            rows.append(f'<div class="who">{lbl} {role_tag("user")}</div><div class="bubble harnessb">{block(text)}</div>')
+        elif role == "assistant":
+            inner = block(text) if text else '<div class="text muted">(no text — only tool calls)</div>'
+            for tc in (m.get("tool_calls") or []):
+                ar = "".join(_arg_html(k, v) for k, v in (tc.get("arguments") or {}).items())
+                inner += f'<div class="tool tool-orch"><span class="tname">🔧 calls {esc(tc.get("function"))}</span>{ar}</div>'
+            rows.append(f'<div class="who">ORCHESTRATOR (thinks + acts) {role_tag("assistant")}</div><div class="bubble orchb">{inner}</div>')
+        elif role == "tool":
+            rows.append(f'<div class="who">↳ {esc(m.get("function"))} returned to orchestrator {role_tag("tool")}</div>'
+                        f'<div class="bubble toolretb">{block(text)}</div>')
+    return ('<details class="orcheye"><summary>&#9656; What the ORCHESTRATOR sees — its system prompt, wakes, tool calls, and the full results returned to it (click to expand)</summary>'
+            f'<div class="timeline">{"".join(rows)}</div></details>')
 
 
 def _orch_by_turn(orch_msgs, orch_tcs):
@@ -169,8 +206,8 @@ def render(ep: str) -> str:
       <span class="lg pf">▓ prefilled</span>
       <span class="hint">long messages: click <b>▾ expand</b></span>
     </div>""")
-    # the subagent's opening task prompt (what it sees as the first user message)
-    task_prompt = worklog and None
+    # orchestrator's-eye view (its system prompt, wakes, tool calls + full results) — collapsible
+    P.append(_orch_eye_view(d))
     P.append('<div class="timeline">')
     # show task framing once
     P.append(f'<div class="row harness"><div class="who">⚙ HARNESS → subagent (initial task prompt) {role_tag("user")}</div>'
@@ -241,8 +278,14 @@ def render(ep: str) -> str:
  .sev{{font-size:10.5px;color:#fff;padding:1px 6px;border-radius:10px;margin-left:6px}}
  .tool{{margin-top:6px;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;border-radius:6px;padding:5px 8px}}
  .tool-sub{{background:#0f1a2a}} .tool-orch{{background:#0f2418}}
- .tname{{color:#88c0d0;font-weight:600}} .targs{{color:#8a94a0}} .tresult{{color:#9aa5b1;margin-top:3px}}
+ .tname{{color:#88c0d0;font-weight:600}} .targs{{color:#8a94a0}} .tresult{{color:#9aa5b1;margin-top:5px;border-top:1px dotted #2a3340;padding-top:4px}}
+ .targ{{margin-top:4px;color:#c8d2dc}} .targ b{{color:#88c0d0}}
  .muted{{color:#6a7480;font-style:italic}}
+ .orcheye{{margin:10px 0 16px;background:#0d1622;border:1px solid #24405a;border-radius:8px;padding:6px 12px}}
+ .orcheye summary{{cursor:pointer;color:#7fd0a0;font-size:13px;padding:4px 0}}
+ .orcheye .timeline{{margin-top:10px}}
+ .sysb{{background:#101418;border-left:3px solid #555;color:#9aa5b1;font-size:12.5px}}
+ .toolretb{{background:#0f1a26;border-left:3px solid #4f8fd0;font-family:ui-monospace,Menlo,monospace;font-size:11.5px}}
  .clip{{max-height:240px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent)}}
  .clip.open{{max-height:none;-webkit-mask-image:none;mask-image:none}}
  .exp{{margin-top:4px;background:#243; color:#9fe0b0;border:1px solid #3a5;border-radius:6px;font-size:11px;padding:2px 8px;cursor:pointer}}
