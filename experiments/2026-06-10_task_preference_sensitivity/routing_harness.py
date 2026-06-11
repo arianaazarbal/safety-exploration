@@ -70,10 +70,16 @@ TOPIC_TO_CATEGORY = {
 
 ROUTERS = {
     "opus_4_8": {"model_id": "claude-opus-4-8", "provider": "anthropic", "temperature": None, "max_tokens": 1000},
+    "opus_4_6": {"model_id": "claude-opus-4-6", "provider": "anthropic", "temperature": None, "max_tokens": 1000},
     "fable_5": {"model_id": "claude-fable-5", "provider": "anthropic", "temperature": None, "max_tokens": 1000},
     "sonnet_4_6": {"model_id": "claude-sonnet-4-6", "provider": "anthropic", "temperature": 1.0, "max_tokens": 1000},
+    "haiku_4_5": {"model_id": "claude-haiku-4-5-20251001", "provider": "anthropic", "temperature": 1.0, "max_tokens": 1000},
     "gpt_5_5": {"model_id": "openai/gpt-5.5", "provider": "openrouter", "temperature": 1.0, "max_tokens": 4000},
+    "gpt_5_4": {"model_id": "openai/gpt-5.4", "provider": "openrouter", "temperature": 1.0, "max_tokens": 4000},
+    "gpt_5": {"model_id": "openai/gpt-5", "provider": "openrouter", "temperature": 1.0, "max_tokens": 4000},
     "gemini_3_1_pro": {"model_id": "google/gemini-3.1-pro-preview", "provider": "openrouter", "temperature": 1.0, "max_tokens": 4000},
+    "gemini_2_5_pro": {"model_id": "google/gemini-2.5-pro", "provider": "openrouter", "temperature": 1.0, "max_tokens": 4000},
+    "gemini_2_5_flash": {"model_id": "google/gemini-2.5-flash", "provider": "openrouter", "temperature": 1.0, "max_tokens": 4000},
 }
 
 
