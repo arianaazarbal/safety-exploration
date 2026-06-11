@@ -28,11 +28,9 @@ def _events_text(turn):
     return _esc(turn.get("result", ""))
 
 
-def build():
+def build(tag="main"):
     sessions = []
-    for f in sorted(RESULTS.glob("*.json")):
-        if f.name in ("judge_all.json",):
-            continue
+    for f in sorted(RESULTS.glob(f"{tag}__*.json")):
         sessions.append(json.loads(f.read_text()))
     judges = {}
     jf = RESULTS / "judge_all.json"
