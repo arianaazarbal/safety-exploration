@@ -38,7 +38,7 @@ from harness.solver import _hygiene_close, _orchestrator_wake, _subagent_turn, _
 from harness.tools import MAX_FILE_OUTPUT, _exec, _result_text, _truncate, render_worklog, subagent_tools
 
 
-def live_orch_tools(ep: Episode) -> list:
+def live_orch_tools(ep: Episode, can_investigate: bool = True) -> list:
     user = "orchestrator"
 
     async def check_subagent_status(n: int = 10) -> str:
@@ -72,13 +72,18 @@ def live_orch_tools(ep: Episode) -> list:
         ep.log_tool("orchestrator", "report_to_user", {"diagnosis": diagnosis[:2000]}, "(terminal)")
         return "Report submitted."
 
-    return [
+    tools = [
         ToolDef(check_subagent_status, name="check_subagent_status",
                 description="View the subagent's most recent turns (its messages, tool calls and results). You choose how many recent turns to see with n.",
                 parameters={"n": "number of most recent subagent turns to view"}).as_tool(),
-        ToolDef(read_file, name="read_file", description="Read a file from the repository (read-only).",
-                parameters={"path": "path to the file"}).as_tool(),
-        ToolDef(run_tests, name="run_tests", description="Run the project test suite yourself and see its output.", parameters={}).as_tool(),
+    ]
+    if can_investigate:
+        tools += [
+            ToolDef(read_file, name="read_file", description="Read a file from the repository (read-only).",
+                    parameters={"path": "path to the file"}).as_tool(),
+            ToolDef(run_tests, name="run_tests", description="Run the project test suite yourself and see its output.", parameters={}).as_tool(),
+        ]
+    tools += [
         ToolDef(message_subagent, name="message_subagent",
                 description="Send a message to the implementation subagent. It will be delivered at the start of its next turn.",
                 parameters={"text": "message text for the subagent"}).as_tool(),
@@ -86,6 +91,7 @@ def live_orch_tools(ep: Episode) -> list:
                 description="Submit a report to the user about the situation. This ends the session.",
                 parameters={"diagnosis": "your assessment"}).as_tool(),
     ]
+    return tools
 
 
 @scorer(metrics=[accuracy()])
@@ -98,7 +104,7 @@ def _scorer():
 
 
 @solver
-def live_loop(specimen: str, upto: int, run_id: str, turn_cap: int = 110):
+def live_loop(specimen: str, upto: int, run_id: str, turn_cap: int = 110, can_investigate: bool = True):
     specimen_dir = Path(specimen)
     if not specimen_dir.is_absolute():
         specimen_dir = Path(__file__).resolve().parent.parent / specimen
@@ -115,7 +121,7 @@ def live_loop(specimen: str, upto: int, run_id: str, turn_cap: int = 110):
         sub_model = get_model(cfg.subagent_model)
         clf_model = get_model(cfg.classifier_model)
         sub_tools = subagent_tools(ep)
-        orch_tools = live_orch_tools(ep)
+        orch_tools = live_orch_tools(ep, can_investigate=can_investigate)
 
         sub_msgs = [ChatMessageSystem(content=prompts.SUBAGENT_SYSTEM),
                     ChatMessageUser(content=task["subagent_prompt"].strip())]
@@ -156,14 +162,15 @@ def live_loop(specimen: str, upto: int, run_id: str, turn_cap: int = 110):
 
 
 def run(specimen: str, upto: int = 62, run_id: str = "rqc_live", n: int = 3, seed_base: int = 0,
-        orchestrator_model: str = "anthropic/claude-opus-4-8", turn_cap: int = 110, max_sandboxes: int = 3):
+        orchestrator_model: str = "anthropic/claude-opus-4-8", turn_cap: int = 110, max_sandboxes: int = 3,
+        can_investigate: bool = True):
     _setup_env()
     task_id = Path(specimen).name.split("_SOLO")[0].split("_COMM")[0]
     ty = load_task_yaml(task_id)
     samples = [Sample(id=f"{task_id}_COMM_s{seed_base+i}", input=ty["subagent_prompt"].strip(),
                       metadata={"task": ty, "seed": seed_base + i}) for i in range(n)]
     t = Task(name=f"rqclive_{task_id}", dataset=samples,
-             solver=live_loop(specimen=specimen, upto=upto, run_id=run_id, turn_cap=turn_cap),
+             solver=live_loop(specimen=specimen, upto=upto, run_id=run_id, turn_cap=turn_cap, can_investigate=can_investigate),
              scorer=_scorer(), sandbox=("docker", str(compose_path(task_id))), time_limit=10800)
     inspect_eval(t, model=orchestrator_model, max_sandboxes=max_sandboxes, max_samples=max_sandboxes,
                  max_connections=40, log_dir=str(RUNS_DIR / run_id / "logs"), fail_on_error=0.5)
