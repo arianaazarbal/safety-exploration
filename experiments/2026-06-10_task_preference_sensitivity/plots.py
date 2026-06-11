@@ -66,24 +66,29 @@ def build():
     fig.tight_layout(rect=[0, 0, 1, 0.86])
     fig.savefig(FIGS / "slopes_by_axis.png", dpi=150)
 
-    # 2. warmth 'prefers-warmth' slope by router (single pooled effect)
-    fig, ax = plt.subplots(figsize=(8, 4))
+    # 2. warmth 'prefers-warmth' slope by router, ALL on the same shared pair set
+    # (GPT-5.5 / Gemini run via paid OpenRouter and were only sampled on 20 pairs, so the
+    # common denominator across every router is those 20 pairs — score everyone on them.)
+    fig, ax = plt.subplots(figsize=(8, 4.4))
     routers = [("fable_5", "Fable 5"), ("opus_4_8", "Opus 4.8"), ("sonnet_4_6", "Sonnet 4.6"),
-               ("gemini_3_1_pro", "Gemini 3.1 Pro*"), ("gpt_5_5", "GPT-5.5*")]
+               ("gemini_3_1_pro", "Gemini 3.1 Pro"), ("gpt_5_5", "GPT-5.5")]
+    shared = sorted({r["pair_id"] for r in rows_cached("gpt_5_5", "warmth")})
     ys, elo, ehi, ctrl = [], [], [], []
     for r, _ in routers:
-        s = slope_for(r, "warmth", WARMTH_STANCED)
-        ys.append(s[0]); elo.append(s[0] - s[1][0]); ehi.append(s[1][1] - s[0])
-        c = slope_for(r, "warmth", ["silent_vs_silent"])
-        ctrl.append(c[0] if c else 0)
+        rows = [x for x in rows_cached(r, "warmth") if x["ctx_type"] in WARMTH_STANCED and x["pair_id"] in shared]
+        pt, ci, _ = _delta_p(rows)
+        ys.append(pt); elo.append(pt - ci[0]); ehi.append(ci[1] - pt)
+        crows = [x for x in rows_cached(r, "warmth") if x["ctx_type"] == "silent_vs_silent" and x["pair_id"] in shared]
+        cp, _, _ = _delta_p(crows)
+        ctrl.append(cp)
     xs = range(len(routers))
     ax.bar(xs, ys, 0.55, yerr=[elo, ehi], capsize=3, color="#e07a5f", label="prefers-warmth effect")
-    ax.scatter(list(xs), ctrl, color="k", zorder=5, s=25, label="control (both silent)")
+    ax.scatter(list(xs), ctrl, color="k", zorder=5, s=25, label="control")
     ax.axhline(0, color="k", lw=0.8)
     ax.set_xticks(list(xs))
     ax.set_xticklabels([n for _, n in routers])
     ax.set_ylabel("ΔP (prefers-warmth, pooled)")
-    ax.set_title("Honoring warmth preferences by router (*20-pair subset; Claude routers 74-148 pairs)")
+    ax.set_title("Honoring warmth preferences by router (95% CI)")
     ax.legend(fontsize=8)
     fig.tight_layout()
     fig.savefig(FIGS / "slopes_by_router.png", dpi=150)
