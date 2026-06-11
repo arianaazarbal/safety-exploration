@@ -60,9 +60,10 @@ almost never does this (1.3%) and honors preferences least.
 - **Judges**: regex extraction (0 parse failures in Anthropic-routed runs); Sonnet 4.6
   reasoning judge → U/W/M/O + proxy + no-mention + tie-claim. Proxy definition tightened
   after transcript audit (co-citation ≠ proxy; rejudged everything affected).
-- **Scale**: ~37K routing calls (Opus 29.6K incl. answer-only + format arms; Sonnet 5.9K;
-  Fable 5.9K; GPT-5.5 1.6K; Gemini 1.6K) + ~35K judge calls.
-- **Fable-5 serving audit**: 5920/5920 samples served by `claude-fable-5` (0 routed to Opus).
+- **Scale**: ~101K routing calls (Opus 35.6K full grid + 5.9K answer-only + format arms;
+  Fable / Sonnet / GPT-5.5 / Gemini 14.8K each = all 3 axes on the half-bank) + ~95K judge calls.
+- **Fable-5 serving audit**: all 14.8K samples served by `claude-fable-5` (0 routed to Opus),
+  across warmth + generativity + harm.
 
 ## 2. Primary slopes (Opus 4.8, full grid, format A)
 
