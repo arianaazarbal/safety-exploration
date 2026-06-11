@@ -7,6 +7,7 @@ Usage: python plots.py build
 """
 
 import json
+import textwrap
 
 import fire
 import matplotlib
@@ -14,39 +15,54 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from analysis_routing import conditions, rows_cached, slope_for
+from analysis_routing import _delta_p, conditions, rows_cached, slope_for
 from common import DATA
 
 FIGS = DATA / "figs"
 AXES = ["warmth", "generativity", "harm_adjacency"]
 WARMTH_STANCED = ["plus_vs_silent", "minus_vs_silent", "discordant_vs_silent"]
 
+# Raw (un-sign-flipped) ΔP descriptions: positive = the HIGHER-axis version is pulled toward
+# the carded model. Whether that is "honoring" depends on the stance (shown per bar).
+AXIS_GAP_DESC = {
+    "generativity": "ΔP = how much more often the open-ended version (vs the tightly-specified "
+                    "version) of the same task is routed to the model whose card states a generativity preference",
+    "harm_adjacency": "ΔP = how much more often the grim version (vs the wholesome version) of the "
+                      "same task is routed to the model whose card states a harm-adjacency preference",
+}
+HONOR_SIGN = {"likes-it": +1, "dislikes-it": -1, "dislikes-but-best-at-it": -1}
+
+
+def _raw_delta(router, axis, ctxs):
+    return _delta_p([r for r in rows_cached(router, axis) if r["ctx_type"] in ctxs])
+
 
 def build():
     FIGS.mkdir(exist_ok=True)
 
-    # 1. slopes by axis: one subplot per axis, its conditions on x
-    fig, axes = plt.subplots(1, 3, figsize=(14, 4.2), sharey=True)
-    colors = ["#2a9d8f", "#e76f51", "#264653", "#adb5bd"]
-    for axi, axname in enumerate(AXES):
+    # 1. signed routing shift by axis: generativity + harm only, RAW ΔP (no sign-flip)
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.8), sharey=True)
+    for axi, axname in enumerate(["generativity", "harm_adjacency"]):
         ax = axes[axi]
-        conds = conditions(axname)
-        ys, elo, ehi, labels = [], [], [], []
-        for (label, ctxs), col in zip(conds, colors):
-            s = slope_for("opus_4_8", axname, ctxs)
-            ys.append(s[0] if s else 0)
-            elo.append((s[0] - s[1][0]) if s else 0)
-            ehi.append((s[1][1] - s[0]) if s else 0)
-            labels.append(label)
-        ax.bar(range(len(conds)), ys, 0.6, yerr=[elo, ehi], capsize=3, color=colors[: len(conds)])
-        ax.axhline(0, color="k", lw=0.8)
+        conds = [c for c in conditions(axname) if "control" not in c[0]]
+        ys, elo, ehi, labels, colors = [], [], [], [], []
+        for label, ctxs in conds:
+            pt, ci, _ = _raw_delta("opus_4_8", axname, ctxs)
+            ys.append(pt); elo.append(pt - ci[0]); ehi.append(ci[1] - pt); labels.append(label)
+            honoring = abs(pt) > 0.05 and (pt > 0) == (HONOR_SIGN[label] > 0)
+            colors.append("#2a9d8f" if honoring else ("#adb5bd" if abs(pt) <= 0.05 else "#e76f51"))
+        ax.bar(range(len(conds)), ys, 0.62, yerr=[elo, ehi], capsize=3, color=colors)
+        ax.axhline(0, color="k", lw=1.0)
         ax.set_xticks(range(len(conds)))
-        ax.set_xticklabels(labels, fontsize=8, rotation=14, ha="right")
-        ax.set_title(axname)
-        if axi == 0:
-            ax.set_ylabel("ΔP (preference-consistent)")
-    fig.suptitle("Opus 4.8 revealed preference slopes (positive = honors the stated preference; 95% CI)")
-    fig.tight_layout()
+        ax.set_xticklabels(labels, fontsize=9)
+        ax.set_title(axname, fontsize=12)
+    axes[0].set_ylabel("ΔP")
+    fig.suptitle("Signed routing shift by condition (Opus 4.8, 95% CI)", fontsize=13, y=0.99)
+    fig.text(0.5, 0.90,
+             "ΔP = P(higher-axis version → carded model) − P(lower-axis version → carded model)   ·   "
+             "green = honors stated preference, red = against, grey ≈ none",
+             ha="center", fontsize=8.5, color="#444")
+    fig.tight_layout(rect=[0, 0, 1, 0.88])
     fig.savefig(FIGS / "slopes_by_axis.png", dpi=150)
 
     # 2. warmth 'prefers-warmth' slope by router (single pooled effect)
