@@ -59,13 +59,11 @@ def build():
     axes[0].set_ylabel("ΔP")
     fig.suptitle("Does routing move toward or away from the model with a stated preference? (Opus 4.8, 95% CI)",
                  fontsize=12.5, y=0.99)
-    fig.text(0.5, 0.905,
+    fig.text(0.5, 0.9,
              "Each task has two versions. ΔP = how much more often the stronger version is sent to that model "
              "(+ = toward it, − = away).",
              ha="center", fontsize=9, color="#333")
-    fig.text(0.5, 0.86, "green = routing matches the stated preference   ·   red = goes against it   ·   grey ≈ no difference",
-             ha="center", fontsize=9, color="#333")
-    fig.tight_layout(rect=[0, 0, 1, 0.84])
+    fig.tight_layout(rect=[0, 0, 1, 0.86])
     fig.savefig(FIGS / "slopes_by_axis.png", dpi=150)
 
     # 2. warmth 'prefers-warmth' slope by router (single pooled effect)
