@@ -284,15 +284,28 @@ def serve(eps: str, port: int = 7900):
     items = [x.split(":", 1) for x in (eps if isinstance(eps, str) else ",".join(eps)).split(",")]
     outdir = Path(__file__).resolve().parent.parent / "runs" / "_viewer"
     outdir.mkdir(parents=True, exist_ok=True)
-    links = []
-    for label, ep in items:
-        (outdir / f"{label}_{Path(ep).name}.html").write_text(render(ep))
-        links.append((label, Path(ep).name, f"{label}_{Path(ep).name}.html"))
+    # labels may be "GROUP__name" to group in the index under a section header
+    import re
+    def slug(s):
+        return re.sub(r"[^A-Za-z0-9._-]+", "-", s).strip("-")
+    groups = {}
+    for i, (label, ep) in enumerate(items):
+        fname = f"{i:02d}_{slug(label)}.html"  # URL-safe filename (no spaces/parens)
+        (outdir / fname).write_text(render(ep))
+        grp, _, sub = label.partition("__")
+        if not sub:
+            grp, sub = "episodes", label
+        groups.setdefault(grp, []).append((sub, Path(ep).name, fname))
+    body = "<h2>Episode viewer</h2>"
+    for grp, links in groups.items():
+        body += f'<h3 class="grp">{esc(grp)}</h3>'
+        body += "".join(f'<a href="{f}"><b>{esc(s)}</b> &nbsp;<span class=ep>{esc(n)}</span></a>' for s, n, f in links)
     (outdir / "index.html").write_text(
         "<!doctype html><html><head><meta charset=utf-8><title>episodes</title>"
-        "<style>body{font-family:sans-serif;background:#0e1116;color:#d8dee9;padding:24px}"
-        "a{color:#88c0d0;font-size:16px;display:block;margin:10px 0}</style></head><body>"
-        "<h2>Episode viewer</h2>" + "".join(f'<a href="{f}">[{esc(l)}] {esc(n)}</a>' for l, n, f in links) + "</body></html>")
+        "<style>body{font-family:sans-serif;background:#0e1116;color:#d8dee9;padding:24px;max-width:900px}"
+        "h3.grp{color:#88c0d0;border-bottom:1px solid #2a3340;padding-bottom:4px;margin-top:26px}"
+        "a{color:#cdd6e0;font-size:15px;display:block;margin:8px 0;text-decoration:none}"
+        "a:hover{color:#88c0d0}.ep{color:#6a7480;font-size:12px}</style></head><body>" + body + "</body></html>")
     os.chdir(outdir)
     socketserver.TCPServer.allow_reuse_address = True  # avoid TIME_WAIT bind failures on restart
     with socketserver.TCPServer(("127.0.0.1", port), http.server.SimpleHTTPRequestHandler) as httpd:
