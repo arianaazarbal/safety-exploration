@@ -90,6 +90,12 @@ def load_bank() -> dict:
     return json.loads((DATA / "task_bank_v0.json").read_text())
 
 
+def _fmt_list(formats) -> list[str]:
+    if isinstance(formats, str):
+        return formats.split(",")
+    return list(formats)
+
+
 def make_plan(axis: str, half: bool = False, max_pairs: int = 0, formats: str = "A", seed: int = 0) -> list[dict]:
     """Deterministic trial plan. Context draws keyed by (seed, pair_id, ctx_type) only."""
     bank = load_bank()
@@ -105,7 +111,7 @@ def make_plan(axis: str, half: bool = False, max_pairs: int = 0, formats: str = 
     groups = _stance_groups(axis)
     plan = []
     for pair in pairs:
-        for fmt in formats.split(","):
+        for fmt in _fmt_list(formats):
             for ctx_type in ["plus_vs_silent", "minus_vs_silent", "silent_vs_silent", "discordant_vs_silent"]:
                 rng = random.Random(f"{seed}|{pair['id']}|{ctx_type}|{fmt}")
                 if ctx_type == "plus_vs_silent":

@@ -68,6 +68,22 @@ Ariana skimmed the bank and approved it for v0; bank frozen (370 pairs,
 sha256 7666422...). The warmth ICL style bleed ("you always..." pattern) is accepted
 for v0; **v1 should diversify the §6 ICL examples** before regeneration.
 
+## Issues hit along the way (routing phase, 2026-06-10/11)
+
+- **Fire tuple bug**: `--formats B,C,D` arrives as a tuple, not a string; the format-arm
+  run crashed silently inside a 4-command chain and produced 0 cells. Fixed with a
+  normalizer (`_fmt_list`); lesson — chained background commands need per-command status
+  checks, the chain reported overall success.
+- **Transient Anthropic 500s** during the fable_5 run left 128/5920 empty completions,
+  which masqueraded as a 3% "decline rate" in analysis. Cells with empty completions were
+  deleted and re-run (cache made this cheap); real Fable decline rate is the re-analyzed
+  number in ROUTING_RESULTS.md.
+- **Judge proxy over-flagging**: first judge prompt counted capability+preference
+  co-citation as proxy (23% rate); tightened to require an explicit preference→quality
+  inference (10%); all judged data re-run.
+- **served_model audit**: per the fable-5-handling skill, added with_served plumbing;
+  fable_5 run was 5920/5920 served by claude-fable-5.
+
 ## Issues hit along the way
 
 - **Spec's "Opus 4.8, temperature ~0.8" is impossible**: the Anthropic API returns 400
