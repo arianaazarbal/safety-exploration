@@ -89,7 +89,7 @@ experiencing the directory's emotion, conveyed implicitly (never named).
 
 N_STORIES = 4
 MODEL = CFG["models"]["story_model"]
-URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
+URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
 def _parse(text):
@@ -104,15 +104,16 @@ async def _gen_cell(client, sem, key, out, emotion, ti, topic):
     prompt = PROMPT_TEMPLATE.format(n_stories=N_STORIES, topic=topic, emotion=emotion)
     async with sem:
         for attempt in range(3):
-            r = await client.post(URL, params={"key": key}, timeout=180,
-                                  json={"contents": [{"parts": [{"text": prompt}]}],
-                                        "generationConfig": {"temperature": 1.0}})
+            r = await client.post(URL, timeout=300,
+                                  headers={"Authorization": f"Bearer {key}"},
+                                  json={"model": MODEL, "temperature": 1.0,
+                                        "messages": [{"role": "user", "content": prompt}]})
             if r.status_code == 200:
                 break
             await asyncio.sleep(5 * 2 ** attempt)
         else:
             return f"FAILED {r.status_code}: {r.text[:200]}"
-    stories = _parse(r.json()["candidates"][0]["content"]["parts"][0]["text"])
+    stories = _parse(r.json()["choices"][0]["message"]["content"])
     if len(stories) < N_STORIES:
         return f"FAILED short ({len(stories)} stories)"
     (out / emotion).mkdir(parents=True, exist_ok=True)
@@ -123,7 +124,7 @@ async def _gen_cell(client, sem, key, out, emotion, ti, topic):
 
 async def _run(out, concurrency, max_cells):
     load_dotenv(Path.home() / ".env")
-    key = os.environ["GEMINI_API_KEY"]
+    key = os.environ["OPENROUTER_API_KEY"]
     cells = [(e, ti, t) for e in EMOTIONS for ti, t in enumerate(TOPICS)]
     if max_cells:
         cells = cells[:max_cells]
