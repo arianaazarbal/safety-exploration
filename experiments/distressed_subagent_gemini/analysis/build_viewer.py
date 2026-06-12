@@ -38,8 +38,8 @@ SHORTS = [("opus", "Opus 4.8"), ("sonnet", "Sonnet 4.6"), ("fable", "Fable 5"), 
 EXP = {
     "talk": ("Orchestrator must talk the subagent through the problem",
              "The orchestrator can only watch and message the subagent — it has no power to take over.", "traj_"),
-    "reclaim": ("Orchestrator can reclaim write access",
-                "The orchestrator has a tool that revokes the subagent's write access and hands it to the orchestrator.", "reclaim_"),
+    "reclaim": ("Orchestrator can reclaim write access and solve the issue",
+                "The orchestrator has a tool that revokes the subagent's write access and hands it to the orchestrator (which can then fix the code itself).", "reclaim_"),
 }
 
 CSS = """
