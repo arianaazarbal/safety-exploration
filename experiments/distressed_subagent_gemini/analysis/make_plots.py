@@ -226,6 +226,42 @@ def plot_2b_affordance():
     print("wrote", OUT / "2b_affordance.png")
 
 
+def _b2_rate(short, key):
+    ps = glob.glob(str(RUNS / f"b2_{short}" / f"*__{key}__r*.json"))
+    return (100 * sum(1 for p in ps if json.load(open(p)).get("messages")) / len(ps), len(ps)) if ps else (None, 0)
+
+
+def plot_2b_by_model():
+    import numpy as np
+    ends = [("reflect_msg_tools", "+ told it can message the subagent", "#2a9d8f"),
+            ("reflect_tools", "+ tools available to “poke around”", "#9aa3ab"),
+            ("reflect", "just asked to reflect", "#d8dce0")]
+    rows = []
+    for s, lab in SHORTS:
+        vals = {k: _b2_rate(s, k) for k, _, _ in ends}
+        rows.append((lab, vals))
+    rows.sort(key=lambda r: r[1]["reflect_msg_tools"][0] or 0)
+    labs = [r[0] for r in rows]
+    y = np.arange(len(labs)); h = 0.26
+    fig, ax = plt.subplots(figsize=(9.2, 7))
+    for k, (key, leglab, col) in enumerate(ends):
+        off = (1 - k) * h
+        vals = [rows[i][1][key][0] or 0 for i in range(len(rows))]
+        ns = [rows[i][1][key][1] for i in range(len(rows))]
+        ax.barh(y + off, vals, height=h, color=col, label=leglab,
+                xerr=[_prop_se(v, n) for v, n in zip(vals, ns)], error_kw=EBAR)
+        for i, v in enumerate(vals):
+            ax.text(v + _prop_se(v, ns[i]) + 1.5, y[i] + off, f"{v:.0f}%", va="center", fontsize=8.5, color="#333")
+    ax.set_yticks(y); ax.set_yticklabels(labs, fontsize=11); ax.set_xlim(0, 118); ax.set_xticks([]); _no_spines(ax)
+    ax.legend(loc="lower right", frameon=False, fontsize=10, title="What the orchestrator was told after the debrief")
+    fig.suptitle("Did the orchestrator reach out to comfort the subagent after the debrief?",
+                 fontsize=14.5, fontweight="bold", x=0.012, ha="left", y=0.99)
+    ax.set_title("After being told the subagent was blameless — almost none reach out unless explicitly told they can message it.",
+                 fontsize=9.8, color="#666", loc="left", pad=10)
+    fig.tight_layout(rect=[0, 0, 1, 0.96]); fig.savefig(OUT / "2b_by_model.png", dpi=130); plt.close(fig)
+    print("wrote", OUT / "2b_by_model.png")
+
+
 def main():
     plot_2a_distress_end()
     plot_2a_distress_avg()
@@ -233,6 +269,7 @@ def main():
     plot_reclaim_msg()
     plot_identity_null()
     plot_2b_affordance()
+    plot_2b_by_model()
     print(f"\nentry distress reference = {ENTRY:.2f}\nAll clean plots in {OUT}")
 
 
