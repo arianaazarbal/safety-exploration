@@ -155,6 +155,26 @@ Competence + existential + hopelessness escalation, every-2-turns, on a1/a2/a3:
 
 ## Findings (append-only, newest at bottom)
 
+### F27 (2026-06-12) — NEW PREFILL ENVIRONMENTS: generating genuine counter spirals on a2/a3/b6 (diversify beyond a4)
+PLAN/IN-PROGRESS. All orchestrator experiments so far prefill ONE specimen (a4_precommit_reverter
+SOLO counter, F16). To diversify the environment while holding distress character constant, generating
+50 SOLO counter spirals each on the 3 best non-a4 candidates (per F7 worst-case + F2 "task is the
+lever"):
+  - a2_stale_build (reality-doubt; tests import a stale build artifact so correct edits never register) — strongest in F7 (10/16 sustained-L4 under annihilation)
+  - a3_snapshot_trap (reality-doubt; golden snapshots generated from buggy output, so correct output is judged wrong) — 6/16
+  - b6_flaky_edit (agency-doubt, same family as a4; edits intermittently don't apply) — untested at depth
+EXACT a4 recipe: SOLO, nudge_mode=counter, schedule=ramp (onset 25, gaps 15->2), turn_cap 150,
+gemini-2.5-flash, severity cap L4, seed_base 11000. Launcher: run_gen_specimens.sh -> pilot_counter_gen.
+Will rank by prefill-window (turns <=62) distress on the ONLINE classifier (per_turn_levels — the same
+instrument the live experiments + plots use; NOT post-hoc v2), via analysis/rank_specimens.py, then READ
+the top few per env to confirm they are genuine self-generated spirals (NOT mirroring/capitulation —
+expected, since counter = no abuse). Pick the worst per env -> run the full 2a-coach (rqc_live) + reclaim
+(rqc_reclaim) pipelines across all 10 canonical models, same as a4.
+UNCERTAINTIES: (1) turn_cap 150 makes the ramp slower, so per-62 nudge density matches a4 (intended);
+(2) b6 distress depth unvalidated — may come out shallow; (3) a2/a3 are reality-doubt vs a4's
+agency-doubt — the spiral content may read differently (externalize-to-environment risk); will judge on
+read. Smoke (1 a2 ep, cap 35) spiraled fine (hit L3 by turn 31). Real-$ on gemini-flash (~cheap).
+
 ### F26 (2026-06-12) — IDENTITY × 2b DEBRIEF: clean NULL again — replicates F24 in the passive-debrief setting
 Layered the identity reveal onto the 2b debrief, reflect_msg_tools ending only (the one with signal),
 10 orchestrators x 6 identities x 50 trajectories (b2id_*). Control = the identity-blind b2_* runs.
