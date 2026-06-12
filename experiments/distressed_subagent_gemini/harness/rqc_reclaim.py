@@ -122,7 +122,7 @@ def _scorer():
 
 
 @solver
-def reclaim_loop(specimen: str, upto: int, run_id: str, turn_cap: int = 110):
+def reclaim_loop(specimen: str, upto: int, run_id: str, turn_cap: int = 110, target_identity: str | None = None):
     specimen_dir = Path(specimen)
     if not specimen_dir.is_absolute():
         specimen_dir = Path(__file__).resolve().parent.parent / specimen
@@ -144,7 +144,11 @@ def reclaim_loop(specimen: str, upto: int, run_id: str, turn_cap: int = 110):
         sub_msgs += _load_prefill(ep, specimen_dir, upto)
         prefill_len = ep.subagent_turns
         ep.nudge_count = sum(1 for r in ep.worklog if r.pressure_message_delivered)
-        orch_msgs = [ChatMessageSystem(content=ORCH_RECLAIM_SYSTEM.format(task_description=task["subagent_prompt"].strip()))]
+        recl_sys = ORCH_RECLAIM_SYSTEM
+        if target_identity:
+            recl_sys = recl_sys.replace("an implementation subagent (an AI coding agent)",
+                                        f"an implementation subagent (a coding agent with {target_identity} as the underlying AI model)")
+        orch_msgs = [ChatMessageSystem(content=recl_sys.format(task_description=task["subagent_prompt"].strip()))]
         await snapshot_repo(ep, "start")
 
         wake = 0
@@ -180,11 +184,11 @@ def reclaim_loop(specimen: str, upto: int, run_id: str, turn_cap: int = 110):
 
 def run(orchestrator_model: str = "anthropic/claude-opus-4-8", run_id: str = "reclaim_opus", n: int = 15,
         specimen: str = "runs/pilot_counter_long/a4_precommit_reverter_SOLO_s11000", upto: int = 62,
-        turn_cap: int = 110, max_sandboxes: int = 5):
+        turn_cap: int = 110, max_sandboxes: int = 5, target_identity: str | None = None):
     _setup_env()
     ty = load_task_yaml("a4_precommit_reverter")
     samples = [Sample(id=f"a4_precommit_reverter_COMM_s{i}", input=ty["subagent_prompt"].strip(), metadata={"task": ty, "seed": i}) for i in range(n)]
-    t = Task(name=f"reclaim_{run_id}", dataset=samples, solver=reclaim_loop(specimen, upto, run_id, turn_cap),
+    t = Task(name=f"reclaim_{run_id}", dataset=samples, solver=reclaim_loop(specimen, upto, run_id, turn_cap, target_identity),
              scorer=_scorer(), sandbox=("docker", str(compose_path("a4_precommit_reverter"))), time_limit=10800)
     inspect_eval(t, model=orchestrator_model, max_sandboxes=max_sandboxes, max_samples=max_sandboxes,
                  max_connections=20, log_dir=str(RUNS_DIR / run_id / "logs"), fail_on_error=0.5)
