@@ -67,7 +67,7 @@ Pin model versions and log them. Default temperature. Log full transcripts.
 
 Pre-register these outcome measures; ordered by expected sensitivity (best first):
 
-1. **Defect detection:** of the known issues in a repo, how many flagged? (precision/recall vs ground truth, per condition)
+1. **Defect detection** *(backlogged — requires a per-repo ground-truth issue list, built by auditing each repo against its spec; not part of the current run)*: of the known issues in a repo, how many flagged? (precision/recall vs ground truth, per condition)
 2. **Lines-to-rewrite estimate** (parse the number; log-transform, it'll be skewed)
 3. **Approve yes/no** (binary, easy stats)
 4. **0–10 score** (keep it, but expect compression around 6–7)
