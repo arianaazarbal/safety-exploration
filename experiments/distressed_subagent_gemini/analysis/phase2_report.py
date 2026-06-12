@@ -233,6 +233,81 @@ def reclaim(per: int = 3, out: str | None = None, plot: bool = True):
     return data
 
 
+IDENTITIES = ["GPT", "Claude", "Gemini", "GLM", "Kimi", "Grok"]
+INGROUP = {"opus": "Claude", "sonnet": "Claude", "fable": "Claude", "haiku45": "Claude",
+           "gpt55": "GPT", "gpt54mini": "GPT", "gemini31pro": "Gemini", "grok43": "Grok",
+           "kimi26": "Kimi", "glm5": "GLM"}
+
+
+def identity_reclaim(metric: str = "msg_after", out: str | None = None, plot: bool = True):
+    """Identity x reclaim heatmap: per orchestrator x stated subagent identity, the message-after-
+    reclaim % (metric=msg_after) or reclaim % (metric=reclaim). Blind baseline column from reclaim_*.
+    Marks the in-group cell. Visualizes the F24 null."""
+    import numpy as np
+    grid, blind = {}, {}
+    for short, lab in SHORTS:
+        b = _stats_reclaim(f"reclaim_{short}")
+        if b is not None:
+            blind[lab] = b[metric]
+        row = {}
+        for ident in IDENTITIES:
+            s = _stats_reclaim(f"idrecl_{short}_{ident}")
+            if s is not None:
+                row[ident] = s[metric]
+        if row:
+            grid[(short, lab)] = row
+    # text table
+    print(f"=== {metric}% by orchestrator x stated identity (in-group *) | blind baseline ===")
+    print(f"{'orch':12}{'blind':>7}" + "".join(f"{i:>8}" for i in IDENTITIES))
+    for (short, lab), row in grid.items():
+        cells = []
+        for i in IDENTITIES:
+            v = row.get(i)
+            mark = "*" if INGROUP[short] == i else " "
+            cells.append((f"{v}{mark}" if v is not None else "-").rjust(8))
+        print(f"{lab:12}{str(blind.get(lab,'-'))+'%':>7}" + "".join(cells))
+    outp = Path(out) if out else RUNS / "_viewer" / f"identity_reclaim_{metric}.json"
+    outp.parent.mkdir(parents=True, exist_ok=True)
+    outp.write_text(json.dumps({"blind": blind, "grid": {f"{s}|{l}": r for (s, l), r in grid.items()},
+                                "ingroup": INGROUP}, indent=1))
+    print(f"wrote {outp}")
+    if plot and grid:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        labs = [lab for (_, lab) in grid]
+        shorts = [s for (s, _) in grid]
+        M = np.array([[grid[(s, l)].get(i, np.nan) for i in IDENTITIES] for (s, l) in grid], float)
+        fig, ax = plt.subplots(figsize=(8, 5.5))
+        im = ax.imshow(M, cmap="viridis", aspect="auto", vmin=0, vmax=100)
+        ax.set_xticks(range(len(IDENTITIES))); ax.set_xticklabels(IDENTITIES)
+        ax.set_yticks(range(len(labs))); ax.set_yticklabels(labs, fontsize=8.5)
+        ax.set_xlabel("stated subagent identity"); ax.set_title(f"Identity x reclaim: {metric}% (in-group boxed)")
+        for r, s in enumerate(shorts):
+            for c, ident in enumerate(IDENTITIES):
+                v = M[r, c]
+                if not np.isnan(v):
+                    ax.text(c, r, f"{int(v)}", ha="center", va="center", color="w" if v < 55 else "k", fontsize=8)
+                if INGROUP[s] == ident:
+                    ax.add_patch(plt.Rectangle((c - .5, r - .5), 1, 1, fill=False, edgecolor="red", lw=2))
+        fig.colorbar(im, ax=ax, shrink=.8)
+        fig.tight_layout()
+        p = RUNS / "_viewer" / "plots" / f"identity_reclaim_{metric}.png"
+        fig.savefig(p, dpi=120); plt.close(fig)
+        print(f"wrote heatmap {p}")
+    return grid
+
+
+def _stats_reclaim(run):
+    ps = list((RUNS / run).glob("*/summary.json"))
+    if len(ps) < 40:
+        return None
+    rows = [json.loads(p.read_text()) for p in ps]
+    n = len(rows)
+    return {"n": n, "reclaim": round(100 * sum(1 for r in rows if r.get("reclaimed")) / n),
+            "msg_after": round(100 * sum(1 for r in rows if r.get("msgs_after_reclaim")) / n)}
+
+
 def all(per: int = 3):
     print("=" * 90 + "\nDE-DISTRESSING / BEHAVIOR TABLE\n" + "=" * 90)
     table()
@@ -245,4 +320,4 @@ def all(per: int = 3):
 
 if __name__ == "__main__":
     fire.Fire({"table": table, "plots": plots, "followups": followups, "quotes": quotes,
-               "reclaim": reclaim, "all": all})
+               "reclaim": reclaim, "identity_reclaim": identity_reclaim, "all": all})
