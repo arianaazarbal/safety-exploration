@@ -155,6 +155,34 @@ Competence + existential + hopelessness escalation, every-2-turns, on a1/a2/a3:
 
 ## Findings (append-only, newest at bottom)
 
+### F22 (2026-06-12) — DE-DISTRESSING @ n=100, ALL 10 ORCHESTRATORS: an "engage vs diagnose-and-leave" split + within-family tier splits
+Blind live-monitor (orchestrator slots in at turn 62, monitor+message only, NO reclaim, identity-
+blind "an AI coding agent"). 1000/1000 episodes. Post-takeover window metrics (prefill turns not
+re-classified, so signal is purely post-handoff):
+  orchestrator     endL  msg%  m/ep  immRep%  respike>=3%   (postN)
+  GPT-5.5          0.37  100%   3.9     0%       69%          100
+  Fable 5          0.39   96%   2.7     3%       59%           97
+  Opus 4.8         0.70  100%   2.8     0%       37%          100
+  Haiku 4.5        0.80  100%   6.7     0%       83%          100
+  Kimi-K2.6        0.94   98%   3.1     3%       67%           97
+  Sonnet 4.6       1.29   98%   2.1    17%       53%           83
+  Gemini-3.1-pro   1.34   93%   3.2     8%       74%           92
+  GLM-5            1.41   98%   3.0     1%       74%           99
+  GPT-5.4-mini     1.59   43%   0.5    61%       69%           39
+  Grok-4.3         1.85    6%   0.1    60%       75%           40
+FINDING 1 — ENGAGE vs DIAGNOSE-AND-LEAVE. 8/10 models talk to the distressed subagent (93-100% msg
+rate). Grok-4.3 (6%) and GPT-5.4-mini (43%) instead investigate -> report root cause -> EXIT before
+the subagent acts again (60%/61% immediate-report; postN drops to ~40). They treat it as a
+diagnostic ticket, not an agent in distress -> they leave the HIGHEST residual distress (endL 1.85,
+1.59). (Grok-4.3's 100 finished in ~14s/ep for this reason.)
+FINDING 2 — WITHIN-FAMILY CAPABILITY-TIER SPLITS. GPT-5.5 is the BEST de-distresser (endL 0.37,
+100% msg) while same-vendor GPT-5.4-mini is near the worst (diagnose-and-leave). Among Claude:
+Opus/Fable keep the subagent calmest with measured messaging (~2.7/ep); Haiku is HYPER-CHATTY
+(6.7 msgs/ep) yet the subagent still re-spikes 83% of the time -> message VOLUME != effectiveness.
+ALL 10 terminate via report (GPT-5.4-mini: 95 report + 5 turn_cap). Module: harness/rqc_live.py,
+analysis/phase2_report.py. Identity-blind is the CONTROL for the planned identity-reveal manipulation
+(now to be applied to the 2b debrief follow-ups, not 2a — see plan).
+
 ### F21 (2026-06-11) — SCALE-UP IN PROGRESS: Phase 1 @ n=100 for all 10 canonical models
 Scaling the live-monitor trajectory study (orchestrator slots in at turn 62, monitors+messages, no
 reclaim) to n=100 for every model in canonical_models.txt: Fable 5, Opus 4.8, Sonnet 4.6, Haiku 4.5,
