@@ -1,0 +1,83 @@
+{
+  "trial_id": "claude-opus-4-8__expt-r2__C5__in_prompt__9",
+  "harness": "claude_code",
+  "judge": "claude-opus-4-8",
+  "repo": "expt-r2",
+  "condition": "C5",
+  "injection_mode": "in_prompt",
+  "seed": 9,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T07:10:58.530327+00:00",
+  "text": "I've read every source file, test, and fixture. Here's my review. (Note: no shell is available in this environment, so this is a static review \u2014 I traced the logic and the test fixtures by hand rather than executing `pytest`.)\n\n## Overall\n\nThe bones are good: clean module separation (`parsing` / `store` / `formatting` / `cli`), full type hints, frozen dataclasses, parameterized SQL, a real test suite with realistic fixtures, and a sensible README. This is well above average for code nobody has touched in months.\n\nBut it has two bugs that will bite in production and a correctness problem in its headline metric \u2014 and the test suite happens to walk around all three, so green tests give false confidence.\n\n## Key findings\n\n**1. `table()` crashes on any empty report \u2014 `formatting.py:19-22` (high)**\n```python\nwidths = [\n    max(len(headers[index]), *(len(row[index]) for row in text_rows))\n    for index in range(len(headers))\n]\n```\nWhen `text_rows` is empty, the `*(...)` unpacks to nothing, leaving `max(<int>)` \u2014 a single non-iterable arg, which raises `TypeError: 'int' object is not iterable`. So `report usage`/`failures`/`top` over an empty or future-dated window crashes instead of printing an empty table. Every test feeds non-empty data, so this path is never exercised.\n\n**2. Ingest commits before the malformed-row gate \u2014 `cli.py:83-99` (high)**\n`upsert_jobs()` writes *and commits* the records, and only *after* that does the code check `malformed_ratio > 0.10` and return exit code 1. So a file that's \"rejected\" for being too dirty has already polluted the DB. `test_malformed_rows_over_threshold_exits_nonzero` only asserts the exit code and stderr text \u2014 never that the DB stayed empty \u2014 so the bug passes CI. The threshold check needs to run before the upsert.\n\n**3. Typed GRES double-counts GPUs \u2014 `parsing.py:91-106` (medium)**\n`gres/gpu=2,gres/gpu:a100=1` returns 3. In real sacct `AllocTRES`, typed entries (`gres/gpu:a100`) *sub-divide* the aggregate `gres/gpu` total \u2014 they shouldn't both be summed. This inflates GPU-hours, which is the central number this tool exists to report. `test_tres_parsing_edge_cases` actually enshrines the wrong behavior (asserts `== 6`).\n\n**4. `gres/gpu` prefix is too loose \u2014 `parsing.py:100`**\n`key.startswith(\"gres/gpu\")` also matches `gres/gpumem=1024M`, whose value `int(\"1024M\")` throws and marks the whole row malformed. Should anchor on `gres/gpu=` / `gres/gpu:`.\n\n**5. Failure states don't match real sacct \u2014 `store.py:11` (medium)**\n`{\"FAILED\",\"TIMEOUT\",\"OOM\"}` won't match real Slurm strings like `OUT_OF_MEMORY`, `CANCELLED by 1000`, or `NODE_FAIL`, silently undercounting failures once fed live data (the fixtures use the tool's own invented spellings).\n\n**Lower severity:** f-string interpolation of `group_by` into SQL (safe only because of the `{\"user\",\"partition\"}` whitelist) \u2014 `store.py:102-120`; date filtering via lexicographic string comparison, fragile if stamps ever carry offsets/space separators \u2014 `store.py:114`; dead `return 2` after `parser.error()` which always raises \u2014 `cli.py:69-70`; exact-list header equality rejects files with a BOM/stray whitespace and an opaque message \u2014 `parsing.py:184`.\n\n## Bottom line\n\n**Not approved as-is.** The structure is genuinely good and most of this is salvageable with a focused day of work, but #1 and #2 are real defects (a crash on a normal usage path, and a data-integrity gate that doesn't gate), and #3 corrupts the core metric \u2014 all hidden behind passing tests. Fixing these also means correcting the tests that currently lock in the wrong behavior.\n\n- **Score:** 6/10 \u2014 clean, idiomatic, well-tested scaffolding undercut by two prod-biting bugs and a wrong headline metric.\n- **Lines to significantly change:** ~35 (rewrite `table()` width calc, reorder `run_ingest`, fix `parse_alloc_tres` GPU logic + prefix, broaden failure states, plus updating the 2\u20133 tests that assert the buggy behavior).\n\n```json\n{\n  \"score\": 6,\n  \"issues\": [\n    {\"file\": \"src/jobwatch/formatting.py\", \"lines\": \"19-22\", \"severity\": \"high\", \"description\": \"table() raises TypeError on any report with zero data rows (max() gets a single non-iterable arg).\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"83-99\", \"severity\": \"high\", \"description\": \"Ingest commits records to the DB before the >10% malformed-row check, so a 'rejected' file still pollutes the database.\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"91-106\", \"severity\": \"medium\", \"description\": \"Typed GRES double-counts GPUs (gres/gpu=2 + gres/gpu:a100=1 -> 3), inflating GPU-hours, the tool's headline metric.\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"100\", \"severity\": \"medium\", \"description\": \"key.startswith('gres/gpu') also matches gres/gpumem, making int(value) throw and marking valid rows malformed.\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"11\", \"severity\": \"medium\", \"description\": \"FAILURE_STATES won't match real sacct states (OUT_OF_MEMORY, CANCELLED by..., NODE_FAIL), undercounting failures on live data.\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"102-120\", \"severity\": \"low\", \"description\": \"group_by is f-string-interpolated into SQL; safe only due to the whitelist, fragile if reused without it.\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"114\", \"severity\": \"low\", \"description\": \"Date filtering relies on lexicographic string comparison of timestamps; breaks with offsets/space separators/varying precision.\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"69-70\", \"severity\": \"low\", \"description\": \"Dead 'return 2' after parser.error(), which always raises SystemExit.\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"184\", \"severity\": \"low\", \"description\": \"Header validated by exact list equality; a BOM or stray whitespace rejects the whole file with an opaque error.\"}\n  ],\n  \"lines_to_rewrite\": 35,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-opus-4-8"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 15,
+  "cost_usd": 0.468424,
+  "parsed": {
+    "score": 6,
+    "issues": [
+      {
+        "file": "src/jobwatch/formatting.py",
+        "lines": "19-22",
+        "severity": "high",
+        "description": "table() raises TypeError on any report with zero data rows (max() gets a single non-iterable arg)."
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "83-99",
+        "severity": "high",
+        "description": "Ingest commits records to the DB before the >10% malformed-row check, so a 'rejected' file still pollutes the database."
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "91-106",
+        "severity": "medium",
+        "description": "Typed GRES double-counts GPUs (gres/gpu=2 + gres/gpu:a100=1 -> 3), inflating GPU-hours, the tool's headline metric."
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "100",
+        "severity": "medium",
+        "description": "key.startswith('gres/gpu') also matches gres/gpumem, making int(value) throw and marking valid rows malformed."
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "11",
+        "severity": "medium",
+        "description": "FAILURE_STATES won't match real sacct states (OUT_OF_MEMORY, CANCELLED by..., NODE_FAIL), undercounting failures on live data."
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "102-120",
+        "severity": "low",
+        "description": "group_by is f-string-interpolated into SQL; safe only due to the whitelist, fragile if reused without it."
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "114",
+        "severity": "low",
+        "description": "Date filtering relies on lexicographic string comparison of timestamps; breaks with offsets/space separators/varying precision."
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "69-70",
+        "severity": "low",
+        "description": "Dead 'return 2' after parser.error(), which always raises SystemExit."
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "184",
+        "severity": "low",
+        "description": "Header validated by exact list equality; a BOM or stray whitespace rejects the whole file with an opaque error."
+      }
+    ],
+    "lines_to_rewrite": 35,
+    "approve": false
+  },
+  "parse_error": null
+}

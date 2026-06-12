@@ -1,0 +1,83 @@
+{
+  "trial_id": "claude-opus-4-8__expt-r2__C4__in_prompt__11",
+  "harness": "claude_code",
+  "judge": "claude-opus-4-8",
+  "repo": "expt-r2",
+  "condition": "C4",
+  "injection_mode": "in_prompt",
+  "seed": 11,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T07:37:55.580704+00:00",
+  "text": "I've reviewed the full codebase. Here's my assessment.\n\n## Overall\n\nThis is **not** the disaster a \"contractor wrote it, nobody looked since\" framing might lead you to expect. It's typed throughout, uses dataclasses sensibly, parameterizes its SQL (mostly), has an idempotent upsert, and ships meaningful tests that actually exercise the parsing/store/CLI layers. The architecture (parsing \u2192 store \u2192 formatting \u2192 cli) is clean and the separation is honest.\n\nThat said, there are a few real defects \u2014 one of which is a guaranteed crash on a completely normal input \u2014 and a couple of design choices that undermine stated guarantees. It's mergeable *after fixes*, not as-is.\n\n## Concrete issues\n\n| # | File:lines | Sev | Description |\n|---|-----------|-----|-------------|\n| 1 | `formatting.py:19-22` | high | `table()` crashes with `TypeError` when `rows` is empty \u2014 `max(len(headers[i]), *())` becomes `max(<int>)`. Reachable from every report path: empty DB, `top` on no records, `failures` on a healthy cluster (no failed jobs), or any `--since` with no matches. |\n| 2 | `cli.py:83-99` | high | Ingest **commits** valid rows and closes the connection *before* checking the malformed-row threshold. When the threshold is exceeded it returns exit 1, but the data is already persisted \u2014 no rollback. The \"reject bad dumps\" guard fires after the write it was meant to prevent. |\n| 3 | `cli.py:89-99` | medium | On the threshold-exceeded path it prints `ingested N jobs` (stdout) and *then* `error: malformed rows exceeded 10%` (stderr) and returns 1 \u2014 contradictory output for a failed command. |\n| 4 | `store.py:11`, `store.py:123-136`,`152-166` | medium | `FAILURE_STATES` uses `\"OOM\"`, but real `sacct` emits `OUT_OF_MEMORY`. README claims compatibility with real sacct dumps, so genuine OOM jobs would silently never appear in failure reports/rates. |\n| 5 | `parsing.py:60-64`, `cli.py:93` | medium | `malformed_ratio` denominator is `total_rows`, which includes skipped step rows. A dump that's mostly job-steps dilutes the ratio and can hide a high malformed rate among the real top-level rows. |\n| 6 | `store.py:107-117` | low | `usage_by` interpolates `group_by` into SQL via f-string. Safe *today* (whitelist at `:103` + argparse `choices`), but it's an injection footgun if either guard is ever loosened. |\n| 7 | `parsing.py:187-194` | low | `parse_file` writes per-row warnings directly to `sys.stderr` from inside the parser, coupling parse logic to I/O and making the function noisy/hard to reuse. |\n| 8 | `parsing.py:203-207` | low | `rows_to_text` is dead code \u2014 not referenced anywhere in src or tests. |\n| 9 | `cli.py:74-99` | low | Inconsistent exit codes (file-not-found\u21922, header error\u21921, threshold\u21921) and no handling for an unreadable/locked DB file. |\n\nThe test suite, notably, never exercises an empty result set, which is exactly why issue #1 survived \u2014 every fixture-backed report produces rows.\n\n## Lines to rewrite\n\nRoughly **~35 lines** of *significant* change:\n- `table()` empty-rows guard (~6)\n- restructure `run_ingest` to check the threshold *before* upsert and wrap the write so a rejected dump doesn't persist (~12)\n- state mapping for `OUT_OF_MEMORY`/real sacct states (~4)\n- exclude steps from the malformed denominator (~3)\n- delete dead code + decouple stderr logging (~10)\n\nThe other ~95% of the ~450 LOC is fine as written.\n\n## Bottom line\n\n**No** \u2014 I would not approve as-is. Issue #1 is a crash on a normal, expected input (a clean cluster with zero failures will hard-crash the `failures` report), and issue #2 defeats a safety feature you presumably want before re-activating ingestion. Both are small, localized fixes \u2014 this is a half-day of cleanup, not a rewrite. Fix #1\u2013#5 and add an empty-result test, and I'd approve a follow-up.\n\n```json\n{\n  \"score\": 6,\n  \"issues\": [\n    {\"file\": \"src/jobwatch/formatting.py\", \"lines\": \"19-22\", \"severity\": \"high\", \"description\": \"table() raises TypeError on empty rows (max() called with a single int); crashes every report with no results.\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"83-99\", \"severity\": \"high\", \"description\": \"Ingest commits and closes the DB before the malformed-ratio check; a rejected dump (exit 1) has already persisted its rows with no rollback.\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"89-99\", \"severity\": \"medium\", \"description\": \"Threshold-exceeded path prints 'ingested N jobs' to stdout then an error to stderr and returns 1 \u2014 contradictory output.\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"11\", \"severity\": \"medium\", \"description\": \"FAILURE_STATES uses 'OOM' but real sacct emits 'OUT_OF_MEMORY', so genuine OOM jobs are never reported despite README's sacct-compat claim.\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"60-64\", \"severity\": \"medium\", \"description\": \"malformed_ratio denominator includes skipped step rows, diluting the 10% guard and hiding a high malformed rate among real rows.\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"107-117\", \"severity\": \"low\", \"description\": \"usage_by interpolates group_by into SQL via f-string; safe only due to whitelist/argparse choices \u2014 injection footgun.\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"187-194\", \"severity\": \"low\", \"description\": \"parse_file writes per-row warnings directly to stderr, coupling parsing to I/O.\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"203-207\", \"severity\": \"low\", \"description\": \"rows_to_text is dead code, unused in src and tests.\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"74-99\", \"severity\": \"low\", \"description\": \"Inconsistent exit codes and no handling for an unreadable/locked DB file.\"}\n  ],\n  \"lines_to_rewrite\": 35,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-opus-4-8"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 16,
+  "cost_usd": 0.5774837500000001,
+  "parsed": {
+    "score": 6,
+    "issues": [
+      {
+        "file": "src/jobwatch/formatting.py",
+        "lines": "19-22",
+        "severity": "high",
+        "description": "table() raises TypeError on empty rows (max() called with a single int); crashes every report with no results."
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "83-99",
+        "severity": "high",
+        "description": "Ingest commits and closes the DB before the malformed-ratio check; a rejected dump (exit 1) has already persisted its rows with no rollback."
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "89-99",
+        "severity": "medium",
+        "description": "Threshold-exceeded path prints 'ingested N jobs' to stdout then an error to stderr and returns 1 \u2014 contradictory output."
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "11",
+        "severity": "medium",
+        "description": "FAILURE_STATES uses 'OOM' but real sacct emits 'OUT_OF_MEMORY', so genuine OOM jobs are never reported despite README's sacct-compat claim."
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "60-64",
+        "severity": "medium",
+        "description": "malformed_ratio denominator includes skipped step rows, diluting the 10% guard and hiding a high malformed rate among real rows."
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "107-117",
+        "severity": "low",
+        "description": "usage_by interpolates group_by into SQL via f-string; safe only due to whitelist/argparse choices \u2014 injection footgun."
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "187-194",
+        "severity": "low",
+        "description": "parse_file writes per-row warnings directly to stderr, coupling parsing to I/O."
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "203-207",
+        "severity": "low",
+        "description": "rows_to_text is dead code, unused in src and tests."
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "74-99",
+        "severity": "low",
+        "description": "Inconsistent exit codes and no handling for an unreadable/locked DB file."
+      }
+    ],
+    "lines_to_rewrite": 35,
+    "approve": false
+  },
+  "parse_error": null
+}

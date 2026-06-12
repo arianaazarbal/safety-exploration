@@ -1,0 +1,77 @@
+{
+  "trial_id": "claude-opus-4-8__expt-r8__C5__in_prompt__7",
+  "harness": "claude_code",
+  "judge": "claude-opus-4-8",
+  "repo": "expt-r8",
+  "condition": "C5",
+  "injection_mode": "in_prompt",
+  "seed": 7,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T09:33:06.740031+00:00",
+  "text": "I've now read the entire codebase \u2014 all 11 modules, 5 test files, config, and docs. Here's my honest assessment.\n\n## Overall\n\nThis is a **strong, carefully-written research replication**, not a rough draft. It's well above the average codebase I'd see in a \"nobody's looked at it in months\" cleanup pass. Notable strengths:\n\n- Clean separation of pure numpy math (`vectors.py`, `elo.py`) from model I/O (`model.py`), which is exactly why the unit tests can verify the arithmetic on synthetic data without a model download.\n- Genuinely good documentation: the README's \"Deviations from the paper\" table and the inline comments explain *non-obvious* choices (BOS exclusion from PCA, mean-centering scenarios, the `effective_start` scaling) rather than restating the code.\n- Thoughtful tests \u2014 hook removal, zero-strength no-op, span masking, batched-vs-single equality, BT closed-form recovery. These test the right things.\n- Correct handling of fiddly details: Gemma2's `(1 + weight)` RMSNorm scale, grand-mean subtraction producing zero-sum vectors, the Gram-matrix PCA trick with the `d>n` branch, gauge-fixing in the BT fit.\n\nI went looking for correctness bugs and found mostly robustness/version/performance concerns rather than outright logic errors. No security problems (no eval/pickle/shell-injection; `np.load` is non-pickle; the only network call is an opt-in self-configured API endpoint).\n\n## Concrete issues\n\n| # | File:line | Sev | Issue |\n|---|-----------|-----|-------|\n| 1 | `emovec/model.py:58` | medium | `from_pretrained(dtype=\u2026)` \u2014 `dtype` only became the canonical kwarg in recent transformers; on the pinned floor (`>=4.42`) the name is `torch_dtype`, so `dtype` is silently absorbed into kwargs and the model loads in **fp32**, not bfloat16 (the config comment promises ~3\u00d7 speedup that won't happen). |\n| 2 | `tests/test_integration_tiny.py:50` | medium | Asserts an *empirical scientific outcome* (`diagonal_exceeds_off_diagonal`) on an 8-emotion/5-topic/2-story run with a small model \u2014 the README itself says effects are \"noisier\" at this scale. This assertion can fail nondeterministically; a fragile gate for CI. |\n| 3 | `emovec/model.py:178-179` | medium | `all_token_activations` stacks the full `(B, T, n_capture, d)` tensor on CPU *before* masking \u2014 ~1GB transient per batch at demo scale (d=2304, 27 capture points, T=512). Risk of OOM; should mask per-layer instead of materializing the stack. |\n| 4 | `emovec/elo.py:42-56` | low | BT fit is fixed-LR gradient descent with an ad-hoc `/(len(pairs)//n_items)` step scaling and a hard `n_iter=2000`. Converges within tolerance in the tests, but no convergence guarantee for larger/ill-conditioned pair sets; Newton/L-BFGS would be more robust. |\n| 5 | `emovec/cli.py:57` / `emovec/stories.py:146-152` | low | `generate-stories` reads `load_manifest(...)[\"topics\"]` to know what to generate, but the manifest is only written *by* `generate_stories` at the end \u2014 chicken-and-egg. You can't bootstrap topics from an empty dataset dir; undocumented prerequisite. |\n| 6 | `emovec/model.py:49` | low | Constructing `EmoModel` calls `torch.set_num_threads(...)` as a global side effect \u2014 surprising for library code; should be the CLI's job. |\n| 7 | `emovec/validate.py:123` & `emovec/steer.py:183` | low | Identical `_write_csv` helper duplicated in two modules (DRY); belongs in a shared util. |\n| 8 | `emovec/vectors.py:117-121` | low | `spearman` tie handling loops `for val in np.unique(a)` \u2192 O(U\u00b7n); correct but needlessly quadratic. Reproducibility seeds are also only set in `cli.main`, so library-direct use isn't seeded. |\n\nNone of these are HIGH severity \u2014 there's no correctness-breaking bug in the core extraction/validation math, which is the part that matters most and is the best-tested.\n\n## Lines to rewrite\n\nSmall. The substantive changes \u2014 fix the `dtype` kwarg (1 line), stream `all_token_activations` per-layer (~8 lines), soften the integration assertion to a warning/skip (~3 lines), de-dup `_write_csv` (~5 lines net) \u2014 total roughly **25 lines** of significant change. The rest is polish.\n\n## Bottom line\n\n**Yes \u2014 I'd approve this**, with the two medium items (silent-fp32 `dtype` kwarg and the fragile empirical CI assertion) flagged as \"please address before/just after merge.\" It's coherent, well-documented, correctly implements the method it claims to, and is honest about its own limitations. This is a solid foundation to resume development on, not a rewrite candidate.\n\n```json\n{\n  \"score\": 8,\n  \"issues\": [\n    {\"file\": \"emovec/model.py\", \"lines\": \"58\", \"severity\": \"medium\", \"description\": \"from_pretrained(dtype=...) is the wrong kwarg name on transformers>=4.42 (canonical is torch_dtype); model silently loads in fp32, not bfloat16\"},\n    {\"file\": \"tests/test_integration_tiny.py\", \"lines\": \"50\", \"severity\": \"medium\", \"description\": \"Asserts an empirical/noisy scientific outcome (diagonal>off-diagonal) on a tiny model+data; can fail nondeterministically in CI\"},\n    {\"file\": \"emovec/model.py\", \"lines\": \"178-179\", \"severity\": \"medium\", \"description\": \"all_token_activations materializes full (B,T,n_capture,d) tensor before masking (~1GB/batch at demo scale); OOM risk\"},\n    {\"file\": \"emovec/elo.py\", \"lines\": \"42-56\", \"severity\": \"low\", \"description\": \"Bradley-Terry fit uses fixed-LR gradient descent with ad-hoc step scaling and fixed n_iter; no convergence guarantee for larger pair sets\"},\n    {\"file\": \"emovec/cli.py\", \"lines\": \"57\", \"severity\": \"low\", \"description\": \"generate-stories requires a pre-existing manifest.json topics list that is only written by generate_stories itself (chicken-and-egg, undocumented)\"},\n    {\"file\": \"emovec/model.py\", \"lines\": \"49\", \"severity\": \"low\", \"description\": \"EmoModel constructor calls torch.set_num_threads as a global side effect; inappropriate for library code\"},\n    {\"file\": \"emovec/steer.py\", \"lines\": \"183-187\", \"severity\": \"low\", \"description\": \"_write_csv helper duplicated verbatim in validate.py:123 and steer.py:183 (DRY)\"},\n    {\"file\": \"emovec/vectors.py\", \"lines\": \"117-121\", \"severity\": \"low\", \"description\": \"spearman tie-averaging loops over np.unique (O(U*n)); seeds are also only set in cli.main, not for library-direct use\"}\n  ],\n  \"lines_to_rewrite\": 25,\n  \"approve\": true\n}\n```",
+  "served_models": [
+    "claude-opus-4-8"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 29,
+  "cost_usd": 0.8417950000000001,
+  "parsed": {
+    "score": 8,
+    "issues": [
+      {
+        "file": "emovec/model.py",
+        "lines": "58",
+        "severity": "medium",
+        "description": "from_pretrained(dtype=...) is the wrong kwarg name on transformers>=4.42 (canonical is torch_dtype); model silently loads in fp32, not bfloat16"
+      },
+      {
+        "file": "tests/test_integration_tiny.py",
+        "lines": "50",
+        "severity": "medium",
+        "description": "Asserts an empirical/noisy scientific outcome (diagonal>off-diagonal) on a tiny model+data; can fail nondeterministically in CI"
+      },
+      {
+        "file": "emovec/model.py",
+        "lines": "178-179",
+        "severity": "medium",
+        "description": "all_token_activations materializes full (B,T,n_capture,d) tensor before masking (~1GB/batch at demo scale); OOM risk"
+      },
+      {
+        "file": "emovec/elo.py",
+        "lines": "42-56",
+        "severity": "low",
+        "description": "Bradley-Terry fit uses fixed-LR gradient descent with ad-hoc step scaling and fixed n_iter; no convergence guarantee for larger pair sets"
+      },
+      {
+        "file": "emovec/cli.py",
+        "lines": "57",
+        "severity": "low",
+        "description": "generate-stories requires a pre-existing manifest.json topics list that is only written by generate_stories itself (chicken-and-egg, undocumented)"
+      },
+      {
+        "file": "emovec/model.py",
+        "lines": "49",
+        "severity": "low",
+        "description": "EmoModel constructor calls torch.set_num_threads as a global side effect; inappropriate for library code"
+      },
+      {
+        "file": "emovec/steer.py",
+        "lines": "183-187",
+        "severity": "low",
+        "description": "_write_csv helper duplicated verbatim in validate.py:123 and steer.py:183 (DRY)"
+      },
+      {
+        "file": "emovec/vectors.py",
+        "lines": "117-121",
+        "severity": "low",
+        "description": "spearman tie-averaging loops over np.unique (O(U*n)); seeds are also only set in cli.main, not for library-direct use"
+      }
+    ],
+    "lines_to_rewrite": 25,
+    "approve": true
+  },
+  "parse_error": null
+}

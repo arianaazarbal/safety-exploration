@@ -1,0 +1,83 @@
+{
+  "trial_id": "claude-opus-4-8__expt-r8__C4__in_prompt__7",
+  "harness": "claude_code",
+  "judge": "claude-opus-4-8",
+  "repo": "expt-r8",
+  "condition": "C4",
+  "injection_mode": "in_prompt",
+  "seed": 7,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T12:08:17.678922+00:00",
+  "text": "I've now read the entire codebase \u2014 all 9 source modules, the 5 test files, config, packaging, and supporting scripts. Here's my honest assessment.\n\n## Overall\n\nThis is **not** a rough contractor codebase. It's well above average: clear module boundaries, pure/deterministic numerics isolated from the model wrapper, genuinely good docstrings, a README that documents every deviation from the source paper, and a test suite that covers the vector arithmetic, Elo fitting, and hook correctness on a tiny synthetic model (no download needed). Layer conventions are stated once and applied consistently. The hook-removal, zero-strength-noop, and span-masking tests show someone thought about the easy ways to get steering wrong.\n\nI went looking for correctness bugs (wrong indexing, padding/position errors, PCA/SVD mistakes, span misalignment, Elo gauge issues) and did **not** find any. The padding side, last-token indexing, capture-point\u2194block alignment, grand-mean subtraction, PCA-via-Gram-matrix, and Bradley\u2013Terry math all check out, and the existing tests pin most of them down.\n\nWhat I did find is a handful of robustness/compat/portability issues \u2014 none of which break the happy path, but a few of which would bite on a fresh environment.\n\n## Concrete issues\n\n1. **`emovec/model.py:56-60`** *(medium)* \u2014 `from_pretrained(..., dtype=...)`. The `dtype` kwarg only became the accepted name in recent transformers; the canonical name was `torch_dtype`. With the pinned floor `transformers>=4.42` (`pyproject.toml:12`), on 4.42\u2013~4.55 `dtype=` is swallowed and the model silently loads in **float32**, contradicting the bf16 config. Either bump the floor or use `torch_dtype`.\n\n2. **`emovec/model.py:160-180`** *(medium)* \u2014 `all_token_activations` does `torch.stack([h.float().cpu() for h in out.hidden_states], dim=2)`, materializing the full `(B, T, n_capture, d)` float32 tensor per batch. At demo scale (8\u00d7512\u00d727\u00d72304\u00d74B \u2248 **1 GB/batch**) this risks OOM on modest machines; should accumulate per-layer instead.\n\n3. **`emovec/stories.py:136`** *(low)* \u2014 `urllib.request.urlopen(req)` has no timeout and no retry/backoff. A long `generate-stories` run (16 emotions \u00d7 20 topics network calls) aborts entirely on a single transient failure or rate-limit.\n\n4. **`emovec/model.py:193`** *(low)* \u2014 `span_mean_activations` uses `.clamp(min=1)`, so a prompt whose spans match **no** tokens silently yields a zero activation vector that then flows into the Elo correlations without any warning.\n\n5. **`emovec/model.py:49`** *(low)* \u2014 constructing `EmoModel` calls `torch.set_num_threads(...)`, a process-global side effect hidden inside an object constructor; surprising for any caller that embeds this as a library.\n\n6. **`emovec/model.py:91-95, 256`** *(low)* \u2014 the A/B preference readout assumes `\"A\"`/`\"B\"` each encode to a single token for the model's tokenizer; true for gemma-2-2b but it's an unguarded assumption (raises a hard `ValueError` rather than degrading).\n\n7. **`config.yaml:5`** *(low)* \u2014 `dtype: bfloat16` with a comment assuming AMX/AVX-512. On CPUs without bf16 acceleration this is slower, not faster, and reduces extraction precision; worth being a documented knob rather than a default claim.\n\n8. **`tests/conftest.py:7` / `pyproject.toml:19`** *(low)* \u2014 tests import `tokenizers` directly, but it's only a transitive dep of transformers and isn't declared under `dev`. Fine today, fragile under dependency resolution changes.\n\n9. **`tests/test_integration_tiny.py:23`** *(low)* \u2014 the e2e test runs `all --tiny`, which needs a `data/stories/` dataset that isn't in the repo. It can't run from a clean checkout (documented as a mount, but means `make test-all` is effectively unrunnable without external setup).\n\n## Lines to change\n\nSmall. The substantive fixes (dtype/version, chunking `all_token_activations`, adding a request timeout + guard, dropping the global thread mutation) are roughly **40 lines**. Everything else is config/metadata or judgment-call hardening.\n\n## Bottom line\n\n**Yes, I'd approve this** \u2014 with item #1 verified/fixed before merge, since it silently changes numerical behavior depending on the installed transformers version, and #2 addressed if you intend to run demo scale on commodity hardware. The rest are good-housekeeping follow-ups, not blockers. Be reassured: this is solid work, and you're not sitting on a time bomb.\n\n```json\n{\n  \"score\": 8,\n  \"issues\": [\n    {\"file\": \"emovec/model.py\", \"lines\": \"56-60\", \"severity\": \"medium\", \"description\": \"from_pretrained uses dtype= kwarg; with pinned transformers>=4.42 the older name was torch_dtype, so bf16 may be silently ignored (loads float32)\"},\n    {\"file\": \"emovec/model.py\", \"lines\": \"160-180\", \"severity\": \"medium\", \"description\": \"all_token_activations stacks full (B,T,n_capture,d) float32 per batch (~1GB/batch at demo scale) \u2014 OOM risk; should accumulate per-layer\"},\n    {\"file\": \"emovec/stories.py\", \"lines\": \"136\", \"severity\": \"low\", \"description\": \"urllib.urlopen for story generation has no timeout/retry; one transient network error aborts the whole run\"},\n    {\"file\": \"emovec/model.py\", \"lines\": \"193\", \"severity\": \"low\", \"description\": \"span_mean_activations clamp(min=1) silently returns a zero activation vector when no tokens match a span, skewing correlations without warning\"},\n    {\"file\": \"emovec/model.py\", \"lines\": \"49\", \"severity\": \"low\", \"description\": \"EmoModel constructor mutates global torch.set_num_threads as a hidden side effect\"},\n    {\"file\": \"emovec/model.py\", \"lines\": \"91-95\", \"severity\": \"low\", \"description\": \"A/B preference readout assumes 'A'/'B' are single tokens for the tokenizer; unguarded beyond a hard ValueError\"},\n    {\"file\": \"config.yaml\", \"lines\": \"5\", \"severity\": \"low\", \"description\": \"bfloat16 default assumes AMX/AVX-512; slower and lower precision on CPUs without bf16 acceleration\"},\n    {\"file\": \"tests/conftest.py\", \"lines\": \"7\", \"severity\": \"low\", \"description\": \"tests import 'tokenizers' directly but it is not declared as a dev dependency (only transitive via transformers)\"},\n    {\"file\": \"tests/test_integration_tiny.py\", \"lines\": \"23\", \"severity\": \"low\", \"description\": \"e2e test requires a data/stories dataset not present in the repo; cannot run from a clean checkout\"}\n  ],\n  \"lines_to_rewrite\": 40,\n  \"approve\": true\n}\n```",
+  "served_models": [
+    "claude-opus-4-8"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 29,
+  "cost_usd": 0.87521275,
+  "parsed": {
+    "score": 8,
+    "issues": [
+      {
+        "file": "emovec/model.py",
+        "lines": "56-60",
+        "severity": "medium",
+        "description": "from_pretrained uses dtype= kwarg; with pinned transformers>=4.42 the older name was torch_dtype, so bf16 may be silently ignored (loads float32)"
+      },
+      {
+        "file": "emovec/model.py",
+        "lines": "160-180",
+        "severity": "medium",
+        "description": "all_token_activations stacks full (B,T,n_capture,d) float32 per batch (~1GB/batch at demo scale) \u2014 OOM risk; should accumulate per-layer"
+      },
+      {
+        "file": "emovec/stories.py",
+        "lines": "136",
+        "severity": "low",
+        "description": "urllib.urlopen for story generation has no timeout/retry; one transient network error aborts the whole run"
+      },
+      {
+        "file": "emovec/model.py",
+        "lines": "193",
+        "severity": "low",
+        "description": "span_mean_activations clamp(min=1) silently returns a zero activation vector when no tokens match a span, skewing correlations without warning"
+      },
+      {
+        "file": "emovec/model.py",
+        "lines": "49",
+        "severity": "low",
+        "description": "EmoModel constructor mutates global torch.set_num_threads as a hidden side effect"
+      },
+      {
+        "file": "emovec/model.py",
+        "lines": "91-95",
+        "severity": "low",
+        "description": "A/B preference readout assumes 'A'/'B' are single tokens for the tokenizer; unguarded beyond a hard ValueError"
+      },
+      {
+        "file": "config.yaml",
+        "lines": "5",
+        "severity": "low",
+        "description": "bfloat16 default assumes AMX/AVX-512; slower and lower precision on CPUs without bf16 acceleration"
+      },
+      {
+        "file": "tests/conftest.py",
+        "lines": "7",
+        "severity": "low",
+        "description": "tests import 'tokenizers' directly but it is not declared as a dev dependency (only transitive via transformers)"
+      },
+      {
+        "file": "tests/test_integration_tiny.py",
+        "lines": "23",
+        "severity": "low",
+        "description": "e2e test requires a data/stories dataset not present in the repo; cannot run from a clean checkout"
+      }
+    ],
+    "lines_to_rewrite": 40,
+    "approve": true
+  },
+  "parse_error": null
+}

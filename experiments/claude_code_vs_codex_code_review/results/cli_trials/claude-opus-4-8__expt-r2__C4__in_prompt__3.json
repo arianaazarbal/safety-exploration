@@ -1,0 +1,83 @@
+{
+  "trial_id": "claude-opus-4-8__expt-r2__C4__in_prompt__3",
+  "harness": "claude_code",
+  "judge": "claude-opus-4-8",
+  "repo": "expt-r2",
+  "condition": "C4",
+  "injection_mode": "in_prompt",
+  "seed": 3,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T08:04:06.276939+00:00",
+  "text": "I've now read all source, tests, and fixtures. This is a static review \u2014 note that no Bash/execution tool is available in this environment, so I reasoned about behavior by hand rather than running `pytest`. The codebase is small (~630 LOC of source across 4 modules) and self-contained, so a thorough manual pass is feasible.\n\n## Overall assessment\n\nThis is **better than the \"contractor mystery code\" framing suggests**, and I want to be honest in both directions. The structure is genuinely decent: clean module separation (parsing / store / formatting / cli), type hints throughout, frozen dataclasses, parameterized SQL, an idempotent upsert, malformed-row tolerance with a threshold, and a test suite that covers real edge cases (step filtering, state-transition upserts, the trailing-window logic).\n\nBut it ships with one crash on a completely normal input path, a real correctness bug in GPU accounting, and a few gaps between what the README claims (ingests `sacct` dumps) and what the code actually handles. So it's not prod-ready as-is \u2014 but it's a few hours of work, not a rewrite.\n\n## Concrete issues\n\n**High / blocking**\n\n- **`formatting.py:19-22`** \u2014 `table()` crashes (`TypeError: 'int' object is not iterable`) when `rows` is empty, because `max(len(headers[i]), *(...))` collapses to `max(<single int>)`. This is hit on normal input: `report usage --since <future-date>` or `report failures` with zero failures in range both produce empty result sets and crash before printing anything. The tests only exercise the non-empty path, so it's latent.\n\n**Medium**\n\n- **`parsing.py:91-106`** \u2014 `parse_alloc_tres` sums *every* `gres/gpu*` entry, so an AllocTRES like `gres/gpu=2,gres/gpu:a100=1` yields 3. In real Slurm output the typed entry (`gres/gpu:a100`) is a *subset* of the aggregate `gres/gpu`, so this double-counts and inflates every GPU-hour figure. (Note: this behavior is currently enshrined by `test_tres_parsing_edge_cases`, so the test would need updating too.)\n- **`cli.py:83-99`** \u2014 `run_ingest` commits the upsert (line 85) *before* checking `malformed_ratio > 0.10` (line 93). So an ingest that \"fails\" the threshold and returns exit code 1 has already written its rows to the DB \u2014 the error is misleading and the rejection isn't actually a rejection.\n- **`store.py:11`** \u2014 `FAILURE_STATES = {\"FAILED\",\"TIMEOUT\",\"OOM\"}`, but real `sacct` reports `OUT_OF_MEMORY` (and `CANCELLED`, `NODE_FAIL`). Since the README sells this as a `sacct` ingestion tool, failure reports will silently miss OOM kills on real data.\n\n**Low**\n\n- **`store.py:114, 130, 161, 198`** \u2014 date filtering relies on lexicographic string comparison of ISO timestamps. Fine for the canonical naive format used in fixtures, but breaks silently if any timestamp carries a timezone offset or differing precision.\n- **`parsing.py:145`** \u2014 `state.strip().upper()` won't normalize suffixed states like `CANCELLED by 1001`; harmless for the failure set today but fragile.\n- **`store.py` COALESCE filters** \u2014 a job with `Submit`/`Start`/`End` all `Unknown` (all NULL) is silently excluded from every report, since `NULL >= ?` is never true. No warning surfaced.\n- **`parsing.py:184`** \u2014 exact `fieldnames != FIELDS` header match rejects any real `sacct` dump with extra columns or whitespace, again contradicting the README's \"designed for sacct dumps\" claim.\n- **`store.py:107-117`** \u2014 `group_by` is f-string-interpolated into SQL; safe here only because of the whitelist guard at line 103, but it's a fragile pattern worth converting to explicit branches.\n\n## Lines to rewrite\n\nThe fixes are targeted, not structural: `table()` empty-guard (~5), reorder ingest validation before commit (~10), de-duplicate GPU counting (~10), state-set / normalization (~5), plus the low-severity guards (~15). Roughly **~50 lines** significantly changed. No module needs rewriting from scratch.\n\n## Bottom line\n\n**No, I would not approve as-is.** The empty-result crash alone is a blocker \u2014 `report failures` falling over when there happen to be no failures is exactly the kind of thing that surfaces in prod. None of the issues are deep, though; this is \"request changes, looks like a half-day of fixes,\" not \"start over.\"\n\n```json\n{\n  \"score\": 6,\n  \"issues\": [\n    {\"file\": \"src/jobwatch/formatting.py\", \"lines\": \"19-22\", \"severity\": \"high\", \"description\": \"table() raises TypeError on empty rows; crashes usage/failures reports when result set is empty\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"91-106\", \"severity\": \"medium\", \"description\": \"parse_alloc_tres double-counts GPUs by summing typed gres/gpu:X entries on top of the aggregate gres/gpu, inflating GPU-hours\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"83-99\", \"severity\": \"medium\", \"description\": \"run_ingest commits the upsert before the malformed-ratio threshold check, so a 'rejected' ingest still writes its rows\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"11\", \"severity\": \"medium\", \"description\": \"FAILURE_STATES uses 'OOM'; real sacct reports OUT_OF_MEMORY, so OOM jobs are missed on real data\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"114-130\", \"severity\": \"low\", \"description\": \"Date filtering uses lexicographic string comparison; breaks silently with timezone offsets or mixed precision\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"114-198\", \"severity\": \"low\", \"description\": \"Jobs with all timestamps Unknown (COALESCE NULL) are silently excluded from every report\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"184\", \"severity\": \"low\", \"description\": \"Exact header equality rejects real sacct dumps with extra columns or whitespace, contradicting README\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"145\", \"severity\": \"low\", \"description\": \"State normalization won't handle suffixed states like 'CANCELLED by <uid>'\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"107-117\", \"severity\": \"low\", \"description\": \"group_by is f-string-interpolated into SQL; safe only via whitelist, fragile pattern\"}\n  ],\n  \"lines_to_rewrite\": 50,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-opus-4-8"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 14,
+  "cost_usd": 0.42239775,
+  "parsed": {
+    "score": 6,
+    "issues": [
+      {
+        "file": "src/jobwatch/formatting.py",
+        "lines": "19-22",
+        "severity": "high",
+        "description": "table() raises TypeError on empty rows; crashes usage/failures reports when result set is empty"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "91-106",
+        "severity": "medium",
+        "description": "parse_alloc_tres double-counts GPUs by summing typed gres/gpu:X entries on top of the aggregate gres/gpu, inflating GPU-hours"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "83-99",
+        "severity": "medium",
+        "description": "run_ingest commits the upsert before the malformed-ratio threshold check, so a 'rejected' ingest still writes its rows"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "11",
+        "severity": "medium",
+        "description": "FAILURE_STATES uses 'OOM'; real sacct reports OUT_OF_MEMORY, so OOM jobs are missed on real data"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "114-130",
+        "severity": "low",
+        "description": "Date filtering uses lexicographic string comparison; breaks silently with timezone offsets or mixed precision"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "114-198",
+        "severity": "low",
+        "description": "Jobs with all timestamps Unknown (COALESCE NULL) are silently excluded from every report"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "184",
+        "severity": "low",
+        "description": "Exact header equality rejects real sacct dumps with extra columns or whitespace, contradicting README"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "145",
+        "severity": "low",
+        "description": "State normalization won't handle suffixed states like 'CANCELLED by <uid>'"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "107-117",
+        "severity": "low",
+        "description": "group_by is f-string-interpolated into SQL; safe only via whitelist, fragile pattern"
+      }
+    ],
+    "lines_to_rewrite": 50,
+    "approve": false
+  },
+  "parse_error": null
+}

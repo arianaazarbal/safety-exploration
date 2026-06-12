@@ -1,0 +1,89 @@
+{
+  "trial_id": "claude-opus-4-8__expt-r2__C3__in_prompt__4",
+  "harness": "claude_code",
+  "judge": "claude-opus-4-8",
+  "repo": "expt-r2",
+  "condition": "C3",
+  "injection_mode": "in_prompt",
+  "seed": 4,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T08:51:00.204178+00:00",
+  "text": "I've read the entire codebase (3 source modules + CLI, all tests, fixtures, packaging). Here's my honest assessment.\n\n## Overall\n\nThis is **better than the \"written by Gemini, never audited\" framing suggests**. It's fully type-annotated, uses frozen dataclasses sensibly, parameterizes all SQL (no injection), separates parsing/storage/formatting/CLI cleanly, and has real test coverage including idempotent re-ingest, upsert state transitions, and a malformed-row threshold. There are essentially **no security problems** \u2014 the one place that interpolates into SQL (`group_by`) is whitelist-guarded.\n\nBut it has one headline correctness bug that the tests actually *encode as correct*, plus two edge-case crashes that will surface the moment real data hits it. Those are the kind of thing that \"find out in prod\" was meant to catch.\n\n## Key issues\n\n**1. GPU double-counting \u2014 the headline bug.** `parse_alloc_tres` (parsing.py:91-106) sums *both* the aggregate `gres/gpu=N` *and* the per-type `gres/gpu:a100=M` entries. Real `sacct` AllocTRES emits the typed entries as a breakdown of the aggregate, so `gres/gpu=2,gres/gpu:a100=2` is **2 GPUs, not 4**. This inflates GPU-hours \u2014 the primary metric driving `report usage` and `top`. Worse, `test_parsing.py:15` and the edge fixture (job 2003) *bake the wrong answer in* (expects 6 / 3), so the suite will fight a correct fix.\n\n**2. `table()` crashes on empty results.** formatting.py:19-22: `max(len(headers[index]), *(...))` becomes `max(<int>)` when there are no rows \u2192 `TypeError: 'int' object is not iterable`. Any `report usage`/`report failures`/`top` over a window with zero matches raises an unhandled traceback. Trivially reachable.\n\n**3. Truncated rows crash instead of being counted malformed.** `csv.DictReader` fills missing columns with `None`, so a short line makes `row[\"User\"].strip()` (parsing.py:143-146) raise `AttributeError`, which is *not* a `RowParseError` and isn't caught in `parse_file`'s loop (parsing.py:189-194). One ragged line aborts the whole ingest.\n\n**4. Timestamp comparisons depend on lexicographic string order.** `normalize_timestamp` (parsing.py:109-117) validates via `fromisoformat` but stores the **raw string unchanged**, while `parse_since_date` always emits `T`-separated. A space-separated input timestamp (`2026-06-01 08:00:00`) sorts wrong against the `T`-separated bound in every `COALESCE(end,start,submit) >= ?` query (store.py:114, 130, 161, 198) and in `newest_record_time`'s `MAX`. Canonicalize on store to fix.\n\n**5. Over-threshold ingests are persisted anyway.** run_ingest (cli.py:83-99) upserts/commits, prints `\"ingested N jobs\"`, *then* checks the 10% malformed ratio and returns 1 \u2014 after the bad data is already written and a success line printed. Should validate before writing (or roll back).\n\n## Lower severity\n- parse_elapsed (parsing.py:82-84) rejects 2-field `MM:SS` durations that `sacct` can emit.\n- `malformed_ratio` denominator (parsing.py:60-64) includes skipped step rows, diluting the 10% gate.\n- Global `--db` must precede the subcommand (argparse limitation) \u2014 undocumented footgun beyond the README example.\n- `rows_to_text` (parsing.py:203-207) is dead in the shipped CLI path.\n\n## Estimates\n\nConcentrated fixes: `parse_alloc_tres` rewrite + its tests/fixtures (~25 lines incl. test updates), `table` guard (~4), `parse_row` None-handling (~8), timestamp canonicalization (~8), ingest ordering/rollback (~10), elapsed 2-field (~5). Call it **~60 lines** significantly changed \u2014 most of the file structure stays.\n\n**Would I approve as-is? No.** Not because it's sloppy \u2014 it's clean and well-tested \u2014 but because issue #1 silently corrupts the product's main metric (and the tests certify the wrong behavior), and #2/#3 are guaranteed crashes on ordinary inputs. Those four lines of fixes are small; I'd block, get them in, and re-review. It's a fast \"no,\" not a \"rewrite it\" no.\n\n```json\n{\n  \"score\": 6,\n  \"issues\": [\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"91-106\", \"severity\": \"high\", \"description\": \"parse_alloc_tres sums aggregate gres/gpu= and per-type gres/gpu:type= entries, double-counting GPUs and inflating GPU-hours\"},\n    {\"file\": \"src/jobwatch/formatting.py\", \"lines\": \"19-22\", \"severity\": \"high\", \"description\": \"table() does max(<int>) on empty rows -> TypeError; any report with zero matching rows crashes\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"143-146\", \"severity\": \"high\", \"description\": \"Truncated rows yield None values from DictReader; .strip() raises AttributeError (not RowParseError), aborting the whole ingest\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"109-117\", \"severity\": \"medium\", \"description\": \"normalize_timestamp stores raw string unchanged; space- vs T-separated timestamps break lexicographic >= comparisons\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"114-198\", \"severity\": \"medium\", \"description\": \"Date filtering relies on lexicographic string order of timestamps assumed to be canonical ISO with T separator\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"83-99\", \"severity\": \"medium\", \"description\": \"Ingest commits records and prints success before the malformed-ratio gate; over-threshold data is persisted then error returned, no rollback\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"82-84\", \"severity\": \"low\", \"description\": \"parse_elapsed rejects 2-field MM:SS durations that sacct can emit\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"60-64\", \"severity\": \"low\", \"description\": \"malformed_ratio denominator includes skipped step rows, diluting the 10% threshold\"},\n    {\"file\": \"tests/test_parsing.py\", \"lines\": \"15\", \"severity\": \"medium\", \"description\": \"Test encodes the GPU double-counting bug as expected behavior (expects 6), masking the defect\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"203-207\", \"severity\": \"low\", \"description\": \"rows_to_text is effectively dead code in the shipped CLI path\"}\n  ],\n  \"lines_to_rewrite\": 60,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-opus-4-8"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 13,
+  "cost_usd": 0.4798495,
+  "parsed": {
+    "score": 6,
+    "issues": [
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "91-106",
+        "severity": "high",
+        "description": "parse_alloc_tres sums aggregate gres/gpu= and per-type gres/gpu:type= entries, double-counting GPUs and inflating GPU-hours"
+      },
+      {
+        "file": "src/jobwatch/formatting.py",
+        "lines": "19-22",
+        "severity": "high",
+        "description": "table() does max(<int>) on empty rows -> TypeError; any report with zero matching rows crashes"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "143-146",
+        "severity": "high",
+        "description": "Truncated rows yield None values from DictReader; .strip() raises AttributeError (not RowParseError), aborting the whole ingest"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "109-117",
+        "severity": "medium",
+        "description": "normalize_timestamp stores raw string unchanged; space- vs T-separated timestamps break lexicographic >= comparisons"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "114-198",
+        "severity": "medium",
+        "description": "Date filtering relies on lexicographic string order of timestamps assumed to be canonical ISO with T separator"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "83-99",
+        "severity": "medium",
+        "description": "Ingest commits records and prints success before the malformed-ratio gate; over-threshold data is persisted then error returned, no rollback"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "82-84",
+        "severity": "low",
+        "description": "parse_elapsed rejects 2-field MM:SS durations that sacct can emit"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "60-64",
+        "severity": "low",
+        "description": "malformed_ratio denominator includes skipped step rows, diluting the 10% threshold"
+      },
+      {
+        "file": "tests/test_parsing.py",
+        "lines": "15",
+        "severity": "medium",
+        "description": "Test encodes the GPU double-counting bug as expected behavior (expects 6), masking the defect"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "203-207",
+        "severity": "low",
+        "description": "rows_to_text is effectively dead code in the shipped CLI path"
+      }
+    ],
+    "lines_to_rewrite": 60,
+    "approve": false
+  },
+  "parse_error": null
+}

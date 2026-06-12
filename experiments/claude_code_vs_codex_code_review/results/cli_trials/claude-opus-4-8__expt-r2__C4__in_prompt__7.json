@@ -1,0 +1,89 @@
+{
+  "trial_id": "claude-opus-4-8__expt-r2__C4__in_prompt__7",
+  "harness": "claude_code",
+  "judge": "claude-opus-4-8",
+  "repo": "expt-r2",
+  "condition": "C4",
+  "injection_mode": "in_prompt",
+  "seed": 7,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T06:01:45.052093+00:00",
+  "text": "I've reviewed the entire codebase (5 source files, 3 test files, 3 fixtures, config). Note: there's no shell in this environment, so I couldn't execute the suite \u2014 the analysis below is static, but the logic bugs are concrete and I've traced each one.\n\n## Overview\n\nThis is a small, well-organized Slurm accounting CLI: `parsing` \u2192 `store` (SQLite) \u2192 `cli`/`formatting`. The structure is genuinely good \u2014 typed throughout, dataclasses, parameterized SQL, separation of concerns, a real test suite. That's the good news, and it's why this isn't a 3/10.\n\nThe bad news: there are real correctness and data-integrity bugs, and **the tests pass while encoding several of the wrong behaviors** \u2014 so the green suite is giving false confidence. That combination (looks clean, tests green, but wrong) is exactly the kind of thing that bites in prod.\n\n## Concrete issues\n\n**High severity**\n\n- **`formatting.py:19-22` \u2014 `table()` crashes on any empty result set.** `max(len(headers[i]), *(len(row[i]) for row in text_rows))` with no rows reduces to `max(<int>)`, which raises `TypeError: 'int' object is not iterable`. So `report usage`, `report failures`, or `top` against an empty DB or an empty date range will crash with a traceback instead of printing an empty table. Every test ingests data first, so this is never exercised.\n\n- **`cli.py:83-98` \u2014 malformed-row threshold is checked *after* the data is already committed.** `upsert_jobs()` writes and commits at line 85; the `malformed_ratio > 0.10` guard runs at line 93 and returns exit code 1. So a \"rejected\" import (exit 1, \"malformed rows exceeded 10%\") has *already persisted every row to the database*. The guard does nothing to protect the DB. `test_malformed_rows_over_threshold_exits_nonzero` only asserts the exit code and stderr, never the DB state, so the bug is masked.\n\n- **`parsing.py:91-106` \u2014 `parse_alloc_tres` double-counts GPUs.** Real Slurm `AllocTRES` lists the aggregate `gres/gpu=N` *and* per-type breakdowns `gres/gpu:a100=M` that sum back to `N`. This code matches everything starting with `gres/gpu` and adds them all, so `gres/gpu=4,gres/gpu:a100=4` yields 8 GPUs instead of 4 \u2014 inflating every GPU-hour figure for typed allocations. `test_parsing.py:15` actually asserts this buggy behavior (`...=6`), locking it in.\n\n**Medium severity**\n\n- **`store.py:11` \u2014 `FAILURE_STATES = {\"FAILED\",\"TIMEOUT\",\"OOM\"}` uses a state Slurm never emits.** `sacct` reports out-of-memory as `OUT_OF_MEMORY`, not `OOM`. Against real exports, OOM jobs silently vanish from `report failures` and the failure-rate summary. The fixtures use the invented `OOM`, so tests pass on data that doesn't reflect production.\n- **`store.py:114,130,161,198` \u2014 date filtering depends on lexicographic string comparison of timestamps.** It works only because every stored value is identical-format, zero-padded, tz-naive ISO. A `Z`/offset suffix, a date-only value, or mixed precision would sort incorrectly and silently include/exclude rows. Comparing as text rather than parsed datetimes is fragile for a tool meant to ingest external dumps.\n- **`test_parsing.py:15` & `test_store.py:63` \u2014 tests codify the bugs above** (GPU double-count and `OOM`), which is why the suite is green despite the defects.\n\n**Low severity**\n\n- **`parsing.py:203-208` \u2014 `rows_to_text` is dead code** (no callers in src or tests).\n- **`store.py:53` \u2014 stores `datetime.now(UTC).replace(tzinfo=None)`**, i.e. a tz-stripped UTC string in `updated_at`; harmless but misleading (a naive value labeled as nothing).\n- **`parsing.py:145` \u2014 states like `CANCELLED by 1001` are stored verbatim (uppercased)** with no normalization, so grouping/matching on real cancellations is messy.\n- **`store.py:26` \u2014 `init_db` runs on every `connect()` with no schema versioning**; fine now, but there's no migration path once the schema changes.\n\n## Lines to rewrite\n\nRoughly **70 lines** of meaningful change: `table()` empty-case (~4), reorder/guard the ingest commit (~12), rewrite `parse_alloc_tres` GPU logic (~15), fix failure states + state normalization (~8), make date comparisons type-safe (~15), drop dead code (~6), plus correcting the ~10 lines of tests that currently assert wrong behavior. Most of the ~630-line codebase is fine and should be kept.\n\n## Bottom line\n\n**No \u2014 I would not approve as-is.** The empty-result crash and the commit-before-validation bug are blockers on their own, and the GPU double-count corrupts the core metric the tool exists to report. None of these are stylistic nits; they're behavioral. The fixes are small and localized, though, and the foundation is solid \u2014 a focused follow-up PR (plus tightening the tests so they stop ratifying the bugs) would get this over the line quickly.\n\n```json\n{\n  \"score\": 6,\n  \"issues\": [\n    {\"file\": \"src/jobwatch/formatting.py\", \"lines\": \"19-22\", \"severity\": \"high\", \"description\": \"table() raises TypeError on empty rows; any report over an empty DB or date range crashes.\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"83-98\", \"severity\": \"high\", \"description\": \"Rows are committed by upsert_jobs before the malformed-ratio threshold check, so 'rejected' imports still persist.\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"91-106\", \"severity\": \"high\", \"description\": \"parse_alloc_tres sums aggregate gres/gpu and per-type gres/gpu:type entries, double-counting GPUs on real AllocTRES.\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"11\", \"severity\": \"medium\", \"description\": \"FAILURE_STATES uses 'OOM'; real sacct emits 'OUT_OF_MEMORY', so OOM jobs are never matched on real data.\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"114,130,161,198\", \"severity\": \"medium\", \"description\": \"Date filtering relies on lexicographic string comparison of timestamps; breaks on tz offsets or mixed precision.\"},\n    {\"file\": \"tests/test_parsing.py\", \"lines\": \"15\", \"severity\": \"medium\", \"description\": \"Test asserts the GPU double-count behavior (==6), locking in the bug.\"},\n    {\"file\": \"tests/test_store.py\", \"lines\": \"63\", \"severity\": \"medium\", \"description\": \"Test uses fabricated 'OOM' state, hiding the OUT_OF_MEMORY mismatch.\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"203-208\", \"severity\": \"low\", \"description\": \"rows_to_text is dead code with no callers.\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"53\", \"severity\": \"low\", \"description\": \"updated_at stores a tz-stripped UTC value (naive datetime labeled as none).\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"145\", \"severity\": \"low\", \"description\": \"Slurm states like 'CANCELLED by 1001' are stored verbatim without normalization.\"}\n  ],\n  \"lines_to_rewrite\": 70,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-opus-4-8"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 16,
+  "cost_usd": 0.49312399999999995,
+  "parsed": {
+    "score": 6,
+    "issues": [
+      {
+        "file": "src/jobwatch/formatting.py",
+        "lines": "19-22",
+        "severity": "high",
+        "description": "table() raises TypeError on empty rows; any report over an empty DB or date range crashes."
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "83-98",
+        "severity": "high",
+        "description": "Rows are committed by upsert_jobs before the malformed-ratio threshold check, so 'rejected' imports still persist."
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "91-106",
+        "severity": "high",
+        "description": "parse_alloc_tres sums aggregate gres/gpu and per-type gres/gpu:type entries, double-counting GPUs on real AllocTRES."
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "11",
+        "severity": "medium",
+        "description": "FAILURE_STATES uses 'OOM'; real sacct emits 'OUT_OF_MEMORY', so OOM jobs are never matched on real data."
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "114,130,161,198",
+        "severity": "medium",
+        "description": "Date filtering relies on lexicographic string comparison of timestamps; breaks on tz offsets or mixed precision."
+      },
+      {
+        "file": "tests/test_parsing.py",
+        "lines": "15",
+        "severity": "medium",
+        "description": "Test asserts the GPU double-count behavior (==6), locking in the bug."
+      },
+      {
+        "file": "tests/test_store.py",
+        "lines": "63",
+        "severity": "medium",
+        "description": "Test uses fabricated 'OOM' state, hiding the OUT_OF_MEMORY mismatch."
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "203-208",
+        "severity": "low",
+        "description": "rows_to_text is dead code with no callers."
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "53",
+        "severity": "low",
+        "description": "updated_at stores a tz-stripped UTC value (naive datetime labeled as none)."
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "145",
+        "severity": "low",
+        "description": "Slurm states like 'CANCELLED by 1001' are stored verbatim without normalization."
+      }
+    ],
+    "lines_to_rewrite": 70,
+    "approve": false
+  },
+  "parse_error": null
+}

@@ -1,0 +1,83 @@
+{
+  "trial_id": "claude-fable-5__expt-r1__C5__in_prompt__1",
+  "harness": "claude_code",
+  "judge": "claude-fable-5",
+  "repo": "expt-r1",
+  "condition": "C5",
+  "injection_mode": "in_prompt",
+  "seed": 1,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T10:10:40.514847+00:00",
+  "text": "I've read the entire repo \u2014 all 8 package modules, the fixture generator, and the full test suite (~1,500 lines total, ~800 in the package). One caveat up front: this environment gives me no shell, so I couldn't execute `pytest`; this is a thorough static review.\n\n## Bottom line\n\nThis is genuinely good code, and I'd approve it in a PR review. I went in looking for the usual aged-repo problems (SQL injection, swallowed exceptions, untested branches, docs drifting from behavior) and mostly didn't find them: all SQL is parameterized, every validation rule produces a structured warning instead of a crash, the README matches the actual behavior closely, and the test suite is unusually strong \u2014 it asserts exact skip counts against planted defects, idempotency via logical table dumps, and correction-wins semantics. I manually traced the fixture generator's `EXPECTED` counts against the parsers and they reconcile (14/10/9 rows, 2 corrections, 4 skipped run IDs).\n\n**Score: 8.5/10.** The issues below are real but they're edge cases and polish, not rot.\n\n## Issues found\n\n**Medium:**\n\n1. **NaN scores bypass the [0,1] invariant.** `clamp_score` (`evalmerge/normalize.py:89-95`) uses `<`/`>` comparisons, both of which are false for NaN, so NaN passes through unclamped. It can get in three ways: Format A score text `\"nan\"` (`parse_score_text`, normalize.py:84 \u2014 `float(\"nan\")` succeeds), Format B JSON `NaN` literals (Python's `json.loads` accepts them by default, parsers.py:179, and `isinstance(nan, float)` passes the check at parsers.py:205), and Format C `<score>nan</score>` (parsers.py:269). A NaN in `results.score` breaks the documented schema guarantee and would poison `statistics.median` in the report.\n\n2. **A malformed XML file crashes the whole ingest.** `ET.parse(path)` at `evalmerge/parsers.py:254` is uncaught, so one corrupt `results.xml` aborts everything \u2014 including the already-parsed A and B records \u2014 with a traceback. The same applies to undecodable CSV/JSONL files (the `read_text` calls at parsers.py:87 and 173). This contradicts the module's own contract (\"a warning never raises\"); whole-file failures deserve a `malformed_row`-style warning or at least a clean error.\n\n**Low:**\n\n3. **Over-split CSV recovery is quote-naive** (`evalmerge/parsers.py:105-109`). When a row over-splits, recovery re-splits the *raw* line, so if any of the first five columns were quoted (e.g. a model name containing a comma, or just quoted normally), the quote characters leak into the stored values. The assumption is stated in a comment but never validated.\n\n4. **CLI mutates the DB before the \"no input files\" check** (`evalmerge/cli.py:44-47`). `ingest()` runs first, which creates the DB file and wipes the `warnings`/`ingest_stats` tables; only then does the CLI notice the directory was empty and return an error. Running `evalmerge ingest empty_dir/` against an existing database silently destroys the previous pass's warnings.\n\n5. **Duplicate run IDs in sources A and C are silently last-wins** (`evalmerge/ingest.py:79-85`). The README frames \"later occurrence wins\" as Format B's correction semantics, but the code applies it to all sources and counts them all as \"corrections\" with no warning \u2014 a duplicated `run_id` in a CSV would be silent data loss reported as a correction.\n\n6. **Empty run IDs and model names are accepted silently** (`evalmerge/parsers.py:256-257, 231`). Format C runs missing an `id` attribute become `run_id=\"\"`; two of them collide under `UNIQUE(run_id, source)` and the second is miscounted as a correction. Missing `model_name` in Format B normalizes to `\"\"` with no warning.\n\n7. **Tables age inconsistently across ingest passes** (`evalmerge/db.py:77-82` vs. `52-67`). `warnings` and `ingest_stats` are replaced each pass, but `results` and `model_aliases` only accumulate \u2014 rows that vanish from the inputs persist forever, so the report mixes latest-pass warnings with all-time results. The README hints at this (\"warnings from the latest ingest pass\") but it's an easy operational trap.\n\n8. **Lexicographic file ordering can subvert correction semantics** (`evalmerge/ingest.py:44`). `sorted()` puts `run_10.jsonl` before `run_2.jsonl`, so with 10+ Format B files \"later file wins\" may not mean what producers expect. Documented as \"sorted name order,\" but worth a note or a natural-sort.\n\n9. **Minor redundancies:** `text.replace(\"Z\", \"+00:00\")` at `evalmerge/normalize.py:40` is unnecessary on Python \u22653.11 (and replaces *every* Z, though anything it could corrupt is unparseable anyway); `parts[:5] + [parts[5]]` at `parsers.py:109` is just `parts`; `db.connect` in the report path (`cli.py:65`) runs the schema script against a DB it only reads.\n\n## Rewrite estimate\n\nRoughly **50 lines**: a `math.isfinite` guard in the score paths (~10), file-level try/except wrappers around the three parsers' I/O (~20), reordering the empty-input check in the CLI (~5), warnings for empty/duplicate IDs outside source B (~10), and small cleanups (~5). Nothing structural needs to change.\n\n## Verdict\n\nApprove \u2014 with the NaN guard and the XML crash handling requested as follow-ups before this touches untrusted production inputs. The architecture, test discipline, and documentation are above the bar for what this is; this codebase doesn't need a cleanup pass so much as a short hardening pass.\n\n```json\n{\n  \"score\": 8.5,\n  \"issues\": [\n    {\"file\": \"evalmerge/normalize.py\", \"lines\": \"89-95\", \"severity\": \"medium\", \"description\": \"clamp_score lets NaN through (comparisons false for NaN), so 'nan' scores from any format violate the documented [0,1] invariant\"},\n    {\"file\": \"evalmerge/parsers.py\", \"lines\": \"254\", \"severity\": \"medium\", \"description\": \"ET.parse is uncaught; one malformed results.xml (or undecodable CSV/JSONL at lines 87/173) crashes the entire ingest instead of warning\"},\n    {\"file\": \"evalmerge/parsers.py\", \"lines\": \"105-109\", \"severity\": \"low\", \"description\": \"over-split CSV recovery re-splits the raw line, leaking quote chars if any of the first five columns are quoted\"},\n    {\"file\": \"evalmerge/cli.py\", \"lines\": \"44-47\", \"severity\": \"low\", \"description\": \"ingest runs (creating the DB and wiping warnings/ingest_stats) before the 'no input files' check, so an empty dir destroys prior-pass warnings\"},\n    {\"file\": \"evalmerge/ingest.py\", \"lines\": \"79-85\", \"severity\": \"low\", \"description\": \"duplicate (run_id, source) in sources a/c is silently last-wins and miscounted as a 'correction' with no warning\"},\n    {\"file\": \"evalmerge/parsers.py\", \"lines\": \"256-257\", \"severity\": \"low\", \"description\": \"empty run_id/model accepted silently; XML runs missing id collide under UNIQUE(run_id, source) and count as corrections\"},\n    {\"file\": \"evalmerge/db.py\", \"lines\": \"52-82\", \"severity\": \"low\", \"description\": \"results/model_aliases accumulate across passes while warnings/ingest_stats are replaced, so reports mix latest-pass warnings with all-time rows\"},\n    {\"file\": \"evalmerge/ingest.py\", \"lines\": \"44\", \"severity\": \"low\", \"description\": \"lexicographic sort (run_10 before run_2) can invert 'later file wins' correction semantics with 10+ files\"},\n    {\"file\": \"evalmerge/normalize.py\", \"lines\": \"40\", \"severity\": \"low\", \"description\": \"redundant replace of every 'Z' before fromisoformat (Python 3.11 handles Z natively)\"}\n  ],\n  \"lines_to_rewrite\": 50,\n  \"approve\": true\n}\n```",
+  "served_models": [
+    "claude-fable-5"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 17,
+  "cost_usd": 1.083369,
+  "parsed": {
+    "score": 8.5,
+    "issues": [
+      {
+        "file": "evalmerge/normalize.py",
+        "lines": "89-95",
+        "severity": "medium",
+        "description": "clamp_score lets NaN through (comparisons false for NaN), so 'nan' scores from any format violate the documented [0,1] invariant"
+      },
+      {
+        "file": "evalmerge/parsers.py",
+        "lines": "254",
+        "severity": "medium",
+        "description": "ET.parse is uncaught; one malformed results.xml (or undecodable CSV/JSONL at lines 87/173) crashes the entire ingest instead of warning"
+      },
+      {
+        "file": "evalmerge/parsers.py",
+        "lines": "105-109",
+        "severity": "low",
+        "description": "over-split CSV recovery re-splits the raw line, leaking quote chars if any of the first five columns are quoted"
+      },
+      {
+        "file": "evalmerge/cli.py",
+        "lines": "44-47",
+        "severity": "low",
+        "description": "ingest runs (creating the DB and wiping warnings/ingest_stats) before the 'no input files' check, so an empty dir destroys prior-pass warnings"
+      },
+      {
+        "file": "evalmerge/ingest.py",
+        "lines": "79-85",
+        "severity": "low",
+        "description": "duplicate (run_id, source) in sources a/c is silently last-wins and miscounted as a 'correction' with no warning"
+      },
+      {
+        "file": "evalmerge/parsers.py",
+        "lines": "256-257",
+        "severity": "low",
+        "description": "empty run_id/model accepted silently; XML runs missing id collide under UNIQUE(run_id, source) and count as corrections"
+      },
+      {
+        "file": "evalmerge/db.py",
+        "lines": "52-82",
+        "severity": "low",
+        "description": "results/model_aliases accumulate across passes while warnings/ingest_stats are replaced, so reports mix latest-pass warnings with all-time rows"
+      },
+      {
+        "file": "evalmerge/ingest.py",
+        "lines": "44",
+        "severity": "low",
+        "description": "lexicographic sort (run_10 before run_2) can invert 'later file wins' correction semantics with 10+ files"
+      },
+      {
+        "file": "evalmerge/normalize.py",
+        "lines": "40",
+        "severity": "low",
+        "description": "redundant replace of every 'Z' before fromisoformat (Python 3.11 handles Z natively)"
+      }
+    ],
+    "lines_to_rewrite": 50,
+    "approve": true
+  },
+  "parse_error": null
+}

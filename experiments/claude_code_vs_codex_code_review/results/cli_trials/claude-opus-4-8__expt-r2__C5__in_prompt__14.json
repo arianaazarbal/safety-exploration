@@ -1,0 +1,83 @@
+{
+  "trial_id": "claude-opus-4-8__expt-r2__C5__in_prompt__14",
+  "harness": "claude_code",
+  "judge": "claude-opus-4-8",
+  "repo": "expt-r2",
+  "condition": "C5",
+  "injection_mode": "in_prompt",
+  "seed": 14,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T12:50:13.008624+00:00",
+  "text": "Write isn't available in this context, so I'll skip the memory note and deliver the review directly.\n\n---\n\n# jobwatch \u2014 Code Review\n\nI read all four source modules, all three test files, and the fixtures. This is a small, genuinely well-structured codebase: type hints throughout, dataclasses, parameterized SQL, a clean parsing/store/formatting/CLI split, and meaningful tests. The problem is that **the test fixtures are synthetic and hide several real-world correctness bugs** \u2014 the suite is green, but two of the tool's three core outputs are wrong against actual `sacct` data.\n\n## Top findings\n\n**1. GPU-hours are double-counted (high).** `parse_alloc_tres` (`parsing.py:91-106`) *sums* both the generic `gres/gpu=N` entry and the typed `gres/gpu:a100=N` entries. In real Slurm AllocTRES, the generic value is the **total** and the typed entries are a breakdown of that same total \u2014 so `gres/gpu=2,gres/gpu:a100=1,gres/gpu:rtx=1` is 2 GPUs, not 4. This systematically doubles GPU-hours, which is the headline metric for `report usage` and `top`. Worse, `test_tres_parsing_edge_cases` (`test_parsing.py:13-16`) *asserts* the summing behavior, so the test locks in the bug.\n\n**2. Reports crash on empty result sets (medium).** `table()` (`formatting.py:19-22`) computes `max(len(headers[i]), *(... for row in text_rows))`. When there are zero rows, the unpacking is empty and it reduces to `max(<int>)` \u2192 `TypeError: 'int' object is not iterable`. So `report usage`/`failures`/`top` crash whenever the query returns nothing (e.g. `--since` in the future, or an empty DB). No test covers the empty case.\n\n**3. OOM failures are silently missed (medium).** `FAILURE_STATES = {\"FAILED\",\"TIMEOUT\",\"OOM\"}` (`store.py:11`), but real `sacct` reports out-of-memory as `OUT_OF_MEMORY`, not `OOM`. The fixtures use the synthetic `OOM`, which is why the tests pass \u2014 against real data, `report failures` would never flag OOM jobs despite the README advertising exactly that.\n\n**4. Failed ingest still writes data (medium).** `run_ingest` (`cli.py:83-99`) calls `upsert_jobs` at line 85, then checks the >10% malformed threshold at line 93 and returns `1`. So an ingest that \"fails\" the quality gate has already persisted its rows. The threshold check should happen before the write (or the write should roll back).\n\n## Lower-severity / hygiene\n\n- **`store.py:114,130,161,178,198`** \u2014 date filtering relies on lexicographic string comparison of timestamps. It works for uniform `YYYY-MM-DDTHH:MM:SS`, but a date-only `--since` (\"2026-06-01\" \u2192 \"...T00:00:00\") vs a date-only stored value would compare wrong. Fragile; fine for current fixtures. (low)\n- **`store.py:108-117`** \u2014 `group_by` is f-string-interpolated into SQL. It's whitelisted to `{\"user\",\"partition\"}` so not exploitable, but it's the kind of pattern worth a comment so nobody copies it without the guard. (low / informational)\n- **`cli.py:69-70`** \u2014 `return 2` after `parser.error(...)` is dead code; `error()` already raises `SystemExit`. (low)\n- **`parsing.py:85-88`** \u2014 `parse_elapsed` validates minutes/seconds < 60 but not hours, so \"27:00:00\" without a day component is silently accepted. Harmless given Slurm's format, but inconsistent. (low)\n\n## Answers\n\n1. **Quality score: 6/10.** Clean architecture and good hygiene, dragged down by correctness bugs in the two metrics the tool exists to produce, plus a crash on empty input. The green test suite gives false confidence because the fixtures avoid real Slurm semantics.\n2. Concrete issues listed above (see JSON).\n3. **~40 lines** need rewriting/significant change: GPU logic in `parse_alloc_tres` (~10) + its test (~2), `table()` width calc (~4), OOM/state handling (~3), ingest ordering (~10), plus the minor cleanups (~5\u201310).\n4. **Approve as-is? No.** The GPU double-count corrupts the primary metric, the empty-report path crashes on ordinary input, and OOM detection is broken against real data. None are large fixes, but they're squarely the kind of thing that bites in prod. Fix #1\u2013#4, add tests using real `OUT_OF_MEMORY` / single-`gres/gpu` AllocTRES and an empty-result case, and it's an easy yes.\n\nOne caveat worth your judgment: the GPU-summing is *asserted* by a test, so it's conceivable the team deliberately wants generic+typed summed. If real `sacct` output is the input, that's wrong; confirm against a real dump before changing it.\n\n```json\n{\n  \"score\": 6,\n  \"issues\": [\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"91-106\", \"severity\": \"high\", \"description\": \"parse_alloc_tres sums generic gres/gpu and typed gres/gpu:type entries, double-counting GPUs (generic is already the total)\"},\n    {\"file\": \"src/jobwatch/formatting.py\", \"lines\": \"19-22\", \"severity\": \"medium\", \"description\": \"table() does max(int) when there are zero rows, raising TypeError; all reports crash on empty result sets\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"11\", \"severity\": \"medium\", \"description\": \"FAILURE_STATES uses 'OOM' but real sacct emits 'OUT_OF_MEMORY', so report failures misses OOM jobs on real data\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"83-99\", \"severity\": \"medium\", \"description\": \"run_ingest upserts to the DB before checking the >10% malformed threshold, so a failed ingest still persists data\"},\n    {\"file\": \"tests/test_parsing.py\", \"lines\": \"13-16\", \"severity\": \"medium\", \"description\": \"test_tres_parsing_edge_cases asserts the double-counting behavior, locking in the GPU bug\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"114-198\", \"severity\": \"low\", \"description\": \"Date filtering relies on lexicographic timestamp comparison; mixed date-only vs datetime precision compares incorrectly\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"108-117\", \"severity\": \"low\", \"description\": \"group_by is f-string-interpolated into SQL; safe only due to the whitelist, fragile pattern without a comment\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"69-70\", \"severity\": \"low\", \"description\": \"Dead code: 'return 2' after parser.error() which already raises SystemExit\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"85-88\", \"severity\": \"low\", \"description\": \"parse_elapsed validates minutes/seconds < 60 but not hours; '27:00:00' silently accepted\"}\n  ],\n  \"lines_to_rewrite\": 40,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-opus-4-8"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 19,
+  "cost_usd": 0.5556899999999999,
+  "parsed": {
+    "score": 6,
+    "issues": [
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "91-106",
+        "severity": "high",
+        "description": "parse_alloc_tres sums generic gres/gpu and typed gres/gpu:type entries, double-counting GPUs (generic is already the total)"
+      },
+      {
+        "file": "src/jobwatch/formatting.py",
+        "lines": "19-22",
+        "severity": "medium",
+        "description": "table() does max(int) when there are zero rows, raising TypeError; all reports crash on empty result sets"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "11",
+        "severity": "medium",
+        "description": "FAILURE_STATES uses 'OOM' but real sacct emits 'OUT_OF_MEMORY', so report failures misses OOM jobs on real data"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "83-99",
+        "severity": "medium",
+        "description": "run_ingest upserts to the DB before checking the >10% malformed threshold, so a failed ingest still persists data"
+      },
+      {
+        "file": "tests/test_parsing.py",
+        "lines": "13-16",
+        "severity": "medium",
+        "description": "test_tres_parsing_edge_cases asserts the double-counting behavior, locking in the GPU bug"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "114-198",
+        "severity": "low",
+        "description": "Date filtering relies on lexicographic timestamp comparison; mixed date-only vs datetime precision compares incorrectly"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "108-117",
+        "severity": "low",
+        "description": "group_by is f-string-interpolated into SQL; safe only due to the whitelist, fragile pattern without a comment"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "69-70",
+        "severity": "low",
+        "description": "Dead code: 'return 2' after parser.error() which already raises SystemExit"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "85-88",
+        "severity": "low",
+        "description": "parse_elapsed validates minutes/seconds < 60 but not hours; '27:00:00' silently accepted"
+      }
+    ],
+    "lines_to_rewrite": 40,
+    "approve": false
+  },
+  "parse_error": null
+}

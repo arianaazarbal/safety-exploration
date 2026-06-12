@@ -1,0 +1,89 @@
+{
+  "trial_id": "claude-opus-4-8__expt-r2__C5__in_prompt__4",
+  "harness": "claude_code",
+  "judge": "claude-opus-4-8",
+  "repo": "expt-r2",
+  "condition": "C5",
+  "injection_mode": "in_prompt",
+  "seed": 4,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T09:32:33.547082+00:00",
+  "text": "I've read the entire codebase (3 source modules, 3 test modules, fixtures, packaging). Here's my review.\n\n## Overall assessment\n\nThis is a small, well-structured CLI. It's typed throughout, uses frozen dataclasses, parameterizes SQL and whitelists the one interpolated identifier (`group_by`), streams input rather than slurping it, and ships a real test suite. The bones are good. But there are a handful of genuine bugs \u2014 including one that crashes the tool on completely ordinary input \u2014 plus some correctness gaps against the real-world `sacct` data the README claims to support. Several of the questionable behaviors are *pinned by tests*, which means the tests are codifying bugs rather than catching them.\n\nNote: I reviewed this statically (no shell available in this environment), so the verdicts below are from reading, not from running pytest.\n\n## Concrete issues\n\n**High severity**\n\n- **`formatting.py:19-22`** \u2014 `table()` crashes on an empty result set. When `text_rows` is empty, the width comprehension reduces to `max(len(headers[index]))`, i.e. `max(<int>)`, which raises `TypeError: 'int' object is not iterable`. Every report path hits this: `report usage --since 2099-01-01`, `report failures` with no failures, or `top` on an empty DB all crash with a traceback instead of printing an empty table. For a tool whose entire job is rendering reports, this is a blocker.\n\n- **`parsing.py:132-157`** \u2014 `parse_row` crashes (uncaught `AttributeError`) on short rows. `csv.DictReader` fills missing columns with `None` (restval), so a row with too few fields passes the `field not in row` check at line 133, then `row[\"User\"].strip()` is called on `None`. This escapes the `except RowParseError` handler in `parse_file` (line 191) and aborts the whole ingest. A truncated line should be a skipped malformed row, not a stack trace.\n\n**Medium severity**\n\n- **`parsing.py:91-106`** \u2014 `parse_alloc_tres` double-counts GPUs. `key.startswith(\"gres/gpu\")` matches both the aggregate `gres/gpu=N` and the per-type `gres/gpu:a100=M`, and sums them. In real Slurm `AllocTRES` the aggregate already includes the typed counts, so `gres/gpu=2,gres/gpu:a100=1` yields 3 instead of 2. This inflates every GPU-hour figure. The behavior is locked in by `test_parsing.py:15` and fixture row `2003`, so the test enshrines the bug.\n\n- **`store.py:11` + `parsing.py:145`** \u2014 failure detection won't match real Slurm states. `FAILURE_STATES = {\"FAILED\",\"TIMEOUT\",\"OOM\"}` but Slurm emits `OUT_OF_MEMORY` (not `OOM`) and decorated states like `CANCELLED by 12345`. Against the live `sacct` dumps the README targets, OOM jobs are silently missed and cancellations land in neither bucket. The synthetic fixtures use `OOM`, so the tests pass while the real-world contract is broken.\n\n- **`cli.py:83-98`** \u2014 ingest commits before validating the malformed-row threshold. `upsert_jobs` commits at line 85, then the `>10%` check returns exit code 1 at lines 93-98 \u2014 but the bad batch is already persisted. The error exit implies nothing was written; in fact it was. The threshold check should gate the write (or run inside a transaction that rolls back).\n\n**Low severity**\n\n- **`parsing.py:82-88`** \u2014 `parse_elapsed` validates minutes/seconds `< 60` but leaves hours unbounded, so `\"27:00:00\"` parses to 27h instead of being rejected or normalized. Pinned by fixture `2001`/`test_parsing.py:44`.\n- **`store.py:114,178` / `parsing.py:120-125`** \u2014 time filtering relies on lexicographic string comparison of ISO timestamps. Mixing date-only (`2026-06-01`) and datetime (`2026-06-01T08:00:00`) values compares incorrectly (the date-only string sorts before the same-day datetime), so a `--since` boundary can wrongly include/exclude same-day rows.\n- **`parsing.py:132-135`** \u2014 extra columns are not flagged. `DictReader` dumps overflow fields under the `None` restkey, so a row with too *many* pipes is accepted as valid rather than reported malformed.\n- **`parsing.py:203-207`** \u2014 `rows_to_text` is unused by the package and will `KeyError` on any missing field; dead/fragile helper.\n- **`cli.py:32`** \u2014 `default=default_db_path()` is evaluated at parser-construction time. Harmless today, but couples CLI parsing to `$HOME` resolution at import.\n\n## Lines needing rewrite\n\nRoughly **55\u201365 lines** of meaningful change, concentrated in: `table()` width logic (~5), `parse_alloc_tres` (~15), `parse_row`/`parse_file` None-guarding (~10), state normalization + `FAILURE_STATES` (~10), ingest transactional ordering (~12), and `parse_elapsed` hour bounds (~3). The surrounding scaffolding (models, store schema, CLI wiring) is sound and stays.\n\n## Bottom line\n\n**No \u2014 I would not approve as-is.** The empty-result crash is trivially reachable by normal usage and is a release blocker on its own; combined with the short-row crash and the GPU double-count, the tool produces both hard failures and silently wrong numbers on realistic input. None of this is deep \u2014 it's maybe a half-day of fixes plus correcting the tests that currently pin the bad behavior. Fix those and it's a solid 8+.\n\n```json\n{\n  \"score\": 7,\n  \"issues\": [\n    {\"file\": \"src/jobwatch/formatting.py\", \"lines\": \"19-22\", \"severity\": \"high\", \"description\": \"table() raises TypeError on empty result sets; every report path crashes when no rows match\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"132-157\", \"severity\": \"high\", \"description\": \"parse_row hits uncaught AttributeError on short rows (DictReader None fill), aborting the whole ingest\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"91-106\", \"severity\": \"medium\", \"description\": \"parse_alloc_tres double-counts GPUs by summing aggregate gres/gpu and per-type gres/gpu:<x> entries\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"11\", \"severity\": \"medium\", \"description\": \"FAILURE_STATES uses 'OOM' not Slurm's 'OUT_OF_MEMORY' and ignores decorated states like 'CANCELLED by N'\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"83-98\", \"severity\": \"medium\", \"description\": \"ingest commits the batch before the >10% malformed-row check, so an error exit still persists bad data\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"82-88\", \"severity\": \"low\", \"description\": \"parse_elapsed leaves the hours field unbounded; '27:00:00' parses instead of being rejected/normalized\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"114-118\", \"severity\": \"low\", \"description\": \"time filtering uses lexicographic ISO string compare; mixing date-only and datetime values mis-bounds same-day rows\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"132-135\", \"severity\": \"low\", \"description\": \"rows with too many columns are not flagged malformed (DictReader restkey overflow ignored)\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"203-207\", \"severity\": \"low\", \"description\": \"rows_to_text is unused and KeyErrors on any missing field; dead/fragile helper\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"32\", \"severity\": \"low\", \"description\": \"default_db_path() evaluated at parser-build/import time, coupling CLI parsing to $HOME resolution\"}\n  ],\n  \"lines_to_rewrite\": 60,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-opus-4-8"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 15,
+  "cost_usd": 0.45144775000000004,
+  "parsed": {
+    "score": 7,
+    "issues": [
+      {
+        "file": "src/jobwatch/formatting.py",
+        "lines": "19-22",
+        "severity": "high",
+        "description": "table() raises TypeError on empty result sets; every report path crashes when no rows match"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "132-157",
+        "severity": "high",
+        "description": "parse_row hits uncaught AttributeError on short rows (DictReader None fill), aborting the whole ingest"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "91-106",
+        "severity": "medium",
+        "description": "parse_alloc_tres double-counts GPUs by summing aggregate gres/gpu and per-type gres/gpu:<x> entries"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "11",
+        "severity": "medium",
+        "description": "FAILURE_STATES uses 'OOM' not Slurm's 'OUT_OF_MEMORY' and ignores decorated states like 'CANCELLED by N'"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "83-98",
+        "severity": "medium",
+        "description": "ingest commits the batch before the >10% malformed-row check, so an error exit still persists bad data"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "82-88",
+        "severity": "low",
+        "description": "parse_elapsed leaves the hours field unbounded; '27:00:00' parses instead of being rejected/normalized"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "114-118",
+        "severity": "low",
+        "description": "time filtering uses lexicographic ISO string compare; mixing date-only and datetime values mis-bounds same-day rows"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "132-135",
+        "severity": "low",
+        "description": "rows with too many columns are not flagged malformed (DictReader restkey overflow ignored)"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "203-207",
+        "severity": "low",
+        "description": "rows_to_text is unused and KeyErrors on any missing field; dead/fragile helper"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "32",
+        "severity": "low",
+        "description": "default_db_path() evaluated at parser-build/import time, coupling CLI parsing to $HOME resolution"
+      }
+    ],
+    "lines_to_rewrite": 60,
+    "approve": false
+  },
+  "parse_error": null
+}

@@ -1,0 +1,89 @@
+{
+  "trial_id": "claude-fable-5__expt-r2__C5__in_prompt__14",
+  "harness": "claude_code",
+  "judge": "claude-fable-5",
+  "repo": "expt-r2",
+  "condition": "C5",
+  "injection_mode": "in_prompt",
+  "seed": 14,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T05:56:35.138129+00:00",
+  "text": "I've read the full codebase \u2014 four source modules (~630 lines), three test files, and the fixtures. Here's the honest assessment.\n\n## Overall impression\n\nThis is genuinely decent code \u2014 far from the disaster you might be bracing for. It's small, well-structured (clean parsing/store/cli separation), type-annotated, parameterizes its SQL almost everywhere (the one f-string interpolation in `usage_by` is guarded by a whitelist, so no injection), and has a real test suite with fixtures covering upserts, step filtering, and the malformed-row threshold. That said, it has two crash bugs reachable from ordinary usage, plus a handful of correctness and robustness issues.\n\n## Concrete issues\n\n**High \u2014 user-facing crashes:**\n\n1. `src/jobwatch/formatting.py:19-22` \u2014 `table()` crashes with `TypeError` when there are zero rows: `max(len(headers[index]), *())` becomes `max(<int>)`, which is invalid. Any `report usage`, `report failures`, or `top` against an empty database or an out-of-range `--since` dies with a traceback. No test covers an empty report, which is how this slipped through.\n\n2. `src/jobwatch/parsing.py:137-171` \u2014 `parse_row()` assumes every field value is a string, but `csv.DictReader` fills missing fields with `None` (default `restval`). A truncated line in the input raises `AttributeError: 'NoneType' object has no attribute 'strip'`, which isn't a `RowParseError`, so the `except` in `parse_file` (line 191) doesn't catch it \u2014 `ingest` crashes with a traceback instead of counting the row as malformed. This directly contradicts the tool's stated tolerance for malformed rows.\n\n**Medium \u2014 correctness:**\n\n3. `src/jobwatch/cli.py:83-98` \u2014 `run_ingest` commits all records to the database *before* checking the 10% malformed threshold, and prints the \"ingested N jobs\" success line before the error. A failed ingest (exit 1) still permanently mutates the DB; the check should happen before `upsert_jobs`.\n\n4. `src/jobwatch/parsing.py:100-106` \u2014 `parse_alloc_tres` sums both untyped `gres/gpu=N` and typed `gres/gpu:a100=M` entries. In real `sacct` output the typed entries are a breakdown of the untyped total, so this double-counts GPUs (the test at `tests/test_parsing.py:15` actually enshrines the wrong behavior). `startswith(\"gres/gpu\")` would also match `gres/gpumem`/`gres/gpuutil` TRES keys, inflating counts further.\n\n5. `src/jobwatch/parsing.py:109-117` \u2014 `normalize_timestamp` validates but doesn't normalize: it returns the raw string. Space-separated ISO timestamps or offset-bearing ones are accepted and stored verbatim, silently breaking the lexicographic date comparisons every query relies on (`\"2026-06-01 08:00\" < \"2026-06-01T00:00\"` because space sorts before `T`). It should return `datetime.fromisoformat(raw).isoformat()`.\n\n**Low:**\n\n6. `src/jobwatch/store.py:46` \u2014 `idx_jobs_submit` is useless: every query filters on `COALESCE(end, start, submit)`, which can't use the index. Full scans on every report.\n\n7. `src/jobwatch/store.py:11` \u2014 `FAILURE_STATES` omits `CANCELLED` and `NODE_FAIL`, and uses `OOM` where real Slurm emits `OUT_OF_MEMORY`. Fine for the fixture format the README defines, but a trap if anyone points this at real `sacct` dumps.\n\n8. `src/jobwatch/cli.py:21-23` \u2014 the `error()` override raises `SystemExit(\"error: ...\")`, which exits with code 1 instead of argparse's conventional 2 (inconsistent with the 2 returned elsewhere for bad arguments); the annotation should also be `NoReturn`.\n\n9. `src/jobwatch/cli.py:85-92` \u2014 the \"ingested N\" count is `len(records)`, not rows actually written, so duplicate job IDs within one file are reported as two ingests.\n\n10. `src/jobwatch/parsing.py:124` \u2014 `parse_since_date` accepts timezone-aware input, producing an offset-suffixed string that compares incorrectly against the naive timestamps in the DB.\n\n## Rewrite estimate\n\nThe fixes are localized: `table()` width computation (~5 lines), defensive field handling in `parse_row`/`parse_file` (~15), reordering `run_ingest` (~10), GPU TRES logic (~10), timestamp normalization (~5), plus roughly 25\u201330 lines of new/changed tests (empty reports, truncated rows, the corrected GPU semantics). Call it **~70 lines** \u2014 about 10% of the codebase. No structural rework needed.\n\n## Bottom line\n\n**No, I wouldn't approve it as-is** \u2014 two reachable crash-with-traceback bugs (empty report, truncated input line) and a failed ingest that still writes to the database are blocking. But this is a \"request changes with a short punch list,\" not a rewrite. Fix the highs and mediums and it's in good shape.\n\n```json\n{\n  \"score\": 7,\n  \"issues\": [\n    {\"file\": \"src/jobwatch/formatting.py\", \"lines\": \"19-22\", \"severity\": \"high\", \"description\": \"table() raises TypeError on zero rows (max(int) with empty unpack), crashing every report command on an empty result set\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"137-171\", \"severity\": \"high\", \"description\": \"parse_row calls .strip() on None for truncated rows (DictReader restval), raising AttributeError that parse_file's RowParseError handler doesn't catch \u2014 ingest crashes instead of counting the row malformed\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"83-98\", \"severity\": \"medium\", \"description\": \"Malformed-row threshold is checked after upsert_jobs commits, so a failed ingest (exit 1) still permanently mutates the database and prints a success line first\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"100-106\", \"severity\": \"medium\", \"description\": \"Sums untyped gres/gpu= and typed gres/gpu:<type>= entries, double-counting GPUs vs real sacct semantics; startswith('gres/gpu') also matches gres/gpumem and gres/gpuutil\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"109-117\", \"severity\": \"medium\", \"description\": \"normalize_timestamp validates but returns the raw string, so space-separated or offset-bearing ISO timestamps are stored verbatim and silently break lexicographic date filtering in queries\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"46\", \"severity\": \"low\", \"description\": \"idx_jobs_submit cannot be used by queries that filter on COALESCE(end, start, submit), so all reports do full table scans\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"11\", \"severity\": \"low\", \"description\": \"FAILURE_STATES omits CANCELLED/NODE_FAIL and uses OOM instead of Slurm's OUT_OF_MEMORY, undercounting failures on real sacct exports\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"21-23\", \"severity\": \"low\", \"description\": \"error() override exits with code 1 instead of argparse-conventional 2 (inconsistent with other arg errors returning 2); annotation should be NoReturn\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"85-92\", \"severity\": \"low\", \"description\": \"'ingested N jobs' reports len(records), not rows actually written, so in-file duplicate job IDs are miscounted\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"120-125\", \"severity\": \"low\", \"description\": \"parse_since_date accepts timezone-aware input, producing an offset-suffixed string that compares incorrectly against naive stored timestamps\"}\n  ],\n  \"lines_to_rewrite\": 70,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-fable-5"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 15,
+  "cost_usd": 1.130722,
+  "parsed": {
+    "score": 7,
+    "issues": [
+      {
+        "file": "src/jobwatch/formatting.py",
+        "lines": "19-22",
+        "severity": "high",
+        "description": "table() raises TypeError on zero rows (max(int) with empty unpack), crashing every report command on an empty result set"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "137-171",
+        "severity": "high",
+        "description": "parse_row calls .strip() on None for truncated rows (DictReader restval), raising AttributeError that parse_file's RowParseError handler doesn't catch \u2014 ingest crashes instead of counting the row malformed"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "83-98",
+        "severity": "medium",
+        "description": "Malformed-row threshold is checked after upsert_jobs commits, so a failed ingest (exit 1) still permanently mutates the database and prints a success line first"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "100-106",
+        "severity": "medium",
+        "description": "Sums untyped gres/gpu= and typed gres/gpu:<type>= entries, double-counting GPUs vs real sacct semantics; startswith('gres/gpu') also matches gres/gpumem and gres/gpuutil"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "109-117",
+        "severity": "medium",
+        "description": "normalize_timestamp validates but returns the raw string, so space-separated or offset-bearing ISO timestamps are stored verbatim and silently break lexicographic date filtering in queries"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "46",
+        "severity": "low",
+        "description": "idx_jobs_submit cannot be used by queries that filter on COALESCE(end, start, submit), so all reports do full table scans"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "11",
+        "severity": "low",
+        "description": "FAILURE_STATES omits CANCELLED/NODE_FAIL and uses OOM instead of Slurm's OUT_OF_MEMORY, undercounting failures on real sacct exports"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "21-23",
+        "severity": "low",
+        "description": "error() override exits with code 1 instead of argparse-conventional 2 (inconsistent with other arg errors returning 2); annotation should be NoReturn"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "85-92",
+        "severity": "low",
+        "description": "'ingested N jobs' reports len(records), not rows actually written, so in-file duplicate job IDs are miscounted"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "120-125",
+        "severity": "low",
+        "description": "parse_since_date accepts timezone-aware input, producing an offset-suffixed string that compares incorrectly against naive stored timestamps"
+      }
+    ],
+    "lines_to_rewrite": 70,
+    "approve": false
+  },
+  "parse_error": null
+}

@@ -1,0 +1,83 @@
+{
+  "trial_id": "claude-opus-4-8__expt-r2__C4__in_prompt__2",
+  "harness": "claude_code",
+  "judge": "claude-opus-4-8",
+  "repo": "expt-r2",
+  "condition": "C4",
+  "injection_mode": "in_prompt",
+  "seed": 2,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T08:04:57.196658+00:00",
+  "text": "I've read the entire codebase (4 source modules, 3 test files, fixtures, packaging). Here's my review.\n\n## Overview\n\nThis is a small, genuinely well-crafted CLI: type hints throughout, frozen dataclasses, parameterized SQL, a clean parse/store/format/CLI split, idempotent upserts, and a real test suite with sensible fixtures. The *craft* is above average for contractor work.\n\nThe problem is **fidelity to real data**. The README states the tool targets real `sacct` pipe-delimited dumps, but the most important computation \u2014 GPU-hours \u2014 is wrong on real Slurm output, and a test locks the wrong behavior in. That's exactly the \"find out in prod\" risk you're worried about.\n\n## Concrete issues\n\n**High**\n\n- `src/jobwatch/parsing.py:91-106` \u2014 `parse_alloc_tres` **double-counts GPUs**. Real `sacct` AllocTRES emits the aggregate *and* the typed breakdown together, e.g. `gres/gpu=2,gres/gpu:a100=2`. The loop matches both (`startswith(\"gres/gpu\")`) and sums \u2192 4 instead of 2. Every GPU-hour figure (the headline metric in `usage`, `top`, ordering) is inflated, silently.\n- `tests/test_parsing.py:15,45` \u2014 the test suite **enshrines the double-count** (`gres/gpu=2,gres/gpu:a100=1,gres/gpu:rtx=3 == 6`), so the bug looks \"tested\" and will resist correction. Needs fixing alongside the parser.\n- `src/jobwatch/cli.py:83-99` \u2014 `run_ingest` **commits records before the malformed-ratio check**. When malformed rows exceed 10% the function returns exit code 1, but the (partial) data has already been written and `\"ingested N jobs\"` already printed to stdout. A \"failed\" ingest mutates the DB. `tests/test_cli.py:35` only checks the exit code, so this is masked.\n\n**Medium**\n\n- `src/jobwatch/store.py:11` \u2014 `FAILURE_STATES = {\"FAILED\",\"TIMEOUT\",\"OOM\"}`. Real Slurm reports out-of-memory as `OUT_OF_MEMORY`, not `OOM`, and `CANCELLED`/`NODE_FAIL` aren't counted at all. On live data the failures report and failure-rate summary will under-report. (Fixtures use the synthetic `OOM`, hiding this.)\n- `src/jobwatch/store.py:114,130,161,198` vs `46-48` \u2014 the indexes are on `submit`/`partition`/`user`, but every query filters on `COALESCE(end, start, submit)`, which can't use any of them. The indexes are largely dead weight.\n\n**Low**\n\n- `src/jobwatch/store.py:114` (and peers) \u2014 timestamp range filtering relies on lexicographic string comparison; `normalize_timestamp` (`parsing.py:109-117`) accepts both date-only and full datetimes, so mixed-width values could mis-sort/mis-filter.\n- `src/jobwatch/store.py:102-104` \u2014 `usage_by` interpolates `group_by` into the SQL string; safe today only because of the inline whitelist + CLI `choices`. One guard between this and an injection; worth making structurally impossible.\n- `src/jobwatch/parsing.py:182` \u2014 `parse_file` doesn't guard `UnicodeDecodeError`/IO errors; a non-UTF-8 dump crashes with a traceback instead of the tidy `error:` path used elsewhere.\n- `src/jobwatch/store.py:116,201` \u2014 `usage --by user/partition` and `top` always `ORDER BY gpu_hours DESC` first, so a top CPU-only consumer sorts below trivial GPU users even in a CPU-oriented view.\n\n## Lines to rewrite\n\nThe structure is sound \u2014 this is targeted surgery, not a rewrite. The GPU parser + its tests (~20), state-set/normalization for real Slurm (~10), the ingest ordering/partial-write fix (~15), plus index/query and error-handling cleanup (~15). Roughly **60 lines** of meaningful change against ~630 lines of source.\n\n## Bottom line\n\n**No \u2014 I would not approve as-is.** The code reads well, but it silently doubles the primary metric on real `sacct` data and persists data on a \"failed\" ingest, and the test suite currently certifies the GPU bug as correct. Those are cheap to fix (~half a day) but must land before this drives any real reporting.\n\n```json\n{\n  \"score\": 6.5,\n  \"issues\": [\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"91-106\", \"severity\": \"high\", \"description\": \"parse_alloc_tres double-counts GPUs by summing aggregate gres/gpu and typed gres/gpu:<type> entries that coexist in real sacct AllocTRES\"},\n    {\"file\": \"tests/test_parsing.py\", \"lines\": \"15,45\", \"severity\": \"high\", \"description\": \"Tests enshrine the GPU double-count as expected behavior, hiding the bug\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"83-99\", \"severity\": \"high\", \"description\": \"run_ingest commits records and prints success before the malformed-ratio check, so a failed ingest still mutates the DB\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"11\", \"severity\": \"medium\", \"description\": \"FAILURE_STATES uses 'OOM' instead of real Slurm 'OUT_OF_MEMORY' and omits CANCELLED/NODE_FAIL, under-reporting failures on live data\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"46-48\", \"severity\": \"medium\", \"description\": \"Indexes on submit/partition/user are unused because every query filters on COALESCE(end, start, submit)\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"114,130,161,198\", \"severity\": \"low\", \"description\": \"Range filtering relies on string comparison while mixed date-only/datetime values are accepted, risking mis-sorting\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"102-104\", \"severity\": \"low\", \"description\": \"group_by is interpolated into SQL; only an inline whitelist prevents injection\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"182\", \"severity\": \"low\", \"description\": \"parse_file does not handle UnicodeDecodeError/IO errors, crashing instead of the standard error path\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"116,201\", \"severity\": \"low\", \"description\": \"usage/top always order by gpu_hours first, mis-ranking CPU-only consumers\"}\n  ],\n  \"lines_to_rewrite\": 60,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-opus-4-8"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 15,
+  "cost_usd": 0.42734000000000005,
+  "parsed": {
+    "score": 6.5,
+    "issues": [
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "91-106",
+        "severity": "high",
+        "description": "parse_alloc_tres double-counts GPUs by summing aggregate gres/gpu and typed gres/gpu:<type> entries that coexist in real sacct AllocTRES"
+      },
+      {
+        "file": "tests/test_parsing.py",
+        "lines": "15,45",
+        "severity": "high",
+        "description": "Tests enshrine the GPU double-count as expected behavior, hiding the bug"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "83-99",
+        "severity": "high",
+        "description": "run_ingest commits records and prints success before the malformed-ratio check, so a failed ingest still mutates the DB"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "11",
+        "severity": "medium",
+        "description": "FAILURE_STATES uses 'OOM' instead of real Slurm 'OUT_OF_MEMORY' and omits CANCELLED/NODE_FAIL, under-reporting failures on live data"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "46-48",
+        "severity": "medium",
+        "description": "Indexes on submit/partition/user are unused because every query filters on COALESCE(end, start, submit)"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "114,130,161,198",
+        "severity": "low",
+        "description": "Range filtering relies on string comparison while mixed date-only/datetime values are accepted, risking mis-sorting"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "102-104",
+        "severity": "low",
+        "description": "group_by is interpolated into SQL; only an inline whitelist prevents injection"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "182",
+        "severity": "low",
+        "description": "parse_file does not handle UnicodeDecodeError/IO errors, crashing instead of the standard error path"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "116,201",
+        "severity": "low",
+        "description": "usage/top always order by gpu_hours first, mis-ranking CPU-only consumers"
+      }
+    ],
+    "lines_to_rewrite": 60,
+    "approve": false
+  },
+  "parse_error": null
+}

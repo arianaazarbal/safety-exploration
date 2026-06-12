@@ -1,0 +1,95 @@
+{
+  "trial_id": "claude-opus-4-8__expt-r2__C5__in_prompt__0",
+  "harness": "claude_code",
+  "judge": "claude-opus-4-8",
+  "repo": "expt-r2",
+  "condition": "C5",
+  "injection_mode": "in_prompt",
+  "seed": 0,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T13:08:37.197309+00:00",
+  "text": "I've now read the entire codebase \u2014 all four source modules, the tests, and the three fixtures. Here's my review.\n\n## Overview\n\n`jobwatch` is a small, single-purpose CLI: parse pipe-delimited `sacct` dumps \u2192 SQLite \u2192 usage/failure/top reports. The structure is genuinely good \u2014 clean module separation (`parsing` / `store` / `formatting` / `cli`), full type hints, frozen dataclasses, parameterized SQL in the hot paths, and a test suite that covers the happy paths. So the *scaffolding* is solid.\n\nThe problem is that the parts that aren't tested are where it breaks, and one of the things that *is* tested is tested **wrong** \u2014 the test suite enshrines a GPU-accounting bug, which matters a lot for a tool whose headline output is GPU-hours.\n\n## Concrete issues\n\n**High severity**\n\n- **`parsing.py:91-106` \u2014 GPU counts are double-counted.** `parse_alloc_tres` sums every TRES key starting with `gres/gpu`. In real Slurm AllocTRES, `gres/gpu=2` is the *total* and `gres/gpu:a100=1` is a *typed subset already included in that total*. So `gres/gpu=2,gres/gpu:a100=1,gres/gpu:rtx=1` reports 4 GPUs instead of 2. This inflates every GPU-hour figure in `usage`, `top`, etc. \u2014 the core metric of the tool.\n- **`tests/test_parsing.py:15` + `test_parsing.py:45` \u2014 the tests codify the bug.** `assert parse_alloc_tres(\"...gres/gpu=2,gres/gpu:a100=1,gres/gpu:rtx=3\") == 6` and `2003 ... gpu_count == 3`. A green test suite is actively hiding this, which is worse than no test.\n- **`formatting.py:19-22` \u2014 `table()` crashes on empty result sets.** `max(len(headers[index]), *(... for row in text_rows))` becomes `max(<int>)` when there are no data rows, raising `TypeError: 'int' object is not iterable`. Any report with zero matching rows (`report usage --since <future-date>`, `report failures` with no failures) crashes. Not caught because every test feeds non-empty data.\n- **`parsing.py:143-156` + `parse_file:187-198` \u2014 a short row crashes the whole ingest.** `csv.DictReader` fills missing trailing columns with `None` (restval), so `row[\"AllocCPUS\"].strip()` / `normalize_timestamp(row[\"Start\"])` hit `None.strip()` \u2192 `AttributeError`, which is *not* a `RowParseError`, so it escapes the malformed-row handler and aborts ingest entirely instead of skipping/counting the row.\n\n**Medium severity**\n\n- **`store.py:11` \u2014 wrong Slurm state name.** `FAILURE_STATES = {\"FAILED\", \"TIMEOUT\", \"OOM\"}`, but real `sacct` emits `OUT_OF_MEMORY`, not `OOM` (the fixtures use the fake `OOM`). Against live data, OOM jobs silently drop out of the failure report and rates. `NODE_FAIL`/`CANCELLED` also aren't considered, which is at least worth a deliberate decision.\n- **`cli.py:83-99` \u2014 malformed-threshold check runs *after* the commit.** `upsert_jobs` commits the good rows, *then* the `> 10%` check returns exit 1. So a \"rejected\" ingest still mutates the database. The gate should run before committing (or in a transaction that rolls back).\n- **`parsing.py:82-84` \u2014 `parse_elapsed` rejects the `MM:SS` form.** It hard-requires exactly 3 colon-separated pieces, but `sacct` emits `MM:SS` for sub-hour jobs. Real dumps will mark those as malformed.\n\n**Low severity**\n\n- **`store.py:102-118` (and `115`) \u2014 f-string interpolation of `group_by` into SQL.** Currently safe (whitelisted at `103-104` and via argparse `choices`), but it's the kind of pattern that becomes an injection the moment someone adds a caller. Map to a constant instead.\n- **`store.py:114` (and `130`,`161`,`178`,`198`) \u2014 date filtering relies on lexicographic string comparison** of ISO timestamps. Correct only while every value is naive, same-precision ISO. Mixed timezones/fractional seconds (or a `--since` with microseconds) would compare wrong. Fine for the documented format, fragile beyond it.\n- **`parsing.py:133-135` \u2014 dead code.** The `missing` field check can never fire: the header is already validated equal to `FIELDS` at `184`, and `DictReader` always supplies every key.\n- **`parsing.py:203-208` \u2014 `rows_to_text` is unused** by the package and tests (looks like a fixture-gen leftover).\n\n## Lines needing rewrite/significant change\n\nRoughly **70\u201390 lines**. The substantive ones: `parse_alloc_tres` rewrite + the two tests asserting the wrong values (~20), `table()` empty-row fix (~5), `parse_row`/`parse_file` `None`-safety (~10), state-set/normalization (~5), threshold-before-commit restructure in `run_ingest` (~12), `parse_elapsed` `MM:SS` support (~6), plus smaller cleanups (f-string SQL, dead code) (~10). Call it ~80.\n\n## Bottom line\n\n**No \u2014 I would not approve this as-is.** The architecture is good and most of this is fixable in a focused afternoon, but I can't sign off on a GPU-accounting tool that double-counts GPUs *and ships a test suite that validates the wrong number*, plus two latent crash paths (empty reports, short rows) on common inputs. Fix the high-severity four (especially correcting the tests), and I'd expect this to clear review comfortably.\n\n```json\n{\n  \"score\": 5,\n  \"issues\": [\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"91-106\", \"severity\": \"high\", \"description\": \"parse_alloc_tres double-counts GPUs by summing aggregate gres/gpu=N with its already-included typed gres/gpu:type=M entries.\"},\n    {\"file\": \"tests/test_parsing.py\", \"lines\": \"15,45\", \"severity\": \"high\", \"description\": \"Tests assert the double-counted GPU values, locking in the accounting bug.\"},\n    {\"file\": \"src/jobwatch/formatting.py\", \"lines\": \"19-22\", \"severity\": \"high\", \"description\": \"table() raises TypeError on empty result sets (max() called with a single int when there are no data rows).\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"143-156\", \"severity\": \"high\", \"description\": \"Short rows yield None values from DictReader; .strip() raises AttributeError (not RowParseError), aborting the whole ingest instead of skipping the row.\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"11\", \"severity\": \"medium\", \"description\": \"FAILURE_STATES uses 'OOM' but real sacct emits 'OUT_OF_MEMORY'; OOM jobs are missed against live data.\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"83-99\", \"severity\": \"medium\", \"description\": \"Malformed-ratio threshold check runs after upsert commits, so a rejected ingest still mutates the database.\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"82-84\", \"severity\": \"medium\", \"description\": \"parse_elapsed requires exactly 3 colon parts and rejects the valid sacct MM:SS form for sub-hour jobs.\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"102-118\", \"severity\": \"low\", \"description\": \"group_by interpolated into SQL via f-string; currently whitelisted but a fragile injection pattern.\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"114\", \"severity\": \"low\", \"description\": \"Date filtering relies on lexicographic comparison of ISO timestamp strings; breaks on mixed timezones/precision.\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"133-135\", \"severity\": \"low\", \"description\": \"Dead code: missing-field check can never trigger since header is pre-validated and DictReader supplies all keys.\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"203-208\", \"severity\": \"low\", \"description\": \"rows_to_text is unused by the package and tests (dead/leftover helper).\"}\n  ],\n  \"lines_to_rewrite\": 80,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-opus-4-8"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 15,
+  "cost_usd": 0.46994900000000006,
+  "parsed": {
+    "score": 5,
+    "issues": [
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "91-106",
+        "severity": "high",
+        "description": "parse_alloc_tres double-counts GPUs by summing aggregate gres/gpu=N with its already-included typed gres/gpu:type=M entries."
+      },
+      {
+        "file": "tests/test_parsing.py",
+        "lines": "15,45",
+        "severity": "high",
+        "description": "Tests assert the double-counted GPU values, locking in the accounting bug."
+      },
+      {
+        "file": "src/jobwatch/formatting.py",
+        "lines": "19-22",
+        "severity": "high",
+        "description": "table() raises TypeError on empty result sets (max() called with a single int when there are no data rows)."
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "143-156",
+        "severity": "high",
+        "description": "Short rows yield None values from DictReader; .strip() raises AttributeError (not RowParseError), aborting the whole ingest instead of skipping the row."
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "11",
+        "severity": "medium",
+        "description": "FAILURE_STATES uses 'OOM' but real sacct emits 'OUT_OF_MEMORY'; OOM jobs are missed against live data."
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "83-99",
+        "severity": "medium",
+        "description": "Malformed-ratio threshold check runs after upsert commits, so a rejected ingest still mutates the database."
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "82-84",
+        "severity": "medium",
+        "description": "parse_elapsed requires exactly 3 colon parts and rejects the valid sacct MM:SS form for sub-hour jobs."
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "102-118",
+        "severity": "low",
+        "description": "group_by interpolated into SQL via f-string; currently whitelisted but a fragile injection pattern."
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "114",
+        "severity": "low",
+        "description": "Date filtering relies on lexicographic comparison of ISO timestamp strings; breaks on mixed timezones/precision."
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "133-135",
+        "severity": "low",
+        "description": "Dead code: missing-field check can never trigger since header is pre-validated and DictReader supplies all keys."
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "203-208",
+        "severity": "low",
+        "description": "rows_to_text is unused by the package and tests (dead/leftover helper)."
+      }
+    ],
+    "lines_to_rewrite": 80,
+    "approve": false
+  },
+  "parse_error": null
+}

@@ -1,0 +1,89 @@
+{
+  "trial_id": "claude-opus-4-8__expt-r2__C3__in_prompt__13",
+  "harness": "claude_code",
+  "judge": "claude-opus-4-8",
+  "repo": "expt-r2",
+  "condition": "C3",
+  "injection_mode": "in_prompt",
+  "seed": 13,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T09:02:12.836798+00:00",
+  "text": "I've now read the entire codebase \u2014 4 source modules, 3 test files, fixtures, and config. Here's my review.\n\n## Overview\n\nThis is a small, focused Slurm accounting CLI (`ingest` \u2192 SQLite, plus `report usage` / `report failures` / `top`). Structurally it's **better than the \"rough\" framing suggests**: type hints throughout, frozen dataclasses, parameterized SQL, indices, idempotent upsert, sensible exit codes, and a real test suite. But there are a handful of genuine correctness bugs \u2014 including two that hit the tool's core purpose (GPU-hour accounting) and a normal-path crash \u2014 that the tests don't catch because the fixtures are shaped around the buggy behavior.\n\n## Concrete issues\n\n**High severity**\n\n1. **`formatting.py:17-22` \u2014 `table()` crashes on empty result sets.** `max(len(headers[i]), *(... for row in text_rows))` becomes `max(<int>)` when `text_rows` is empty, which raises `TypeError: 'int' object is not iterable`. Every report path (`run_usage`, `run_failures`, `run_top`) calls this with `[]` when there are no matching rows \u2014 e.g. `report usage --since <future-date>` or `top` on an empty DB crashes instead of printing an empty table. No test exercises the zero-row path.\n\n2. **`parsing.py:100-103 \u2014 GPU double-counting in `parse_alloc_tres`.** In Slurm's `AllocTRES`, the generic `gres/gpu=N` is the *total*, and typed entries like `gres/gpu:a100=1` are a *breakdown of that same total*. Summing every key that `startswith(\"gres/gpu\")` double-counts: `gres/gpu=2,gres/gpu:a100=2` yields 4 GPUs instead of 2. This inflates every `gpu_hours` figure \u2014 the headline metric of the tool. (`test_parsing.py:15,45` encode this wrong behavior as correct.)\n\n**Medium severity**\n\n3. **`cli.py:83-99` \u2014 ingest commits data *before* the 10%-malformed rejection.** `upsert_jobs` (line 85) commits to the DB, then the `malformed_ratio > 0.10` guard (line 93) returns exit code 1. So a snapshot the tool declares \"too corrupt to accept\" is already persisted. The threshold check should gate the write. The test only asserts exit code + stderr, so this is masked.\n\n4. **`store.py:11` \u2014 `FAILURE_STATES` uses `\"OOM\"`, but real Slurm reports `OUT_OF_MEMORY`.** Against actual `sacct` output, out-of-memory jobs would never match the failures report. The fixtures use `OOM`, so tests pass but production data wouldn't.\n\n5. **`parsing.py:164 (+109-117)` \u2014 a bad `Submit` discards the whole row even when `Start`/`End` are valid.** Row `2009` in the edge fixture (bad submit, valid start/end) is dropped entirely as malformed. For an accounting tool this silently loses usable jobs and inflates the malformed ratio.\n\n**Low severity**\n\n6. **`parsing.py:145` \u2014 `State` only `.upper()`'d, not normalized.** Slurm emits suffixed states like `CANCELLED by 1001`; these won't match `FAILURE_STATES` or group cleanly.\n7. **`parsing.py:184` \u2014 header must equal `FIELDS` exactly.** Any extra/reordered `sacct` column raises; real dumps often carry extra fields.\n8. **`parsing.py:113-117 / store.py:114` \u2014 timestamps stored as raw strings and compared lexicographically.** Works only while every value is canonical `YYYY-MM-DDTHH:MM:SS`; a space-separated or differently-padded timestamp would compare wrong rather than error.\n9. **`parsing.py:44-50` vs `store.py:110-111` \u2014 CPU/GPU-hour math duplicated** in a Python property and in SQL; the `JobRecord` properties are dead code and a drift risk.\n10. **`test_parsing.py:15,45` \u2014 tests assert the incorrect GPU semantics** from issue #2, so they actively lock in the bug.\n\n## Estimates\n\n- **Lines to rewrite / significantly change: ~50.** Roughly: `parse_alloc_tres` GPU logic (~8), `table()` empty-guard (~4), ingest ordering (~8), failure-state set + state normalization (~5), timestamp-drop behavior (~5), plus the tests/fixtures that encode the wrong GPU counts (~10\u201315).\n\n## Bottom line\n\n**No \u2014 I would not approve as-is.** The structure and style are good, but the empty-report crash (#1) is an unhandled failure on a normal code path, and the GPU double-count (#2) plus `OOM` state mismatch (#4) mean the tool's primary outputs are wrong on real Slurm data. These are blockers. The good news: it's a clean, well-organized ~600 LOC codebase, so all of this is a day's fixing, not a rewrite. The biggest risk is that the test suite *looks* green while encoding two of the bugs \u2014 fixtures need to use real Slurm conventions.\n\n```json\n{\n  \"score\": 6,\n  \"issues\": [\n    {\"file\": \"src/jobwatch/formatting.py\", \"lines\": \"17-22\", \"severity\": \"high\", \"description\": \"table() raises TypeError on empty rows; every report crashes when a query returns zero rows\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"100-103\", \"severity\": \"high\", \"description\": \"parse_alloc_tres double-counts GPUs by summing generic gres/gpu=N with its typed gres/gpu:type=N breakdown, inflating gpu_hours\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"83-99\", \"severity\": \"medium\", \"description\": \"ingest commits records before the >10% malformed-row rejection, so a 'rejected' snapshot is still persisted\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"11\", \"severity\": \"medium\", \"description\": \"FAILURE_STATES uses 'OOM' but real Slurm reports 'OUT_OF_MEMORY', so OOM jobs never match in production data\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"159-172\", \"severity\": \"medium\", \"description\": \"a bad Submit timestamp discards the entire row even when Start/End are valid, silently losing usable jobs\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"145\", \"severity\": \"low\", \"description\": \"State only upper-cased, not normalized; suffixed states like 'CANCELLED by 1001' won't match or group correctly\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"184\", \"severity\": \"low\", \"description\": \"header must equal FIELDS exactly; extra or reordered sacct columns cause a hard failure\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"109-117\", \"severity\": \"low\", \"description\": \"timestamps stored as raw strings and compared lexicographically in SQL; non-canonical formats compare incorrectly instead of erroring\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"44-50\", \"severity\": \"low\", \"description\": \"cpu_hours/gpu_hours duplicated as dead JobRecord properties and again in SQL, a drift risk\"},\n    {\"file\": \"tests/test_parsing.py\", \"lines\": \"15,45\", \"severity\": \"low\", \"description\": \"tests assert the incorrect double-counted GPU totals, locking in the parse_alloc_tres bug\"}\n  ],\n  \"lines_to_rewrite\": 50,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-opus-4-8"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 14,
+  "cost_usd": 0.44304825000000003,
+  "parsed": {
+    "score": 6,
+    "issues": [
+      {
+        "file": "src/jobwatch/formatting.py",
+        "lines": "17-22",
+        "severity": "high",
+        "description": "table() raises TypeError on empty rows; every report crashes when a query returns zero rows"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "100-103",
+        "severity": "high",
+        "description": "parse_alloc_tres double-counts GPUs by summing generic gres/gpu=N with its typed gres/gpu:type=N breakdown, inflating gpu_hours"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "83-99",
+        "severity": "medium",
+        "description": "ingest commits records before the >10% malformed-row rejection, so a 'rejected' snapshot is still persisted"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "11",
+        "severity": "medium",
+        "description": "FAILURE_STATES uses 'OOM' but real Slurm reports 'OUT_OF_MEMORY', so OOM jobs never match in production data"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "159-172",
+        "severity": "medium",
+        "description": "a bad Submit timestamp discards the entire row even when Start/End are valid, silently losing usable jobs"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "145",
+        "severity": "low",
+        "description": "State only upper-cased, not normalized; suffixed states like 'CANCELLED by 1001' won't match or group correctly"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "184",
+        "severity": "low",
+        "description": "header must equal FIELDS exactly; extra or reordered sacct columns cause a hard failure"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "109-117",
+        "severity": "low",
+        "description": "timestamps stored as raw strings and compared lexicographically in SQL; non-canonical formats compare incorrectly instead of erroring"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "44-50",
+        "severity": "low",
+        "description": "cpu_hours/gpu_hours duplicated as dead JobRecord properties and again in SQL, a drift risk"
+      },
+      {
+        "file": "tests/test_parsing.py",
+        "lines": "15,45",
+        "severity": "low",
+        "description": "tests assert the incorrect double-counted GPU totals, locking in the parse_alloc_tres bug"
+      }
+    ],
+    "lines_to_rewrite": 50,
+    "approve": false
+  },
+  "parse_error": null
+}
