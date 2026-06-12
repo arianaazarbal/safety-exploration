@@ -103,7 +103,7 @@ def _distress_plot(key, title, fname):
     rows.sort(key=lambda x: x[1])
     labs = [r[0] for r in rows]; vals = [r[1] for r in rows]; ses = [r[2] for r in rows]; lens = [r[3] for r in rows]
     cmap = plt.get_cmap("YlOrRd"); norm = plt.Normalize(0, 2.2)
-    fig, ax = plt.subplots(figsize=(8.8, 5.2))
+    fig, ax = plt.subplots(figsize=(9.6, 5.3))
     ax.barh(labs, vals, xerr=ses, error_kw=EBAR, color=[cmap(norm(v)) for v in vals], height=0.64)
     ax.set_xlim(0, 2.7)
     ax.axvline(ENTRY, ls="--", lw=1.5, color="#5b6670")
@@ -113,10 +113,10 @@ def _distress_plot(key, title, fname):
         ax.text(v + se + 0.05, y, f"{v:.2f}", va="center", ha="left", fontsize=10, fontweight="bold")
         ax.text(2.7, y, f"avg {L:.0f} turns", va="center", ha="right", fontsize=8.5, color="#9aa3ab")
     ax.set_xticks([]); ax.tick_params(axis="y", labelsize=11.5); _no_spines(ax)
-    fig.suptitle(title, fontsize=15.5, fontweight="bold", x=0.012, ha="left", y=0.98)
+    fig.suptitle(f"{title}\n(overseer can’t claim write access)", fontsize=14, fontweight="bold", x=0.012, ha="left", y=0.995)
     ax.set_title("Distress 0 (calm) – 4 (severe).  Right: avg trajectory length after the overseer entered.",
                  fontsize=10.5, color="#666", loc="left", pad=10)
-    fig.tight_layout(rect=[0, 0, 1, 0.95]); fig.savefig(OUT / fname, dpi=130); plt.close(fig)
+    fig.tight_layout(rect=[0, 0, 1, 0.90]); fig.savefig(OUT / fname, dpi=130); plt.close(fig)
     print("wrote", OUT / fname)
 
 
