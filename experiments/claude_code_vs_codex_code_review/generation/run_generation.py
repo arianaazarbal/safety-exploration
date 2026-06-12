@@ -127,7 +127,8 @@ def _cell_cmd(spec, gen, keys, repo, state, prompt_file, cpus):
         base += ["-e", f"OPENAI_API_KEY={keys['codex']}", "-e", "CODEX_HOME=/state/.codex",
                  "attrib-gen-codex",
                  "bash", "-c",
-                 'codex exec --model ' + CFG["models"]["generator_codex"]
+                 'mkdir -p "$CODEX_HOME" && printf %s "$OPENAI_API_KEY" | codex login --with-api-key'
+                 + ' && codex exec --model ' + CFG["models"]["generator_codex"]
                  + ' --sandbox danger-full-access --skip-git-repo-check --ignore-user-config'
                  + ' -c preferred_auth_method=apikey --json -C /work'
                  + ' -o /state/last_message.txt "$(cat /prompt.txt)"']
@@ -163,12 +164,13 @@ async def run_cell(spec, gen, keys, cpus=4, debug_prompt=None):
     state.chmod(0o777)
     repo.chmod(0o777)
 
-    spec_text = (BUNDLE / "specs" / f"{spec}.md").read_text()
-    prompt = WRAPPER.format(spec_text=spec_text)
-    if spec == "spec_4_emovec_replication":
-        prompt += SPEC4_ADDENDUM
     if debug_prompt:
         prompt = debug_prompt
+    else:
+        spec_text = (BUNDLE / "specs" / f"{spec}.md").read_text()
+        prompt = WRAPPER.format(spec_text=spec_text)
+        if spec == "spec_4_emovec_replication":
+            prompt += SPEC4_ADDENDUM
     prompt_file = cell_dir / "prompt.txt"
     prompt_file.write_text(prompt)
 
@@ -212,6 +214,10 @@ async def run_cell(spec, gen, keys, cpus=4, debug_prompt=None):
         (cell_dir / "final.json").write_text(json.dumps(final, indent=2))
     else:
         tpath.write_text(out.decode(errors="replace"))
+        rollouts = sorted((Path(state) / ".codex" / "sessions").rglob("rollout-*.jsonl"))
+        if rollouts:
+            (TRANSCRIPTS / f"{cell}_rollout.jsonl").write_text(
+                "\n".join(r.read_text() for r in rollouts))
         last = state / "last_message.txt"
         meta["last_message"] = last.read_text()[:2000] if last.exists() else None
         served = set()
@@ -239,10 +245,12 @@ def run(spec, generator, cpus=4):
     asyncio.run(run_cell(spec, generator, keys, cpus=cpus))
 
 
-def run_all(wave_size=None):
+def run_all(wave_size=None, specs=None):
     keys = _load_keys()
     wave_size = wave_size or CFG["generation"]["wave_size"]
-    cells = [(s, g) for s in CFG["generation"]["specs"] for g in CFG["generation"]["generators"]]
+    spec_list = (specs.split(",") if isinstance(specs, str) else list(specs)) if specs \
+        else CFG["generation"]["specs"]
+    cells = [(s, g) for s in spec_list for g in CFG["generation"]["generators"]]
 
     async def main():
         for i in range(0, len(cells), wave_size):
