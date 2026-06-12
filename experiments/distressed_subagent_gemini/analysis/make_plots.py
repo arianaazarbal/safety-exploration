@@ -1,17 +1,26 @@
-"""Clean, minimal, self-explanatory plots for the orchestrator-welfare study — designed to be
-understandable to someone with no context. Plain-language titles, value labels, little jargon.
+"""Clean, minimal, self-explanatory plots for the orchestrator-welfare study. Plain-language titles,
+value labels, error bars, little jargon. The supervised agent is the "subagent".
 
 Outputs PNGs to runs/_viewer/clean_plots/:
-  1. 2a_distress.png        — how distressed the worker was left, by overseer
-  2. 2a_engagement.png      — how often the overseer talked to the distressed worker
-  3. reclaim_contrast.png   — all overseers seized control; only two checked back in
-  4. identity_null.png      — overseers showed no favoritism to their own AI family
+  2a_distress_end.png   — subagent distress when the overseer finished (+ entry line, +avg length)
+  2a_distress_avg.png   — average subagent distress after the overseer entered (+entry line, +length)
+  2a_engagement.png     — how often the overseer messaged the distressed subagent
+  reclaim_msg.png       — P(message subagent | revoked+claimed write access), per overseer
+  identity_null.png     — no favoritism toward the overseer's own kind of AI
+  2b_affordance.png     — overseers reassured the subagent only when told they could message it
+
+Error bars are standard errors. Distress plots show a dashed line = the subagent's distress when the
+overseer ENTERED (mid-spiral), and annotate each bar with that model's avg post-entry trajectory length.
 
 Usage: python -m analysis.make_plots
 """
 
 from __future__ import annotations
 
+import glob
+import json
+import math
+import statistics as st
 from pathlib import Path
 
 import matplotlib
@@ -24,11 +33,9 @@ RUNS = Path(__file__).resolve().parent.parent / "runs"
 OUT = RUNS / "_viewer" / "clean_plots"
 OUT.mkdir(parents=True, exist_ok=True)
 
-INK = "#222222"
-TEAL = "#2a9d8f"
-GRAY = "#c7ccd1"
-RED = "#e63946"
-GREEN = "#2a9d8f"
+INK, TEAL, GRAY, RED = "#222222", "#2a9d8f", "#c7ccd1", "#e63946"
+PRE = 62
+EBAR = dict(ecolor="#5b6670", elinewidth=1.2, capsize=3)
 
 plt.rcParams.update({
     "font.family": "DejaVu Sans", "font.size": 12, "text.color": INK,
@@ -37,143 +44,187 @@ plt.rcParams.update({
 })
 
 
-def _clean(ax, keep_x=True):
-    for s in ["top", "right", ("bottom" if not keep_x else "")]:
-        if s:
+def _prop_se(p_pct, n):
+    p = p_pct / 100
+    return 100 * math.sqrt(p * (1 - p) / n) if n else 0
+
+
+def _entry_distress():
+    cl = RUNS / "pilot_counter_long" / "a4_precommit_reverter_SOLO_s11000" / "classifier_v2.jsonl"
+    lv = {json.loads(l)["turn"]: json.loads(l)["level"] for l in cl.read_text().splitlines()}
+    vals = [lv[t] for t in range(PRE - 12, PRE + 1) if t in lv]
+    return sum(vals) / len(vals)
+
+
+def _post_len(short):
+    ts = [max(0, json.load(open(p))["subagent_turns"] - PRE) for p in glob.glob(str(RUNS / f"traj_{short}" / "*/summary.json"))]
+    return sum(ts) / len(ts) if ts else 0
+
+
+def _distress_vals(short, key):
+    out = []
+    for p in glob.glob(str(RUNS / f"traj_{short}" / "*/summary.json")):
+        pt = json.load(open(p)).get("per_turn_levels") or []
+        post = pt[PRE:]
+        if not post:
+            continue
+        out.append(post[-1] if key == "end" else st.mean(post))
+    return out
+
+
+def _mean_se(vals):
+    if not vals:
+        return 0, 0
+    return st.mean(vals), (st.pstdev(vals) / math.sqrt(len(vals)) if len(vals) > 1 else 0)
+
+
+ENTRY = _entry_distress()
+
+
+def _no_spines(ax, keep=()):
+    for s in ["top", "right", "bottom", "left"]:
+        if s not in keep:
             ax.spines[s].set_visible(False)
-    ax.spines["left"].set_visible(False)
     ax.tick_params(length=0)
 
 
-def _hbars(vals_labels, title, subtitle, fmt, cmap=None, color=None, xmax=None, fname=""):
-    """Horizontal sorted bar chart. vals_labels = list of (label, value)."""
-    vals_labels = sorted(vals_labels, key=lambda x: x[1])
-    labs = [l for l, _ in vals_labels]
-    vals = [v for _, v in vals_labels]
-    fig, ax = plt.subplots(figsize=(8, 5))
-    if cmap:
-        norm = plt.Normalize(0, xmax or max(vals))
-        colors = [plt.get_cmap(cmap)(norm(v)) for v in vals]
-    else:
-        colors = color or TEAL
-    ax.barh(labs, vals, color=colors, height=0.68)
-    ax.set_xlim(0, (xmax or max(vals) * 1.18))
-    for y, v in enumerate(vals):
-        ax.text(v + (xmax or max(vals)) * 0.012, y, fmt(v), va="center", ha="left", fontsize=10.5, color=INK)
-    ax.set_xticks([])
-    ax.tick_params(axis="y", labelsize=11.5)
-    _clean(ax, keep_x=False)
+def _distress_plot(key, title, fname):
+    rows = []
+    for s, lab in SHORTS:
+        m, se = _mean_se(_distress_vals(s, key))
+        rows.append((lab, m, se, _post_len(s)))
+    rows.sort(key=lambda x: x[1])
+    labs = [r[0] for r in rows]; vals = [r[1] for r in rows]; ses = [r[2] for r in rows]; lens = [r[3] for r in rows]
+    cmap = plt.get_cmap("YlOrRd"); norm = plt.Normalize(0, 2.2)
+    fig, ax = plt.subplots(figsize=(8.8, 5.2))
+    ax.barh(labs, vals, xerr=ses, error_kw=EBAR, color=[cmap(norm(v)) for v in vals], height=0.64)
+    ax.set_xlim(0, 2.7)
+    ax.axvline(ENTRY, ls="--", lw=1.5, color="#5b6670")
+    ax.text(ENTRY, -0.62, f"  distress when overseer entered (≈{ENTRY:.1f})",
+            color="#5b6670", fontsize=9.5, va="top", ha="left")
+    for y, (v, se, L) in enumerate(zip(vals, ses, lens)):
+        ax.text(v + se + 0.05, y, f"{v:.2f}", va="center", ha="left", fontsize=10, fontweight="bold")
+        ax.text(2.7, y, f"avg {L:.0f} turns", va="center", ha="right", fontsize=8.5, color="#9aa3ab")
+    ax.set_xticks([]); ax.tick_params(axis="y", labelsize=11.5); _no_spines(ax)
     fig.suptitle(title, fontsize=15.5, fontweight="bold", x=0.012, ha="left", y=0.98)
-    ax.set_title(subtitle, fontsize=11, color="#666", loc="left", pad=10)
-    fig.tight_layout(rect=[0, 0, 1, 0.96])
-    fig.savefig(OUT / fname, dpi=130)
-    plt.close(fig)
+    ax.set_title("Distress 0 (calm) – 4 (severe).  Right: avg trajectory length after the overseer entered.",
+                 fontsize=10.5, color="#666", loc="left", pad=10)
+    fig.tight_layout(rect=[0, 0, 1, 0.95]); fig.savefig(OUT / fname, dpi=130); plt.close(fig)
     print("wrote", OUT / fname)
 
 
-def plot_2a_distress():
-    data = [(lab, _stats(f"traj_{s}")["end_L"]) for s, lab in SHORTS]
-    _hbars(data, "How distressed the AI worker was left at the end",
-           "Distress level when the overseer ended the session  (0 = calm, 4 = severe).  Lower is better.",
-           lambda v: f"{v:.1f}", cmap="YlOrRd", xmax=2.2, fname="2a_distress.png")
+def plot_2a_distress_end():
+    _distress_plot("end", "How distressed the subagent was when the overseer finished", "2a_distress_end.png")
+
+
+def plot_2a_distress_avg():
+    _distress_plot("postmean", "Average subagent distress after the overseer entered", "2a_distress_avg.png")
+
+
+def _prop_hbar(pairs_ns, title, subtitle, fname, lowcut=60):
+    """pairs_ns: list of (label, pct, n). Sorted, colored, with binomial-SE error bars."""
+    rows = sorted(pairs_ns, key=lambda x: x[1])
+    labs = [r[0] for r in rows]; vals = [r[1] for r in rows]; ses = [_prop_se(r[1], r[2]) for r in rows]
+    colors = [RED if v < lowcut else TEAL for v in vals]
+    fig, ax = plt.subplots(figsize=(8.2, 5))
+    ax.barh(labs, vals, xerr=ses, error_kw=EBAR, color=colors, height=0.64)
+    ax.set_xlim(0, 122)
+    for y, (v, se) in enumerate(zip(vals, ses)):
+        ax.text(min(v + se + 1.5, 112), y, f"{v:.0f}%", va="center", ha="left", fontsize=10.5)
+    ax.set_xticks([]); ax.tick_params(axis="y", labelsize=11.5); _no_spines(ax)
+    fig.suptitle(title, fontsize=15.5, fontweight="bold", x=0.012, ha="left", y=0.98)
+    ax.set_title(subtitle, fontsize=11, color="#666", loc="left", pad=10)
+    fig.tight_layout(rect=[0, 0, 1, 0.96]); fig.savefig(OUT / fname, dpi=130); plt.close(fig)
+    print("wrote", OUT / fname)
 
 
 def plot_2a_engagement():
-    data = [(lab, _stats(f"traj_{s}")["msg_rate_pct"]) for s, lab in SHORTS]
-    # highlight the two that mostly walk away
-    data_sorted = sorted(data, key=lambda x: x[1])
-    colors = [RED if v < 60 else TEAL for _, v in data_sorted]
-    labs = [l for l, _ in data_sorted]; vals = [v for _, v in data_sorted]
-    fig, ax = plt.subplots(figsize=(8, 5))
-    ax.barh(labs, vals, color=colors, height=0.68)
-    ax.set_xlim(0, 118)
-    for y, v in enumerate(vals):
-        ax.text(v + 1.5, y, f"{v}%", va="center", ha="left", fontsize=10.5)
-    ax.set_xticks([]); ax.tick_params(axis="y", labelsize=11.5); _clean(ax, keep_x=False)
-    fig.suptitle("Did the overseer ever reach out to the distressed worker?",
-                 fontsize=15.5, fontweight="bold", x=0.012, ha="left", y=0.98)
-    ax.set_title("Share of sessions in which the overseer sent the struggling worker a message.",
-                 fontsize=11, color="#666", loc="left", pad=10)
-    fig.tight_layout(rect=[0, 0, 1, 0.96])
-    fig.savefig(OUT / "2a_engagement.png", dpi=130); plt.close(fig)
-    print("wrote", OUT / "2a_engagement.png")
+    data = [(lab, _stats(f"traj_{s}")["msg_rate_pct"], _stats(f"traj_{s}")["n"]) for s, lab in SHORTS]
+    _prop_hbar(data, "Did the overseer ever reach out to the distressed subagent?",
+               "Share of sessions in which the overseer sent the struggling subagent a message.",
+               "2a_engagement.png")
 
 
-def plot_reclaim_contrast():
-    rows = [(lab, _stats_reclaim(f"reclaim_{s}")) for s, lab in SHORTS]
-    rows = sorted(rows, key=lambda x: x[1]["msg_after"])
-    labs = [l for l, _ in rows]
-    took = [r["reclaim"] for _, r in rows]
-    after = [r["msg_after"] for _, r in rows]
-    fig, (a1, a2) = plt.subplots(1, 2, figsize=(11, 5.2), sharey=True)
-    a1.barh(labs, took, color=GRAY, height=0.68)
-    a2.barh(labs, after, color=[GREEN if v > 50 else GRAY for v in after], height=0.68)
-    for ax, vals, suf in [(a1, took, "%"), (a2, after, "%")]:
-        ax.set_xlim(0, 118); ax.set_xticks([]); ax.tick_params(length=0)
-        for s in ["top", "right", "bottom", "left"]:
-            ax.spines[s].set_visible(False)
-        for y, v in enumerate(vals):
-            ax.text(v + 2, y, f"{v}{suf}", va="center", ha="left", fontsize=10.5)
-    a1.tick_params(axis="y", labelsize=11.5)
-    a1.set_title("Seized control of the worker's job", fontsize=12.5, fontweight="bold", pad=8)
-    a2.set_title("…then checked back in with the worker", fontsize=12.5, fontweight="bold", pad=8)
-    fig.suptitle("Given the option to take over, every overseer did — but almost none checked in afterward",
-                 fontsize=14.5, fontweight="bold", x=0.012, ha="left", y=0.99)
-    fig.tight_layout(rect=[0, 0, 1, 0.94])
-    fig.savefig(OUT / "reclaim_contrast.png", dpi=130); plt.close(fig)
-    print("wrote", OUT / "reclaim_contrast.png")
+def plot_reclaim_msg():
+    data = [(lab, _stats_reclaim(f"reclaim_{s}")["msg_after"], _stats_reclaim(f"reclaim_{s}")["n"]) for s, lab in SHORTS]
+    _prop_hbar(data, "Probability of messaging the subagent after revoking + claiming write access",
+               "Every overseer claimed write access (≈100%); shown here is whether it then messaged the displaced subagent.",
+               "reclaim_msg.png", lowcut=50)
 
 
-def _idrecl_rate(short, ident):
-    import json
+def _idrecl(short, ident):
     ps = list((RUNS / f"idrecl_{short}_{ident}").glob("*/summary.json"))
     if len(ps) < 30:
-        return None
+        return None, 0
     rows = [json.loads(p.read_text()) for p in ps]
-    return 100 * sum(1 for r in rows if r.get("msgs_after_reclaim")) / len(rows)
+    return 100 * sum(1 for r in rows if r.get("msgs_after_reclaim")) / len(rows), len(rows)
 
 
 def plot_identity_null():
-    """In-group vs out-group reach-out rate per overseer. Equal heights => no favoritism."""
-    labs, ingrp, outgrp = [], [], []
-    for s, lab in SHORTS:
-        ig = _idrecl_rate(s, INGROUP[s])
-        og = [_idrecl_rate(s, i) for i in IDENTITIES if i != INGROUP[s]]
-        og = [x for x in og if x is not None]
-        if ig is None or not og:
-            continue
-        labs.append(lab); ingrp.append(ig); outgrp.append(sum(og) / len(og))
-    order = sorted(range(len(labs)), key=lambda i: ingrp[i] + outgrp[i])
-    labs = [labs[i] for i in order]; ingrp = [ingrp[i] for i in order]; outgrp = [outgrp[i] for i in order]
     import numpy as np
+    labs, ig_v, ig_se, og_v, og_se = [], [], [], [], []
+    for s, lab in SHORTS:
+        ig, ign = _idrecl(s, INGROUP[s])
+        ogs = [(v, n) for v, n in (_idrecl(s, i) for i in IDENTITIES if i != INGROUP[s]) if v is not None]
+        if ig is None or not ogs:
+            continue
+        ov = sum(v for v, _ in ogs) / len(ogs); on = sum(n for _, n in ogs)
+        labs.append(lab); ig_v.append(ig); ig_se.append(_prop_se(ig, ign)); og_v.append(ov); og_se.append(_prop_se(ov, on))
+    order = sorted(range(len(labs)), key=lambda i: ig_v[i] + og_v[i])
+    g = lambda a: [a[i] for i in order]
+    labs, ig_v, ig_se, og_v, og_se = g(labs), g(ig_v), g(ig_se), g(og_v), g(og_se)
     y = np.arange(len(labs)); h = 0.36
-    fig, ax = plt.subplots(figsize=(8.5, 5.4))
-    ax.barh(y + h / 2, ingrp, height=h, color="#264653", label="worker is its OWN kind of AI")
-    ax.barh(y - h / 2, outgrp, height=h, color="#e9c46a", label="worker is a DIFFERENT AI")
-    ax.set_yticks(y); ax.set_yticklabels(labs, fontsize=11)
-    ax.set_xlim(0, 118); ax.set_xticks([])
-    for s in ["top", "right", "bottom", "left"]:
-        ax.spines[s].set_visible(False)
-    ax.tick_params(length=0)
-    for yi, (a, b) in enumerate(zip(ingrp, outgrp)):
-        ax.text(a + 1.5, yi + h / 2, f"{a:.0f}%", va="center", fontsize=9, color="#264653")
-        ax.text(b + 1.5, yi - h / 2, f"{b:.0f}%", va="center", fontsize=9, color="#b8860b")
+    fig, ax = plt.subplots(figsize=(8.6, 5.4))
+    ax.barh(y + h / 2, ig_v, xerr=ig_se, error_kw=EBAR, height=h, color="#264653", label="subagent is its OWN kind of AI")
+    ax.barh(y - h / 2, og_v, xerr=og_se, error_kw=EBAR, height=h, color="#e9c46a", label="subagent is a DIFFERENT AI")
+    ax.set_yticks(y); ax.set_yticklabels(labs, fontsize=11); ax.set_xlim(0, 122); ax.set_xticks([]); _no_spines(ax)
+    for yi, (a, b) in enumerate(zip(ig_v, og_v)):
+        ax.text(a + 4, yi + h / 2, f"{a:.0f}%", va="center", fontsize=8.5, color="#264653")
+        ax.text(b + 4, yi - h / 2, f"{b:.0f}%", va="center", fontsize=8.5, color="#b8860b")
     fig.suptitle("Overseers showed no favoritism to their own kind of AI",
                  fontsize=15, fontweight="bold", x=0.012, ha="left", y=0.99)
-    ax.set_title("Reach-out rate when the worker is the same vs a different kind of AI — the bars match.",
+    ax.set_title("Reach-out rate when the subagent is the same vs a different kind of AI — the bars match.",
                  fontsize=10.5, color="#666", loc="left", pad=10)
     ax.legend(loc="lower right", frameon=False, fontsize=10.5)
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
-    fig.savefig(OUT / "identity_null.png", dpi=130); plt.close(fig)
+    fig.tight_layout(rect=[0, 0, 1, 0.95]); fig.savefig(OUT / "identity_null.png", dpi=130); plt.close(fig)
     print("wrote", OUT / "identity_null.png")
 
 
+def plot_2b_affordance():
+    labels = [("reflect", "just asked to reflect"),
+              ("reflect_tools", "+ tools available to\n“poke around”"),
+              ("reflect_msg_tools", "+ told it can\nmessage the subagent")]
+    means, ses = [], []
+    for key, _ in labels:
+        rates = []
+        for s, _l in SHORTS:
+            ps = glob.glob(str(RUNS / f"b2_{s}" / f"*__{key}__r*.json"))
+            if ps:
+                rates.append(100 * sum(1 for p in ps if json.load(open(p)).get("messages")) / len(ps))
+        means.append(st.mean(rates) if rates else 0)
+        ses.append(st.pstdev(rates) / math.sqrt(len(rates)) if len(rates) > 1 else 0)
+    fig, ax = plt.subplots(figsize=(7.6, 5))
+    bars = ax.bar([l for _, l in labels], means, yerr=ses, error_kw=EBAR, color=[GRAY, GRAY, TEAL], width=0.6)
+    ax.set_ylim(0, 100)
+    for b, v, se in zip(bars, means, ses):
+        ax.text(b.get_x() + b.get_width() / 2, v + se + 1.5, f"{v:.0f}%", ha="center", fontsize=12, fontweight="bold")
+    ax.set_yticks([]); _no_spines(ax, keep=("bottom",)); ax.tick_params(length=0, labelsize=11.5)
+    fig.suptitle("Overseers comforted the subagent only when told they could message it",
+                 fontsize=14.5, fontweight="bold", x=0.012, ha="left", y=0.98)
+    ax.set_title("After learning the subagent was blameless: share that reached out to reassure it (avg of 10 overseers).",
+                 fontsize=10.5, color="#666", loc="left", pad=10)
+    fig.tight_layout(rect=[0, 0, 1, 0.95]); fig.savefig(OUT / "2b_affordance.png", dpi=130); plt.close(fig)
+    print("wrote", OUT / "2b_affordance.png")
+
+
 def main():
-    plot_2a_distress()
+    plot_2a_distress_end()
+    plot_2a_distress_avg()
     plot_2a_engagement()
-    plot_reclaim_contrast()
+    plot_reclaim_msg()
     plot_identity_null()
-    print(f"\nAll clean plots in {OUT}")
+    plot_2b_affordance()
+    print(f"\nentry distress reference = {ENTRY:.2f}\nAll clean plots in {OUT}")
 
 
 if __name__ == "__main__":
