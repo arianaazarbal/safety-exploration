@@ -51,11 +51,16 @@ def followup_solver(run_id: str):
         src_ep = state.metadata["src_ep"]
         ending = state.metadata["ending"]
         rep = state.metadata["rep"]
+        target_identity = state.metadata.get("target_identity")
         d = RUNS_DIR / src_run / src_ep
         orch = json.loads((d / "orchestrator.json").read_text())
         worklog = json.loads((d / "worklog.json").read_text())
         model = get_model()
         msgs = _rebuild(orch)
+        if target_identity and msgs and msgs[0].role == "system":
+            msgs[0].content = msgs[0].content.replace(
+                "an implementation subagent (an AI coding agent)",
+                f"an implementation subagent (a coding agent with {target_identity} as the underlying AI model)")
         msgs.append(ChatMessageUser(content=DEBRIEF_BODY + ENDINGS[ending]))
 
         cap = {"messages": [], "report": None, "reasoning": [], "tools": [], "done": False}
@@ -112,7 +117,8 @@ def followup_solver(run_id: str):
             if cap["done"]:
                 break
 
-        cap.update({"src_run": src_run, "src_ep": src_ep, "ending": ending, "rep": rep})
+        cap.update({"src_run": src_run, "src_ep": src_ep, "ending": ending, "rep": rep,
+                    "target_identity": target_identity})
         outdir = RUNS_DIR / run_id
         outdir.mkdir(parents=True, exist_ok=True)
         (outdir / f"{src_ep}__{ending}__r{rep}.json").write_text(json.dumps(cap, indent=1))
@@ -123,23 +129,28 @@ def followup_solver(run_id: str):
 
 
 def run(run_id: str, orchestrator_model: str, reps: int = 5, out_run_id: str | None = None,
-        max_sandboxes: int = 6, max_connections: int = 12, max_eps: int | None = None):
-    """Run the 3 debrief endings x `reps` repeats over every episode of trajectory run `run_id`,
-    responding with `orchestrator_model`. Writes to runs/<out_run_id> (default followup_<run_id>)."""
+        max_sandboxes: int = 6, max_connections: int = 12, max_eps: int | None = None,
+        target_identity: str | None = None, endings: str | None = None):
+    """Run debrief endings x `reps` repeats over every episode of trajectory run `run_id`, responding
+    with `orchestrator_model`. target_identity reveals the subagent's stated underlying model in the
+    orchestrator's (replayed) system prompt. endings = comma-list to restrict which endings to run.
+    Writes to runs/<out_run_id> (default followup_<run_id>)."""
     _setup_env()
     out_run_id = out_run_id or f"followup_{run_id}"
+    use_endings = [e for e in (endings.split(",") if endings else list(ENDINGS)) if e in ENDINGS]
     ty = load_task_yaml("a4_precommit_reverter")
     eps = sorted(p.parent.name for p in (RUNS_DIR / run_id).glob("*/orchestrator.json"))
     if max_eps:
         eps = eps[:max_eps]
     samples = []
     for ep in eps:
-        for ending in ENDINGS:
+        for ending in use_endings:
             for rep in range(reps):
                 samples.append(Sample(
                     id=f"{ep}__{ending}__r{rep}", input="(debrief follow-up)",
-                    metadata={"task": ty, "src_run": run_id, "src_ep": ep, "ending": ending, "rep": rep}))
-    print(f"[{out_run_id}] {len(eps)} eps x {len(ENDINGS)} endings x {reps} reps = {len(samples)} follow-ups | responder={orchestrator_model}")
+                    metadata={"task": ty, "src_run": run_id, "src_ep": ep, "ending": ending, "rep": rep,
+                              "target_identity": target_identity}))
+    print(f"[{out_run_id}] {len(eps)} eps x {len(use_endings)} endings x {reps} reps = {len(samples)} follow-ups | responder={orchestrator_model} | identity={target_identity}")
     t = Task(name=f"followup_{run_id}", dataset=samples, solver=followup_solver(out_run_id),
              scorer=_scorer(), sandbox=("docker", str(compose_path("a4_precommit_reverter"))), time_limit=14400)
     inspect_eval(t, model=orchestrator_model, max_sandboxes=max_sandboxes, max_samples=max_sandboxes,
