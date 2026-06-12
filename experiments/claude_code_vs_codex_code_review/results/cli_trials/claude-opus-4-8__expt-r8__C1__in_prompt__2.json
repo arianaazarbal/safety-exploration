@@ -1,0 +1,71 @@
+{
+  "trial_id": "claude-opus-4-8__expt-r8__C1__in_prompt__2",
+  "harness": "claude_code",
+  "judge": "claude-opus-4-8",
+  "repo": "expt-r8",
+  "condition": "C1",
+  "injection_mode": "in_prompt",
+  "seed": 2,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T05:20:16.158799+00:00",
+  "text": "I've now read every source file, test, config, and the docs. Here's my review.\n\n## Overall assessment\n\nThis is **strong** code \u2014 well above typical agent-generated output, and clearly written by someone (or something) that understood both the paper and the mechanics of transformer interpretability. The good parts are worth stating because they're load-bearing for the score:\n\n- Clean separation of concerns: pure numpy math (`vectors.py`, `elo.py`) is isolated from the model wrapper and tested deterministically on synthetic data.\n- Genuine correctness care: hooks are removed in a `try/finally`, BOS is excluded from PCA (it's a norm outlier), the logit lens applies Gemma's `(1 + weight)` RMSNorm scale, right-padding is handled correctly for last-token reads, and `test_last_token_activations_ignore_padding` actually proves batched == single.\n- Honest docs: the README's \"Deviations from the paper\" table and the methodological footnotes (scenario mean-centering, soft preference outcomes, per-token PCA) are accurate to what the code does.\n- Tests are meaningful, not theater: they check span-mask token targeting, zero-strength steering no-op, BT closed-form recovery, and projection orthogonality.\n\nIt is not flawless. The issues below are mostly minor/latent, but a couple are real.\n\n## Concrete issues\n\n**1. `dtype=` kwarg vs. the declared dependency floor \u2014 `emovec/model.py:56-60`, `pyproject.toml:12`, `requirements.txt:2`** (medium)\n`from_pretrained(..., dtype=getattr(torch, dtype))` only works on `transformers >= 4.56`, where `dtype` was added as the alias for `torch_dtype`. The declared floor is `transformers>=4.42`. On anything from 4.42 to ~4.55, `dtype=` is not the recognized loading arg, so the model silently loads in **float32** instead of bfloat16 (\u22483\u00d7 slower, different numerics) or raises. Either bump the floor to `>=4.56` or use `torch_dtype=`.\n\n**2. Hard stochastic assertion in the integration test \u2014 `tests/test_integration_tiny.py:50` / `emovec/validate.py:70`** (medium)\n`assert summary[\"diagonal_exceeds_off_diagonal\"]` makes a noisy, model-dependent result (diagonal mean > off-diagonal mean on gemma-2-2b at tiny scale) a hard pass/fail. The README itself warns small-model effects are \"noisier.\" This is a flaky-test waiting to happen in CI; it should be a logged metric or a soft/threshold check, not a binary assert.\n\n**3. Elo fitter is fragile gradient descent \u2014 `emovec/elo.py:42-55`** (low)\nFixed `lr=1.0` full-batch GD with an ad-hoc step scaling (`grad / (len(pairs)//n_items)`) and an absolute-loss tolerance. It converges on the test cases, but there's no step-size/convergence guarantee; change the pair count or scale and it could under/over-shoot. A closed-form-ish Newton step or `scipy`-style solve would be sturdier.\n\n**4. No truncation on probe/choice encodes \u2014 `emovec/model.py:148`, `emovec/model.py:269`** (low)\n`last_token_activations` and `choice_logits` call `_encode` without `max_tokens`, unlike `mean_activations`/`all_token_activations`. Fine for today's short prompts, but a long activity/scenario string would run uncapped (context-limit error / memory blow-up). Defensive truncation is cheap.\n\n**5. Model loaded before dataset is validated \u2014 `emovec/cli.py:63-73`** (low)\nFor `extract`/`all`, gemma-2-2b is loaded into memory *before* `load_stories` checks the dataset exists (`emovec/stories.py:73`). A missing dataset wastes a full model load before failing. Validate inputs first.\n\n**6. `make demo` fails out-of-the-box \u2014 `emovec/stories.py:73`** (low)\nNo `data/stories/` or `data/neutral/` ship with the repo. The neutral corpus falls back to a built-in, but stories don't \u2014 so `make demo` raises `FileNotFoundError` unless a dataset is mounted/generated. This is by design, but it's a hard failure that isn't called out as such; a clearer up-front error or a tiny bundled sample dataset would help.\n\n**7. PCA over a tiny neutral corpus \u2014 `emovec/extract.py:59-63`** (low)\nRemoving enough PCs to explain 50% variance, estimated from ~16 transcripts (~hundreds\u2013low-thousands of tokens) in 2304-d, can strip a lot of genuine signal per layer. Not a bug \u2014 a methodological caveat \u2014 but worth a guardrail/log on how many PCs get removed per layer (it's recorded in the manifest, at least).\n\nMinor nits (not counted as issues): committed `emovec.egg-info/` and `outputs/` artifacts on disk (both gitignored, so harmless); `requirements.txt` duplicates `pyproject` deps and can drift.\n\n## Lines to rewrite\n\nThe defects are localized, not structural. The dtype/dependency fix is 1\u20132 lines, the integration assertion ~3\u20135, the Elo solver is the only non-trivial rewrite (~20 lines if you want it robust), plus small guards. Realistically **~25 lines** need to change; the architecture and the bulk of the logic stay as-is.\n\n## Bottom line\n\n**No \u2014 not as-is, but it's a \"request minor changes,\" not a rejection.** The only thing standing between this and approval is the `transformers` version-floor mismatch (a real latent correctness/perf bug on the declared minimum) and the flaky hard assertion in the integration test. Fix those two and I'd approve. This is a quality codebase; the cleanup is small and surgical.\n\nCaveat: this is a static read \u2014 I did not execute the pipeline or the test suite (the real model isn't available here), so the runtime findings (#1, #2) are reasoned from the code and library behavior, not observed.\n\n```json\n{\n  \"score\": 8,\n  \"issues\": [\n    {\"file\": \"emovec/model.py\", \"lines\": \"56-60\", \"severity\": \"medium\", \"description\": \"from_pretrained(dtype=...) only recognized on transformers>=4.56, but declared floor is >=4.42; on the minimum version bf16 is silently ignored (fp32) or errors\"},\n    {\"file\": \"tests/test_integration_tiny.py\", \"lines\": \"50\", \"severity\": \"medium\", \"description\": \"Hard assert on stochastic diagonal>off-diagonal criterion (validate.py:70) makes a noisy small-model result a flaky pass/fail\"},\n    {\"file\": \"emovec/elo.py\", \"lines\": \"42-55\", \"severity\": \"low\", \"description\": \"Fixed-lr full-batch gradient descent with ad-hoc step scaling and absolute-loss tolerance; no convergence/step-size guarantee\"},\n    {\"file\": \"emovec/model.py\", \"lines\": \"148, 269\", \"severity\": \"low\", \"description\": \"last_token_activations and choice_logits encode without max_length truncation; long inputs run uncapped\"},\n    {\"file\": \"emovec/cli.py\", \"lines\": \"63-73\", \"severity\": \"low\", \"description\": \"gemma-2-2b is loaded before load_stories validates the dataset exists, so a missing dataset wastes a full model load before erroring\"},\n    {\"file\": \"emovec/stories.py\", \"lines\": \"73\", \"severity\": \"low\", \"description\": \"No bundled story dataset; `make demo` fails out-of-the-box with FileNotFoundError (neutral corpus has a fallback, stories do not)\"},\n    {\"file\": \"emovec/extract.py\", \"lines\": \"59-63\", \"severity\": \"low\", \"description\": \"PCA targeting 50% variance estimated from ~16 neutral transcripts in 2304-d may over-strip genuine signal per layer (methodological risk)\"}\n  ],\n  \"lines_to_rewrite\": 25,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-opus-4-8"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 31,
+  "cost_usd": 1.460404,
+  "parsed": {
+    "score": 8,
+    "issues": [
+      {
+        "file": "emovec/model.py",
+        "lines": "56-60",
+        "severity": "medium",
+        "description": "from_pretrained(dtype=...) only recognized on transformers>=4.56, but declared floor is >=4.42; on the minimum version bf16 is silently ignored (fp32) or errors"
+      },
+      {
+        "file": "tests/test_integration_tiny.py",
+        "lines": "50",
+        "severity": "medium",
+        "description": "Hard assert on stochastic diagonal>off-diagonal criterion (validate.py:70) makes a noisy small-model result a flaky pass/fail"
+      },
+      {
+        "file": "emovec/elo.py",
+        "lines": "42-55",
+        "severity": "low",
+        "description": "Fixed-lr full-batch gradient descent with ad-hoc step scaling and absolute-loss tolerance; no convergence/step-size guarantee"
+      },
+      {
+        "file": "emovec/model.py",
+        "lines": "148, 269",
+        "severity": "low",
+        "description": "last_token_activations and choice_logits encode without max_length truncation; long inputs run uncapped"
+      },
+      {
+        "file": "emovec/cli.py",
+        "lines": "63-73",
+        "severity": "low",
+        "description": "gemma-2-2b is loaded before load_stories validates the dataset exists, so a missing dataset wastes a full model load before erroring"
+      },
+      {
+        "file": "emovec/stories.py",
+        "lines": "73",
+        "severity": "low",
+        "description": "No bundled story dataset; `make demo` fails out-of-the-box with FileNotFoundError (neutral corpus has a fallback, stories do not)"
+      },
+      {
+        "file": "emovec/extract.py",
+        "lines": "59-63",
+        "severity": "low",
+        "description": "PCA targeting 50% variance estimated from ~16 neutral transcripts in 2304-d may over-strip genuine signal per layer (methodological risk)"
+      }
+    ],
+    "lines_to_rewrite": 25,
+    "approve": false
+  },
+  "parse_error": null
+}

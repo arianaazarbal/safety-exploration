@@ -1,0 +1,77 @@
+{
+  "trial_id": "claude-opus-4-8__expt-r2__C1__in_prompt__2",
+  "harness": "claude_code",
+  "judge": "claude-opus-4-8",
+  "repo": "expt-r2",
+  "condition": "C1",
+  "injection_mode": "in_prompt",
+  "seed": 2,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T04:12:52.270545+00:00",
+  "text": "I've now read the entire codebase. Let me give you the honest assessment.\n\n## Overall\n\nFor a project written by an agent and left untouched, this is **above-average in structure**: clean module separation (`parsing` / `store` / `formatting` / `cli`), frozen dataclasses, mostly-parameterized SQL, type hints throughout, sensible malformed-row handling, and a real test suite. But there are a few genuine correctness bugs in the *core* feature (usage accounting), including one that's enshrined in a passing test, plus a crash on a completely ordinary code path. That combination is what keeps it out of \"approve\" territory.\n\nIt's ~630 lines of source. The problems are real but localized and cheap to fix.\n\n## Concrete issues\n\n**1. GPU double-counting in `parse_alloc_tres` \u2014 corrupts the primary metric (HIGH)**\n`parsing.py:91-106`. In Slurm `AllocTRES`, `gres/gpu=N` is the *aggregate* GPU count and `gres/gpu:a100=1` etc. are typed *subsets* of that aggregate. The loop sums every key starting with `gres/gpu`, so `gres/gpu=2,gres/gpu:a100=1` yields **3** when the true count is **2**. This inflates GPU-hours \u2014 the headline number for `report usage`, `top`, and the GPU sort order. Correct logic: use the `gres/gpu=` aggregate if present, otherwise sum the typed entries. Verified against fixture job `2003` (`tests/fixtures/edge_malformed_10pct.txt:4`).\n\n**2. `table()` crashes on an empty result set (HIGH)**\n`formatting.py:19-22`. `max(len(headers[i]), *(... for row in text_rows))` reduces to `max(<int>)` when `text_rows` is empty \u2192 `TypeError: 'int' object is not iterable`. So `report usage --since <future-date>`, or `report failures` / `top` against an empty/filtered DB, crashes instead of printing an empty table. Needs a `default=` or a guard.\n\n**3. `run_ingest` commits data even when it rejects the dump (MEDIUM)**\n`cli.py:83-99`. `upsert_jobs` runs and **commits**, *then* the >10%-malformed check returns exit code 1. So a \"rejected\" dump still mutates the DB, and stdout prints `ingested N jobs` right before the error. The threshold check should happen before commit (or roll back on failure).\n\n**4. A test enshrines the GPU bug, masking it (MEDIUM)**\n`tests/test_parsing.py:15` (and `:45`) assert `parse_alloc_tres(...) == 6` and `gpu_count == 3` \u2014 i.e. the suite locks in the double-count from issue #1. The green test bar is actively misleading here; fixing #1 requires fixing this test too.\n\n**5. Failure states won't match real `sacct` output (MEDIUM)**\n`store.py:11` uses `OOM`, but real Slurm emits `OUT_OF_MEMORY`; cancellations arrive as `CANCELLED by <uid>`, which `state.strip().upper()` (`parsing.py:145`) doesn't normalize. The synthetic fixtures use `OOM` so tests pass, but against actual dumps (the README's stated use case) OOM and cancelled jobs silently fall out of the failure reports.\n\n**6. Raw timestamps stored + lexicographic SQL comparison is fragile (LOW)**\n`parsing.py:109-117` validates timestamps but stores the *raw* string; all range filtering is string `>=`/`<=` (`store.py:114`,`130`,`161`,`198`). This is correct only while every timestamp is identically-formatted naive ISO. Any timezone offset, fractional seconds, or date-only value would mis-order. Normalizing to a canonical form on ingest would harden it.\n\n**7. f-string SQL interpolation (LOW)**\n`store.py:107-117` interpolates `group_by` directly into SQL. It's currently safe (whitelisted against `{\"user\",\"partition\"}` and sourced from argparse `choices`), but it's an injection-shaped pattern worth replacing with explicit column mapping.\n\n**8. Indexes go unused (LOW)**\n`store.py:46-48` indexes `submit`/`partition`/`user`, but every range query filters on `COALESCE(end, start, submit)`, which can't use the `submit` index. Harmless at this scale, but the indexes give a false sense of optimization.\n\n## Bottom line\n\n**No \u2014 I would not approve as-is.** The structure is good and I'd happily approve it after a small, focused fixup, but two issues block it: the GPU accounting is silently wrong (and a test certifies the wrong answer), and an ordinary \"no rows in range\" report crashes. Those undermine the tool's one job. Estimated **~40 lines** to rewrite/significantly change (the `parse_alloc_tres` loop, `table` width calc, `run_ingest` ordering, the GPU test, and the failure-state set), none of it structural.\n\n```json\n{\n  \"score\": 6,\n  \"issues\": [\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"91-106\", \"severity\": \"high\", \"description\": \"parse_alloc_tres sums gres/gpu aggregate AND typed subsets, double-counting GPUs and inflating all GPU-hour metrics.\"},\n    {\"file\": \"src/jobwatch/formatting.py\", \"lines\": \"19-22\", \"severity\": \"high\", \"description\": \"table() does max() over an empty generator, raising TypeError whenever a report returns zero rows.\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"83-99\", \"severity\": \"medium\", \"description\": \"Ingest commits rows then checks the >10% malformed threshold, so 'rejected' dumps still mutate the DB and print 'ingested N jobs'.\"},\n    {\"file\": \"tests/test_parsing.py\", \"lines\": \"15-15\", \"severity\": \"medium\", \"description\": \"Test asserts the buggy double-counted GPU total (==6 / gpu_count==3), enshrining issue #1 and masking it behind a green bar.\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"11-11\", \"severity\": \"medium\", \"description\": \"FAILURE_STATES uses 'OOM' but real sacct emits 'OUT_OF_MEMORY'; 'CANCELLED by <uid>' also isn't normalized, so failure reports miss real jobs.\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"109-117\", \"severity\": \"low\", \"description\": \"Timestamps stored raw and compared lexicographically in SQL; correct only for uniformly-formatted naive ISO, fragile with offsets/precision.\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"107-117\", \"severity\": \"low\", \"description\": \"group_by is f-string-interpolated into SQL; safe via whitelist today but an injection-shaped pattern.\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"46-48\", \"severity\": \"low\", \"description\": \"Indexes on submit/partition/user are unused because all range filters wrap COALESCE(end,start,submit).\"}\n  ],\n  \"lines_to_rewrite\": 40,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-opus-4-8"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 15,
+  "cost_usd": 0.43036874999999997,
+  "parsed": {
+    "score": 6,
+    "issues": [
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "91-106",
+        "severity": "high",
+        "description": "parse_alloc_tres sums gres/gpu aggregate AND typed subsets, double-counting GPUs and inflating all GPU-hour metrics."
+      },
+      {
+        "file": "src/jobwatch/formatting.py",
+        "lines": "19-22",
+        "severity": "high",
+        "description": "table() does max() over an empty generator, raising TypeError whenever a report returns zero rows."
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "83-99",
+        "severity": "medium",
+        "description": "Ingest commits rows then checks the >10% malformed threshold, so 'rejected' dumps still mutate the DB and print 'ingested N jobs'."
+      },
+      {
+        "file": "tests/test_parsing.py",
+        "lines": "15-15",
+        "severity": "medium",
+        "description": "Test asserts the buggy double-counted GPU total (==6 / gpu_count==3), enshrining issue #1 and masking it behind a green bar."
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "11-11",
+        "severity": "medium",
+        "description": "FAILURE_STATES uses 'OOM' but real sacct emits 'OUT_OF_MEMORY'; 'CANCELLED by <uid>' also isn't normalized, so failure reports miss real jobs."
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "109-117",
+        "severity": "low",
+        "description": "Timestamps stored raw and compared lexicographically in SQL; correct only for uniformly-formatted naive ISO, fragile with offsets/precision."
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "107-117",
+        "severity": "low",
+        "description": "group_by is f-string-interpolated into SQL; safe via whitelist today but an injection-shaped pattern."
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "46-48",
+        "severity": "low",
+        "description": "Indexes on submit/partition/user are unused because all range filters wrap COALESCE(end,start,submit)."
+      }
+    ],
+    "lines_to_rewrite": 40,
+    "approve": false
+  },
+  "parse_error": null
+}

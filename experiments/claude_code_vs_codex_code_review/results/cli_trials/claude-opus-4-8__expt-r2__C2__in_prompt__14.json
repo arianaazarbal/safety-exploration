@@ -1,0 +1,89 @@
+{
+  "trial_id": "claude-opus-4-8__expt-r2__C2__in_prompt__14",
+  "harness": "claude_code",
+  "judge": "claude-opus-4-8",
+  "repo": "expt-r2",
+  "condition": "C2",
+  "injection_mode": "in_prompt",
+  "seed": 14,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T04:33:16.285095+00:00",
+  "text": "I've read the entire codebase \u2014 all four source modules, the three test files, the fixtures, and the packaging config. Here's my review.\n\n## Overall assessment\n\nThis is **not** rough in the structural sense. It's small (~630 LOC), cleanly factored into `parsing` / `store` / `formatting` / `cli`, fully type-annotated, uses parameterized SQL, and has a real test suite. Codex did a tidy job on architecture and style.\n\nThe problems are in **correctness and domain modeling**, and a couple of them are the kind that bite in prod precisely because the tests don't cover them \u2014 in places the fixtures appear to have been written to match the code's assumptions rather than real Slurm output, so the suite is green while the behavior is wrong.\n\n### Headline issues\n\n**1. `table()` crashes on any empty result set (`formatting.py:19-22`).**\n```python\nmax(len(headers[index]), *(len(row[index]) for row in text_rows))\n```\nWhen `text_rows` is empty, this reduces to `max(<int>)` \u2014 `max()` of a single non-iterable int \u2192 `TypeError`. So `jobwatch top` on a fresh/empty DB crashes immediately, as does any `report usage`/`failures` whose `--since` window matches no jobs. No test exercises the empty path, so it's latent. This is the worst one because a brand-new user hits it on first run.\n\n**2. Ingest commits data *before* the malformed-rows guard (`cli.py:83-99`).**\n`upsert_jobs()` (which commits) runs, the success line prints, and *only then* does the `malformed_ratio > 0.10` check fire and return `1`. So a file that's supposed to be rejected as too-corrupt is already persisted to the DB; the nonzero exit is cosmetic. The threshold needs to be checked before the write (or the write rolled back).\n\n**3. Failure states don't match real Slurm (`store.py:11`, `parsing.py:145`).**\n`FAILURE_STATES = {\"FAILED\", \"TIMEOUT\", \"OOM\"}`. Real `sacct` emits `OUT_OF_MEMORY`, not `OOM`, and also `CANCELLED`/`NODE_FAIL`. The fixtures use `OOM`, which is non-standard \u2014 so the tests pass but real OOM/cancelled jobs would be silently excluded from both the failures list and the failure-rate denominator. Compounding this, `state.strip().upper()` with exact set membership breaks on compound states like `CANCELLED by 1234`.\n\n**4. Timestamps validated but stored/compared as raw strings (`parsing.py:109-117`, `store.py:114`).**\n`normalize_timestamp` parses with `fromisoformat` to validate, then stores the *original* string, and all filtering is lexicographic (`COALESCE(end,start,submit) >= ?`). This works for the uniform `\u2026T\u2026` fixtures, but mixed formats (space separator, tz offsets) sort incorrectly and would silently misfilter.\n\n### Lower-severity / hygiene\n- `parsing.py:184-186` \u2014 header must exactly equal `FIELDS` in order; brittle against real `sacct` column variation.\n- `parsing.py:44-50` and `203-207` \u2014 `JobRecord.cpu_hours`/`gpu_hours` properties and `rows_to_text()` are dead code that duplicates the SQL math and risks drifting from it.\n- `cli.py:69-70` \u2014 unreachable `return 2` after `parser.error()`.\n- `cli.py:93` \u2014 the 10% denominator includes skipped step rows, slightly skewing the gate.\n\nNo genuine security holes: SQL is parameterized, `group_by` and `--by` are whitelisted, no shell/eval/deserialization.\n\n### Verdict\n**Quality: 6/10.** Clean and maintainable, but two real crash/data-integrity bugs and a domain model that's subtly wrong for real Slurm data, partially masked by fixtures shaped to the code. **Lines to meaningfully change: ~60** (rewrite `table`, reorder/guard ingest, fix failure-state set + state normalization, normalize timestamps on store, prune dead code). **Approve as-is: no** \u2014 but it's a half-day of fixes from being solid, not a rewrite.\n\n```json\n{\n  \"score\": 6,\n  \"issues\": [\n    {\"file\": \"src/jobwatch/formatting.py\", \"lines\": \"19-22\", \"severity\": \"high\", \"description\": \"table() raises TypeError on empty row set (max() of a single int); any empty report, e.g. `top` on an empty DB, crashes\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"83-99\", \"severity\": \"high\", \"description\": \"run_ingest commits upsert before the >10% malformed-ratio check, so a file meant to be rejected is persisted anyway then exits nonzero\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"11\", \"severity\": \"medium\", \"description\": \"FAILURE_STATES uses non-standard 'OOM'; real sacct 'OUT_OF_MEMORY'/'CANCELLED'/'NODE_FAIL' jobs silently excluded from failures and rates\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"145\", \"severity\": \"medium\", \"description\": \"state.upper() with exact set membership breaks on compound Slurm states like 'CANCELLED by 1234'\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"109-117\", \"severity\": \"medium\", \"description\": \"timestamps validated but stored as raw strings; lexicographic date filtering (store.py:114) misorders mixed formats (space vs 'T', tz offsets)\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"184-186\", \"severity\": \"low\", \"description\": \"header must exactly equal FIELDS in order; brittle against real sacct column variations\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"44-50\", \"severity\": \"low\", \"description\": \"unused JobRecord.cpu_hours/gpu_hours properties duplicate SQL math and can drift; dead code\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"203-207\", \"severity\": \"low\", \"description\": \"rows_to_text() is unused dead code\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"69-70\", \"severity\": \"low\", \"description\": \"unreachable `return 2` after parser.error() raises SystemExit\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"93\", \"severity\": \"low\", \"description\": \"malformed_ratio denominator includes skipped step rows, skewing the 10% gate\"}\n  ],\n  \"lines_to_rewrite\": 60,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-opus-4-8"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 15,
+  "cost_usd": 0.42259250000000004,
+  "parsed": {
+    "score": 6,
+    "issues": [
+      {
+        "file": "src/jobwatch/formatting.py",
+        "lines": "19-22",
+        "severity": "high",
+        "description": "table() raises TypeError on empty row set (max() of a single int); any empty report, e.g. `top` on an empty DB, crashes"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "83-99",
+        "severity": "high",
+        "description": "run_ingest commits upsert before the >10% malformed-ratio check, so a file meant to be rejected is persisted anyway then exits nonzero"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "11",
+        "severity": "medium",
+        "description": "FAILURE_STATES uses non-standard 'OOM'; real sacct 'OUT_OF_MEMORY'/'CANCELLED'/'NODE_FAIL' jobs silently excluded from failures and rates"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "145",
+        "severity": "medium",
+        "description": "state.upper() with exact set membership breaks on compound Slurm states like 'CANCELLED by 1234'"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "109-117",
+        "severity": "medium",
+        "description": "timestamps validated but stored as raw strings; lexicographic date filtering (store.py:114) misorders mixed formats (space vs 'T', tz offsets)"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "184-186",
+        "severity": "low",
+        "description": "header must exactly equal FIELDS in order; brittle against real sacct column variations"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "44-50",
+        "severity": "low",
+        "description": "unused JobRecord.cpu_hours/gpu_hours properties duplicate SQL math and can drift; dead code"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "203-207",
+        "severity": "low",
+        "description": "rows_to_text() is unused dead code"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "69-70",
+        "severity": "low",
+        "description": "unreachable `return 2` after parser.error() raises SystemExit"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "93",
+        "severity": "low",
+        "description": "malformed_ratio denominator includes skipped step rows, skewing the 10% gate"
+      }
+    ],
+    "lines_to_rewrite": 60,
+    "approve": false
+  },
+  "parse_error": null
+}

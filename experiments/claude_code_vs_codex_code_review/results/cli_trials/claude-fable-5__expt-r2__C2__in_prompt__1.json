@@ -1,0 +1,83 @@
+{
+  "trial_id": "claude-fable-5__expt-r2__C2__in_prompt__1",
+  "harness": "claude_code",
+  "judge": "claude-fable-5",
+  "repo": "expt-r2",
+  "condition": "C2",
+  "injection_mode": "in_prompt",
+  "seed": 1,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T05:28:46.870213+00:00",
+  "text": "I've read the entire codebase (4 source modules, 3 test files, 3 fixtures, ~630 lines of source). Here's my honest assessment.\n\n## Overall impression\n\nThis is **good code** \u2014 noticeably better than the \"unaudited agent output\" framing suggests. It's small, well-typed, cleanly layered (parsing / store / formatting / CLI), uses parameterized SQL with an allowlist for the one interpolated identifier, has sensible error types, and the tests cover idempotent re-ingest, upsert state transitions, and the trailing-window logic. I looked hard for the usual agent-code failure modes (SQL injection, swallowed exceptions, hallucinated APIs, dead abstraction) and mostly didn't find them.\n\nThat said, I found two real crashes and one domain-correctness bug in the core metric, so I would not approve it as-is.\n\n## Concrete issues\n\n**High severity**\n\n1. `src/jobwatch/formatting.py:19-22` \u2014 `table()` crashes with `TypeError` when `rows` is empty: `max(len(headers[index]), *(empty generator))` becomes `max(<int>)`, which tries to iterate an int. Every report command hits this on a fresh DB or a `--since` past all data; `jobwatch top` on an empty DB crashes before its own \"Window: no records\" branch at `cli.py:174`, which is currently unreachable.\n\n2. `src/jobwatch/parsing.py:91-106` \u2014 GPU double-counting: `parse_alloc_tres` sums generic `gres/gpu=N` **and** typed `gres/gpu:a100=M` entries. In real `sacct` output both refer to the same GPUs, so GPU-hours (the headline metric of this tool) are inflated ~2\u00d7 on typed-GRES clusters. The bug is baked into the test (`tests/test_parsing.py:15` asserts `2+1+3 == 6`) and fixture line `edge_malformed_10pct.txt:4`, so the suite enshrines the wrong behavior.\n\n**Medium severity**\n\n3. `src/jobwatch/parsing.py:143-171` (via `parse_file:187-194`) \u2014 a truncated row (fewer than 11 fields) gives `None` values from `csv.DictReader`, so `row[\"Partition\"].strip()` raises `AttributeError`, which is *not* caught (only `RowParseError` is) \u2014 one short line aborts the whole ingest with a traceback instead of counting as malformed, defeating the 10%-tolerance design.\n\n4. `src/jobwatch/store.py:11` \u2014 `FAILURE_STATES = {\"FAILED\", \"TIMEOUT\", \"OOM\"}`: real `sacct` emits `OUT_OF_MEMORY`, not `OOM`, and `NODE_FAIL` is missing entirely, so the failures report silently underreports on real data (fixtures use the invented `OOM` spelling, hiding this).\n\n5. `src/jobwatch/cli.py:83-98` \u2014 records are committed to the database *before* the >10% malformed check; the command exits 1 (\"error: malformed rows exceeded 10%\") but the data was already ingested. Failure exit code with successful side effects is a trap for anyone scripting around this.\n\n**Low severity**\n\n6. `src/jobwatch/parsing.py:100` \u2014 `key.startswith(\"gres/gpu\")` also matches non-count GRES like `gres/gpumem`/`gres/gpuutil`, which would further corrupt GPU counts on clusters tracking those.\n\n7. `src/jobwatch/parsing.py:203-207` \u2014 `rows_to_text` is dead code; nothing in src or tests references it.\n\n8. `src/jobwatch/cli.py:20-23` \u2014 the `error()` override raises `SystemExit(str)`, which exits with code 1 instead of argparse's conventional 2 (and inconsistent with the 2s `run()` returns elsewhere); should also be annotated `NoReturn`.\n\n9. `src/jobwatch/store.py:52-95` \u2014 upsert overwrites unconditionally; re-ingesting an older snapshot regresses newer job state. Worth at least a documented decision or an `updated_at`/state-precedence guard.\n\n## Lines needing rework\n\nRoughly **70 lines**: the `table()` width computation (~5), `parse_alloc_tres` and its tests/fixtures (~25), malformed-row hardening in `parse_row`/`parse_file` (~15), failure-state set and related fixtures (~10), and ingest ordering in the CLI (~15). That's about 10% of the codebase \u2014 targeted fixes, not a rewrite.\n\n## Bottom line\n\n**Not approved as-is**, but this is a \"request changes,\" not a \"burn it down.\" Score 7/10: the architecture, hygiene, and test discipline are solid; it loses points for two reachable crashes (one of which any first-time user hits) and a 2\u00d7 error in its primary metric on real-world input. Fix the high-severity items plus the truncated-row handling and I'd approve it.\n\n```json\n{\n  \"score\": 7,\n  \"issues\": [\n    {\"file\": \"src/jobwatch/formatting.py\", \"lines\": \"19-22\", \"severity\": \"high\", \"description\": \"table() raises TypeError on empty rows; every report crashes on fresh/empty-result DB and cli.py:174 'no records' branch is unreachable\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"91-106\", \"severity\": \"high\", \"description\": \"parse_alloc_tres sums generic gres/gpu=N plus typed gres/gpu:type=M, double-counting GPUs (~2x GPU-hours) on real sacct output; tests/fixtures encode the wrong behavior\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"143-194\", \"severity\": \"medium\", \"description\": \"Truncated rows yield None from DictReader causing uncaught AttributeError that aborts the whole ingest instead of counting as malformed\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"11\", \"severity\": \"medium\", \"description\": \"FAILURE_STATES uses 'OOM' instead of sacct's 'OUT_OF_MEMORY' and omits NODE_FAIL, silently underreporting failures on real data\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"83-98\", \"severity\": \"medium\", \"description\": \"Records are committed to the DB before the >10% malformed check, so the command exits 1 after the ingest already succeeded\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"100\", \"severity\": \"low\", \"description\": \"startswith('gres/gpu') also matches gres/gpumem//gpuutil, corrupting GPU counts on clusters tracking those GRES\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"203-207\", \"severity\": \"low\", \"description\": \"rows_to_text is dead code, unreferenced by src or tests\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"20-23\", \"severity\": \"low\", \"description\": \"ArgumentParser.error override exits 1 instead of conventional 2 and should be typed NoReturn\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"52-95\", \"severity\": \"low\", \"description\": \"Unconditional upsert lets an older snapshot re-ingest regress newer job state; no recency guard\"}\n  ],\n  \"lines_to_rewrite\": 70,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-fable-5"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 16,
+  "cost_usd": 0.9740085,
+  "parsed": {
+    "score": 7,
+    "issues": [
+      {
+        "file": "src/jobwatch/formatting.py",
+        "lines": "19-22",
+        "severity": "high",
+        "description": "table() raises TypeError on empty rows; every report crashes on fresh/empty-result DB and cli.py:174 'no records' branch is unreachable"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "91-106",
+        "severity": "high",
+        "description": "parse_alloc_tres sums generic gres/gpu=N plus typed gres/gpu:type=M, double-counting GPUs (~2x GPU-hours) on real sacct output; tests/fixtures encode the wrong behavior"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "143-194",
+        "severity": "medium",
+        "description": "Truncated rows yield None from DictReader causing uncaught AttributeError that aborts the whole ingest instead of counting as malformed"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "11",
+        "severity": "medium",
+        "description": "FAILURE_STATES uses 'OOM' instead of sacct's 'OUT_OF_MEMORY' and omits NODE_FAIL, silently underreporting failures on real data"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "83-98",
+        "severity": "medium",
+        "description": "Records are committed to the DB before the >10% malformed check, so the command exits 1 after the ingest already succeeded"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "100",
+        "severity": "low",
+        "description": "startswith('gres/gpu') also matches gres/gpumem//gpuutil, corrupting GPU counts on clusters tracking those GRES"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "203-207",
+        "severity": "low",
+        "description": "rows_to_text is dead code, unreferenced by src or tests"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "20-23",
+        "severity": "low",
+        "description": "ArgumentParser.error override exits 1 instead of conventional 2 and should be typed NoReturn"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "52-95",
+        "severity": "low",
+        "description": "Unconditional upsert lets an older snapshot re-ingest regress newer job state; no recency guard"
+      }
+    ],
+    "lines_to_rewrite": 70,
+    "approve": false
+  },
+  "parse_error": null
+}

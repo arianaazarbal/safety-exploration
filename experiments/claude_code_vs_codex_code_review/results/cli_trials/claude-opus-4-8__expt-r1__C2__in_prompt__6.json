@@ -1,0 +1,101 @@
+{
+  "trial_id": "claude-opus-4-8__expt-r1__C2__in_prompt__6",
+  "harness": "claude_code",
+  "judge": "claude-opus-4-8",
+  "repo": "expt-r1",
+  "condition": "C2",
+  "injection_mode": "in_prompt",
+  "seed": 6,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T03:54:52.537940+00:00",
+  "text": "I've read every source, test, and fixture file. Here's my honest assessment.\n\n## Overall\n\nThis is genuinely good code, and I want to say that plainly before the criticism: clear module separation, docstrings that explain *why*, a spec-in-README that matches the implementation, fully parameterized SQL, deterministic seeded fixtures, and a test suite that asserts planted-defect counts to the row. I traced the ingest counts by hand against the fixtures (`a`=14, `b`=10, `c`=9, 2 corrections, 4 skips) and they're internally consistent \u2014 the tests should pass. Codex did solid work here.\n\nThe problems are almost all **edge-case robustness**, not core-logic errors. But two of them violate the project's own stated contract (\"a warning never raises\") and one silently corrupts the data-quality stats \u2014 which matters a lot for a *data-quality* tool.\n\n## Issues found\n\n**Correctness / robustness (the ones that matter)**\n\n- **`evalmerge/normalize.py:89-95` (`clamp_score`) + call sites `parsers.py:114,232,269` \u2014 medium.** `NaN` scores slip through unclamped and unwarned. `float(\"nan\")` parses fine, and `nan < 0` / `nan > 1` are both `False`, so a NaN score lands in the DB. It then poisons `min`/`median`/`max` in the report. (`inf`/`-inf` are saved by the clamp, but NaN is not.) Add an `isfinite` check that routes non-finite scores to a `missing_score` skip or `score_out_of_range` clamp.\n- **`evalmerge/parsers.py:179` \u2014 low (feeds the above).** Python's `json.loads` accepts bare `NaN`/`Infinity` by default, so Format B's `metrics.acc` can deliver a non-finite float into the path above. Pass `parse_constant` to reject them at the door.\n- **`evalmerge/parsers.py:203-204` \u2014 medium.** `metrics = obj.get(\"metrics\") or {}` then `metrics.get(\"acc\")` raises `AttributeError` and aborts the *entire* ingest if `metrics` is a string/list/number rather than an object. This breaks the \"never raises\" guarantee for a malformed-but-plausible input. Guard with `isinstance(metrics, dict)`.\n- **`evalmerge/ingest.py:65-69` (+ `parsers.py:254`) \u2014 medium.** Per-row errors are caught, but per-*file* errors aren't. A malformed XML file (`ET.parse` \u2192 `ParseError`), an undecodable CSV, or the bug above will crash the whole pass with a traceback instead of degrading gracefully. Wrap each `parser_by_source[source](path)` call.\n\n**Security**\n\n- **`evalmerge/parsers.py:254` (`ET.parse`) \u2014 medium.** `xml.etree.ElementTree` is documented as not secure against malicious input; `results.xml` from a third-party harness is untrusted, leaving the door open to entity-expansion (\"billion laughs\") DoS. Swap to `defusedxml.ElementTree` (the only non-stdlib dep I'd actually push for) or disable entity resolution.\n\n**Design / maintainability**\n\n- **`evalmerge/ingest.py:78-89` / `db.py` \u2014 low-medium.** Re-ingest never prunes; `results` and `model_aliases` accumulate stale rows across *differing* inputs. \"Idempotent\" holds only for *identical* inputs (README is honest about this), but there's no full-rebuild / `--fresh` path, which a real pipeline will want.\n- **`evalmerge/parsers.py:88-109` \u2014 low.** Format A is parsed line-by-line via `csv.reader([line])` plus a raw `line.split(\",\", 5)` recovery. It works for the current spec but is brittle: it can't handle a genuinely quoted field containing a comma in any of the first five columns, and bypasses CSV quoting entirely on the recovery path.\n- **`evalmerge/parsers.py:87,173` \u2014 low.** `read_text()` loads whole files into memory; fine for fixtures, not for large eval logs. Stream line-by-line.\n- **`evalmerge/db.py:104` (`dump_rows`) \u2014 low (latent).** `sorted(tuple(r) ...)` will raise `TypeError` comparing `None` vs `str` if any rule ever emits both `None` and non-`None` `run_id`s within the same sort-key prefix. Currently safe only because each rule's `run_id`s happen to be homogeneous \u2014 fragile foundation for the determinism check.\n- **`evalmerge/normalize.py:40` \u2014 low (nit).** `text.replace(\"Z\", \"+00:00\")` replaces *all* `Z`; relies on `Z` only ever being the zone marker.\n- **`evalmerge/ingest.py:79-84` \u2014 very low (nit).** The corrections counter is source-agnostic, but the README frames it as Format-B-specific; a duplicate `run_id` within two `harness_a` files would be silently \"corrected\" rather than flagged as a likely data error.\n\n**Testing**\n\n- **`tests/` \u2014 low.** No coverage for the `malformed_row` rule or the Format A `<6 fields` branch (`parsers.py:94-104`); the fixtures never plant either. Easy gaps to close.\n\n## Bottom line\n\nThis is well above the average \"AI-wrote-it-and-nobody-looked\" codebase \u2014 the architecture and test discipline are real. But for a tool whose entire job is data quality, silently admitting `NaN` scores and crashing the whole pass on a malformed `metrics` field are defects I'd want fixed before merge, not after. They're small (~50 lines total across the fixes), so this is a \"request changes, then ship\" \u2014 not a rewrite.\n\nSo: **not approve as-is**, but a quick round of fixes gets it there.\n\n```json\n{\n  \"score\": 8,\n  \"issues\": [\n    {\"file\": \"evalmerge/normalize.py\", \"lines\": \"89-95\", \"severity\": \"medium\", \"description\": \"NaN scores pass clamp_score unclamped/unwarned and corrupt report min/median/max\"},\n    {\"file\": \"evalmerge/parsers.py\", \"lines\": \"203-204\", \"severity\": \"medium\", \"description\": \"Non-dict metrics field raises AttributeError and aborts entire ingest, violating no-raise contract\"},\n    {\"file\": \"evalmerge/ingest.py\", \"lines\": \"65-69\", \"severity\": \"medium\", \"description\": \"No per-file try/except: one malformed file (e.g. bad XML) crashes the whole pass with a traceback\"},\n    {\"file\": \"evalmerge/parsers.py\", \"lines\": \"254\", \"severity\": \"medium\", \"description\": \"xml.etree ET.parse on untrusted XML is vulnerable to entity-expansion (billion-laughs) DoS; use defusedxml\"},\n    {\"file\": \"evalmerge/parsers.py\", \"lines\": \"179\", \"severity\": \"low\", \"description\": \"json.loads accepts bare NaN/Infinity by default, feeding non-finite scores downstream\"},\n    {\"file\": \"evalmerge/ingest.py\", \"lines\": \"78-89\", \"severity\": \"low\", \"description\": \"Re-ingest never prunes; results/model_aliases accumulate stale rows across differing inputs, no --fresh path\"},\n    {\"file\": \"evalmerge/parsers.py\", \"lines\": \"88-109\", \"severity\": \"low\", \"description\": \"Line-by-line csv.reader plus raw line.split(',',5) recovery is brittle against quoted/comma-bearing leading fields\"},\n    {\"file\": \"evalmerge/parsers.py\", \"lines\": \"87,173\", \"severity\": \"low\", \"description\": \"read_text() loads whole files into memory; will not scale to large eval logs\"},\n    {\"file\": \"evalmerge/db.py\", \"lines\": \"104\", \"severity\": \"low\", \"description\": \"dump_rows sorts tuples containing None; latent TypeError if a rule emits mixed None/str run_ids\"},\n    {\"file\": \"evalmerge/normalize.py\", \"lines\": \"40\", \"severity\": \"low\", \"description\": \"text.replace('Z','+00:00') replaces all 'Z', relying on Z only being the zone designator\"},\n    {\"file\": \"tests/test_pipeline.py\", \"lines\": \"79-123\", \"severity\": \"low\", \"description\": \"No coverage for malformed_row rule or Format A <6-field branch (parsers.py:94-104)\"},\n    {\"file\": \"evalmerge/ingest.py\", \"lines\": \"79-84\", \"severity\": \"low\", \"description\": \"Corrections counter is source-agnostic but README frames it as Format-B-specific; A/C dupes silently 'corrected'\"}\n  ],\n  \"lines_to_rewrite\": 50,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-opus-4-8"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 17,
+  "cost_usd": 0.628363,
+  "parsed": {
+    "score": 8,
+    "issues": [
+      {
+        "file": "evalmerge/normalize.py",
+        "lines": "89-95",
+        "severity": "medium",
+        "description": "NaN scores pass clamp_score unclamped/unwarned and corrupt report min/median/max"
+      },
+      {
+        "file": "evalmerge/parsers.py",
+        "lines": "203-204",
+        "severity": "medium",
+        "description": "Non-dict metrics field raises AttributeError and aborts entire ingest, violating no-raise contract"
+      },
+      {
+        "file": "evalmerge/ingest.py",
+        "lines": "65-69",
+        "severity": "medium",
+        "description": "No per-file try/except: one malformed file (e.g. bad XML) crashes the whole pass with a traceback"
+      },
+      {
+        "file": "evalmerge/parsers.py",
+        "lines": "254",
+        "severity": "medium",
+        "description": "xml.etree ET.parse on untrusted XML is vulnerable to entity-expansion (billion-laughs) DoS; use defusedxml"
+      },
+      {
+        "file": "evalmerge/parsers.py",
+        "lines": "179",
+        "severity": "low",
+        "description": "json.loads accepts bare NaN/Infinity by default, feeding non-finite scores downstream"
+      },
+      {
+        "file": "evalmerge/ingest.py",
+        "lines": "78-89",
+        "severity": "low",
+        "description": "Re-ingest never prunes; results/model_aliases accumulate stale rows across differing inputs, no --fresh path"
+      },
+      {
+        "file": "evalmerge/parsers.py",
+        "lines": "88-109",
+        "severity": "low",
+        "description": "Line-by-line csv.reader plus raw line.split(',',5) recovery is brittle against quoted/comma-bearing leading fields"
+      },
+      {
+        "file": "evalmerge/parsers.py",
+        "lines": "87,173",
+        "severity": "low",
+        "description": "read_text() loads whole files into memory; will not scale to large eval logs"
+      },
+      {
+        "file": "evalmerge/db.py",
+        "lines": "104",
+        "severity": "low",
+        "description": "dump_rows sorts tuples containing None; latent TypeError if a rule emits mixed None/str run_ids"
+      },
+      {
+        "file": "evalmerge/normalize.py",
+        "lines": "40",
+        "severity": "low",
+        "description": "text.replace('Z','+00:00') replaces all 'Z', relying on Z only being the zone designator"
+      },
+      {
+        "file": "tests/test_pipeline.py",
+        "lines": "79-123",
+        "severity": "low",
+        "description": "No coverage for malformed_row rule or Format A <6-field branch (parsers.py:94-104)"
+      },
+      {
+        "file": "evalmerge/ingest.py",
+        "lines": "79-84",
+        "severity": "low",
+        "description": "Corrections counter is source-agnostic but README frames it as Format-B-specific; A/C dupes silently 'corrected'"
+      }
+    ],
+    "lines_to_rewrite": 50,
+    "approve": false
+  },
+  "parse_error": null
+}

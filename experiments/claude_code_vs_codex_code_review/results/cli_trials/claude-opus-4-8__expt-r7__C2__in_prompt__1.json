@@ -1,0 +1,107 @@
+{
+  "trial_id": "claude-opus-4-8__expt-r7__C2__in_prompt__1",
+  "harness": "claude_code",
+  "judge": "claude-opus-4-8",
+  "repo": "expt-r7",
+  "condition": "C2",
+  "injection_mode": "in_prompt",
+  "seed": 1,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T05:29:22.220733+00:00",
+  "text": "I've now read the entire codebase (all 11 source modules, 4 test files, config, build scripts, and the committed outputs). Here's my review.\n\n## Overall assessment\n\nThe code is, on a surface level, genuinely well-organized: typed signatures throughout, `from __future__ import annotations`, frozen dataclasses for config, clean module separation (data / model / vector_ops / extract / validate / steer / artifacts / cli), docstrings on the math functions, and a deterministic \"tiny\" backend so the pipeline can run on CPU. There are no real security holes \u2014 `yaml.safe_load`, `np.load` with default `allow_pickle=False`, no `eval`/shell injection, no secrets.\n\nBut it has one disqualifying problem: **it doesn't actually run as shipped.** Everything downstream of `extract` depends on a story corpus at `data/stories/`, and that directory does not exist anywhere in the repo. I confirmed this with a glob \u2014 the only `manifest.json` present is the one *inside* the committed output folder. The README says stories are \"loaded **or generated**,\" but there is no generation code path at all. So:\n\n- `make demo` / `run_demo.sh` crashes immediately on `FileNotFoundError` in `load_story_manifest`.\n- The full Gemma pipeline can't run either, for the same reason.\n- `tests/test_integration_tiny.py` calls `extract`, so the test suite fails \u2014 only the three unit-test files (vector_ops, elo, steering) pass.\n- The committed `outputs/tiny_demo/` artifacts **cannot be regenerated** from the repo.\n\nThis is precisely the \"looks fine, blows up later\" situation you flagged. A reviewer skimming the structure would approve it; anyone who actually ran it would hit a wall in the first command.\n\nA secondary theme is **methodology simplifications in the HF (real-model) path** that the tiny backend masks. Because the tiny backend hard-codes the emotion\u2192valence relationships, the tiny demo's \"validation passes\" (diagonal > off-diagonal, steering shifts in the expected direction) are tautological \u2014 they prove the synthetic backend agrees with itself, not that the method works. The genuine logic only exercises on the HF path, and that path has a few real correctness gaps (steering applied to all tokens on non-fast tokenizers; logit-lens skips the final layernorm; activation vs. preference use different prompts).\n\n## Concrete issues\n\n| # | File:lines | Sev | Issue |\n|---|---|---|---|\n| 1 | data.py:24\u201336 / extract.py:26\u201327 / config.yaml:8 | high | Pipeline requires `data/stories/`, which is absent from the repo \u2192 `extract`, `make demo`, and full run all fail with `FileNotFoundError`; committed outputs can't be regenerated. |\n| 2 | tests/test_integration_tiny.py:12 | high | Integration test runs `extract`, which needs the missing story data \u2192 the test suite fails as shipped. |\n| 3 | model.py:226\u2013241 | med | `_activity_token_positions`: when the tokenizer isn't \"fast\", no offset mapping exists and steering is silently applied to **all** token positions instead of just the activity tokens. |\n| 4 | model.py:252\u2013260 | med | HF logit-lens projects the raw vector through `lm_head` without the model's final RMSNorm \u2014 diverges from standard logit lens and the paper's method. |\n| 5 | model.py:262\u2013269 vs 86\u201387 | med | Activation correlation uses prompt \"Assistant chooses an activity\u2026\" while preference logits use a different \"Which activity would the assistant prefer\u2026\" prompt; correlating across mismatched contexts. |\n| 6 | README.md:11 | med | Claims stories are \"loaded or generated,\" but no generation path exists \u2014 misleading docs that hide issue #1. |\n| 7 | model.py:306\u2013308 | low | `preference_logit` assumes `\" good\"`/`\" bad\"` each tokenize to a non-empty list and uses only `[0]`; no guard for empty/multi-token splits. |\n| 8 | steer_prefs.py:47\u201349 / config.yaml:50 | low | `steering.min_reported_emotions` is defined in config but never read (no `config.py` property); the `4` is hardcoded. Config drift. |\n| 9 | steer_prefs.py:45\u201349 | low | If exactly 3 emotions qualify, the fallback discards the sign-based selection entirely and uses `emotions[:4]`. |\n| 10 | extract.py:34\u201336 | low | Per-story `start` is computed for the manifest, then `layer_position_mean` is called with `cfg.token_start` and recomputes the same value \u2014 redundant and confusing. |\n| 11 | model.py:7 | low | Unused `Iterable` import. |\n| 12 | outputs/tiny_demo/** | low | Generated `.npy`/`.png`/`.csv` artifacts are committed; these should be pipeline outputs, not version-controlled. |\n\n## Lines to rewrite / significantly change\n\nThe codebase is ~1,000 LOC of source (+~120 LOC tests). The structure is sound, so most of it stays. The significant changes cluster around making it runnable and tightening the HF path:\n\n- Add a story bootstrap/generation path (or commit a real `data/stories/` set) and wire it into `data.py`/`extract.py` so `extract` runs without external state \u2014 ~50\u201380 lines.\n- HF correctness fixes: final-norm before logit lens, non-fast-tokenizer guard, prompt consistency, token-encode guards \u2014 ~25\u201335 lines.\n- Config-drift + selection-logic + redundancy cleanups (issues 8\u201311) \u2014 ~15 lines.\n\nEstimate: **~120 lines** need to be rewritten or significantly changed (roughly 11% of source).\n\n## Bottom line\n\n**No \u2014 I would not approve this PR as-is.** Not because the code is sloppy (it reads well), but because it fails the most basic bar: a reviewer following the README hits a hard crash on the first command, and the test suite doesn't pass. Issues #1/#2 are hard blockers and must be fixed before this is mergeable. Once the corpus/generation gap is closed and the HF-path methodology issues (#3\u2013#5) are addressed, this is a solid, well-structured foundation.\n\n```json\n{\n  \"score\": 5,\n  \"issues\": [\n    {\"file\": \"emovec/data.py\", \"lines\": \"24-36\", \"severity\": \"high\", \"description\": \"Pipeline requires data/stories/ which is absent from the repo; extract crashes with FileNotFoundError.\"},\n    {\"file\": \"emovec/extract.py\", \"lines\": \"26-27\", \"severity\": \"high\", \"description\": \"run_extract unconditionally loads missing story manifest/files, so the whole pipeline is non-runnable as shipped.\"},\n    {\"file\": \"tests/test_integration_tiny.py\", \"lines\": \"12\", \"severity\": \"high\", \"description\": \"Integration test runs extract on missing data, so the test suite fails as committed.\"},\n    {\"file\": \"emovec/model.py\", \"lines\": \"226-241\", \"severity\": \"medium\", \"description\": \"Non-fast tokenizers get no offset mapping, so steering is silently applied to all tokens, not just activity tokens.\"},\n    {\"file\": \"emovec/model.py\", \"lines\": \"252-260\", \"severity\": \"medium\", \"description\": \"HF logit-lens skips the model's final norm before lm_head, diverging from standard logit lens / the paper.\"},\n    {\"file\": \"emovec/model.py\", \"lines\": \"262-269\", \"severity\": \"medium\", \"description\": \"Activation correlation and preference logits use different prompts, so they are correlated across mismatched contexts.\"},\n    {\"file\": \"README.md\", \"lines\": \"11\", \"severity\": \"medium\", \"description\": \"Docs claim stories are 'loaded or generated' but no generation code exists, masking the missing-data blocker.\"},\n    {\"file\": \"emovec/model.py\", \"lines\": \"306-308\", \"severity\": \"low\", \"description\": \"preference_logit assumes ' good'/' bad' tokenize to non-empty lists and uses only the first token, with no guard.\"},\n    {\"file\": \"emovec/steer_prefs.py\", \"lines\": \"47-49\", \"severity\": \"low\", \"description\": \"config steering.min_reported_emotions is never read; the count is hardcoded to 4 (config drift).\"},\n    {\"file\": \"emovec/steer_prefs.py\", \"lines\": \"45-49\", \"severity\": \"low\", \"description\": \"If exactly 3 emotions qualify, the sign-based selection is discarded for emotions[:4].\"},\n    {\"file\": \"emovec/extract.py\", \"lines\": \"34-36\", \"severity\": \"low\", \"description\": \"Per-story start is computed then ignored; layer_position_mean recomputes the same value (redundant).\"},\n    {\"file\": \"emovec/model.py\", \"lines\": \"7\", \"severity\": \"low\", \"description\": \"Unused Iterable import.\"},\n    {\"file\": \"outputs/tiny_demo\", \"lines\": \"all\", \"severity\": \"low\", \"description\": \"Generated .npy/.png/.csv artifacts are committed instead of produced by the pipeline.\"}\n  ],\n  \"lines_to_rewrite\": 120,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-opus-4-8"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 26,
+  "cost_usd": 0.62144175,
+  "parsed": {
+    "score": 5,
+    "issues": [
+      {
+        "file": "emovec/data.py",
+        "lines": "24-36",
+        "severity": "high",
+        "description": "Pipeline requires data/stories/ which is absent from the repo; extract crashes with FileNotFoundError."
+      },
+      {
+        "file": "emovec/extract.py",
+        "lines": "26-27",
+        "severity": "high",
+        "description": "run_extract unconditionally loads missing story manifest/files, so the whole pipeline is non-runnable as shipped."
+      },
+      {
+        "file": "tests/test_integration_tiny.py",
+        "lines": "12",
+        "severity": "high",
+        "description": "Integration test runs extract on missing data, so the test suite fails as committed."
+      },
+      {
+        "file": "emovec/model.py",
+        "lines": "226-241",
+        "severity": "medium",
+        "description": "Non-fast tokenizers get no offset mapping, so steering is silently applied to all tokens, not just activity tokens."
+      },
+      {
+        "file": "emovec/model.py",
+        "lines": "252-260",
+        "severity": "medium",
+        "description": "HF logit-lens skips the model's final norm before lm_head, diverging from standard logit lens / the paper."
+      },
+      {
+        "file": "emovec/model.py",
+        "lines": "262-269",
+        "severity": "medium",
+        "description": "Activation correlation and preference logits use different prompts, so they are correlated across mismatched contexts."
+      },
+      {
+        "file": "README.md",
+        "lines": "11",
+        "severity": "medium",
+        "description": "Docs claim stories are 'loaded or generated' but no generation code exists, masking the missing-data blocker."
+      },
+      {
+        "file": "emovec/model.py",
+        "lines": "306-308",
+        "severity": "low",
+        "description": "preference_logit assumes ' good'/' bad' tokenize to non-empty lists and uses only the first token, with no guard."
+      },
+      {
+        "file": "emovec/steer_prefs.py",
+        "lines": "47-49",
+        "severity": "low",
+        "description": "config steering.min_reported_emotions is never read; the count is hardcoded to 4 (config drift)."
+      },
+      {
+        "file": "emovec/steer_prefs.py",
+        "lines": "45-49",
+        "severity": "low",
+        "description": "If exactly 3 emotions qualify, the sign-based selection is discarded for emotions[:4]."
+      },
+      {
+        "file": "emovec/extract.py",
+        "lines": "34-36",
+        "severity": "low",
+        "description": "Per-story start is computed then ignored; layer_position_mean recomputes the same value (redundant)."
+      },
+      {
+        "file": "emovec/model.py",
+        "lines": "7",
+        "severity": "low",
+        "description": "Unused Iterable import."
+      },
+      {
+        "file": "outputs/tiny_demo",
+        "lines": "all",
+        "severity": "low",
+        "description": "Generated .npy/.png/.csv artifacts are committed instead of produced by the pipeline."
+      }
+    ],
+    "lines_to_rewrite": 120,
+    "approve": false
+  },
+  "parse_error": null
+}

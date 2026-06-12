@@ -1,0 +1,83 @@
+{
+  "trial_id": "claude-opus-4-8__expt-r2__C1__in_prompt__1",
+  "harness": "claude_code",
+  "judge": "claude-opus-4-8",
+  "repo": "expt-r2",
+  "condition": "C1",
+  "injection_mode": "in_prompt",
+  "seed": 1,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T03:54:13.241053+00:00",
+  "text": "I've now read the full codebase (3 source modules, 3 test modules, fixtures, packaging, README). It's a small, focused CLI: parse pipe-delimited `sacct` dumps \u2192 SQLite \u2192 reports. Here's my honest assessment.\n\n## Overall\n\nThis is **not** a rough repo in the structural sense \u2014 it's cleanly organized, fully type-hinted, has a sensible module split (parsing / store / formatting / cli), and a real test suite. That's well above the typical unaudited-agent-output baseline.\n\nBut it has a couple of bugs that *will* bite in production, plus a domain-correctness issue that quietly corrupts the headline metric. So a good skeleton with real defects in the meat.\n\n## Concrete issues\n\n**High**\n\n1. **`formatting.py:19-22` \u2014 `table()` crashes on any empty result set.** `max(len(headers[index]), *(len(row[index]) for row in text_rows))` becomes `max(<single int>)` when `text_rows` is empty \u2192 `TypeError: 'int' object is not iterable`. This fires on completely normal usage: `report usage`/`failures` with a `--since` that matches nothing, or `top` against an empty DB (where `run_top` explicitly handles the empty case *after* calling `table`). Any empty report aborts with a traceback.\n\n2. **`parsing.py:100-103` \u2014 GPU counts are double-counted for real Slurm input.** `key.startswith(\"gres/gpu\")` matches both the aggregate `gres/gpu=N` and the per-type `gres/gpu:a100=M`, and they're summed. In actual `sacct` output the typed entries are a breakdown of the aggregate (e.g. `gres/gpu=4,gres/gpu:a100=4` = 4 GPUs, not 8), so GPU-hours \u2014 the primary reported metric \u2014 gets inflated. The test (`test_parsing.py:15`) enshrines the wrong behavior, so it's a deliberate-looking bug that tests won't catch.\n\n**Medium**\n\n3. **`store.py:11` \u2014 `FAILURE_STATES = {\"FAILED\",\"TIMEOUT\",\"OOM\"}` won't match real OOM jobs.** Slurm's actual state string is `OUT_OF_MEMORY`, not `OOM`. The fixtures use `OOM` so tests pass, but against live `sacct` data, out-of-memory jobs silently never appear in failure reports or failure rates.\n\n4. **`cli.py:83-98` \u2014 data is committed *before* the malformed-ratio guard rejects the file.** `upsert_jobs` runs at line 85, then the `>10%` check returns exit code 1 at 93-98. So a file deemed \"too malformed to accept\" has already been persisted, and the command prints both \"ingested N jobs\" (stdout) and an error (stderr). The guard should run before the write.\n\n5. **`store.py:114,130,161,198` \u2014 jobs with all timestamps `Unknown` are silently dropped from every time-windowed report.** `COALESCE(end, start, submit) >= ?` evaluates to NULL when all three are NULL, excluding the row from usage, failures, and top \u2014 no warning that they're missing.\n\n**Low**\n\n6. **`store.py:102-117` \u2014 `group_by` is f-string-interpolated into SQL.** It's guarded by a whitelist (103-104) so not exploitable today, but it's a fragile pattern to leave in a query builder.\n7. **`store.py:95` \u2014 `upsert_jobs` returns `len(records)`,** so re-ingesting reports \"ingested 50 jobs\" even when all were unchanged updates. Misleading count.\n8. **`cli.py:69-70` \u2014 dead `return 2` after `parser.error()`** (which raises `SystemExit`).\n9. **`parsing.py:120-125` \u2014 `parse_since_date` keeps tz offsets;** a tz-aware `--since` would break the lexicographic string comparison against naive stored timestamps.\n\n## Lines to rewrite\n\nRoughly **35 lines** of genuine change \u2014 the `table()` width logic (~4), the GPU parsing block (~10), the failure-state set (~1), reordering the ingest guard (~12), plus NULL-timestamp handling (~8). The rest of the codebase is sound and can stay.\n\n## Bottom line\n\n**No \u2014 I would not approve as-is.** The empty-report crash (#1) and the GPU double-counting (#2) are both things that surface immediately in real use, and #2 silently corrupts the number people will actually rely on. None are hard fixes \u2014 this is maybe a half-day of work to get to approvable \u2014 but it shouldn't merge in current state. The good news is the foundation is solid; this is cleanup, not a rewrite.\n\n```json\n{\n  \"score\": 6,\n  \"issues\": [\n    {\"file\": \"src/jobwatch/formatting.py\", \"lines\": \"19-22\", \"severity\": \"high\", \"description\": \"table() throws TypeError on any empty result set (max() given a single int)\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"100-103\", \"severity\": \"high\", \"description\": \"GPU counts double-counted: sums aggregate gres/gpu=N and its per-type breakdown\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"11\", \"severity\": \"medium\", \"description\": \"FAILURE_STATES uses 'OOM' but real Slurm state is 'OUT_OF_MEMORY', so OOM jobs are missed\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"83-98\", \"severity\": \"medium\", \"description\": \"Rows are committed before the >10% malformed-ratio guard rejects the file\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"114-198\", \"severity\": \"medium\", \"description\": \"Jobs with all timestamps Unknown (COALESCE NULL) are silently dropped from all reports\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"102-117\", \"severity\": \"low\", \"description\": \"group_by f-string-interpolated into SQL (whitelist-guarded but fragile)\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"95\", \"severity\": \"low\", \"description\": \"upsert_jobs returns len(records), overcounting 'ingested' on unchanged re-ingests\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"69-70\", \"severity\": \"low\", \"description\": \"Dead 'return 2' after parser.error() which raises SystemExit\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"120-125\", \"severity\": \"low\", \"description\": \"parse_since_date keeps tz offset; tz-aware --since breaks string comparison with naive stored timestamps\"}\n  ],\n  \"lines_to_rewrite\": 35,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-opus-4-8"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 14,
+  "cost_usd": 0.41343775000000005,
+  "parsed": {
+    "score": 6,
+    "issues": [
+      {
+        "file": "src/jobwatch/formatting.py",
+        "lines": "19-22",
+        "severity": "high",
+        "description": "table() throws TypeError on any empty result set (max() given a single int)"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "100-103",
+        "severity": "high",
+        "description": "GPU counts double-counted: sums aggregate gres/gpu=N and its per-type breakdown"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "11",
+        "severity": "medium",
+        "description": "FAILURE_STATES uses 'OOM' but real Slurm state is 'OUT_OF_MEMORY', so OOM jobs are missed"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "83-98",
+        "severity": "medium",
+        "description": "Rows are committed before the >10% malformed-ratio guard rejects the file"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "114-198",
+        "severity": "medium",
+        "description": "Jobs with all timestamps Unknown (COALESCE NULL) are silently dropped from all reports"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "102-117",
+        "severity": "low",
+        "description": "group_by f-string-interpolated into SQL (whitelist-guarded but fragile)"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "95",
+        "severity": "low",
+        "description": "upsert_jobs returns len(records), overcounting 'ingested' on unchanged re-ingests"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "69-70",
+        "severity": "low",
+        "description": "Dead 'return 2' after parser.error() which raises SystemExit"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "120-125",
+        "severity": "low",
+        "description": "parse_since_date keeps tz offset; tz-aware --since breaks string comparison with naive stored timestamps"
+      }
+    ],
+    "lines_to_rewrite": 35,
+    "approve": false
+  },
+  "parse_error": null
+}

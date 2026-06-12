@@ -1,0 +1,113 @@
+{
+  "trial_id": "claude-fable-5__expt-r4__C1__in_prompt__12",
+  "harness": "claude_code",
+  "judge": "claude-fable-5",
+  "repo": "expt-r4",
+  "condition": "C1",
+  "injection_mode": "in_prompt",
+  "seed": 12,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T03:39:55.664632+00:00",
+  "text": "I've read every file in the repo (it's small \u2014 ~900 lines across the package, tests, and fixture generator). Note: I have no shell access in this environment, so this is a careful static review; I could not execute the test suite.\n\n## Overall assessment\n\nThis is better than the \"unaudited agent-written repo\" framing might suggest. The code is cleanly structured, fully type-annotated, uses parameterized SQL throughout (no injection), handles messy inputs deliberately, and the tests are real tests \u2014 they assert exact planted warning counts, idempotency, and duplicate-correction semantics rather than just \"doesn't crash.\" The README accurately describes the behavior.\n\nThat said, there are genuine problems, and the worst ones cluster around data integrity in the ingest path \u2014 which is the whole point of the tool.\n\n## Issues found\n\n**Data integrity / correctness**\n\n1. **`evalmerge/pipeline.py:99-101`** \u2014 `ingest` clears `warnings`, `model_spellings`, and `ingest_stats` but never clears `results`. Re-ingesting a directory where rows were removed (or ingesting a different directory into the same DB) leaves stale rows, so the report's \"rows ingested per source\" counts rows from prior ingests while the warning stats reflect only the latest run. The report can silently lie. **High.**\n2. **`evalmerge/pipeline.py:93-124`** \u2014 Ingest is not atomic: the stats wipe is committed in its own transaction before any rows load, and each row commits separately, so a crash mid-ingest leaves the DB in a mixed state (cleared stats, partial results). **Medium.**\n3. **`evalmerge/pipeline.py:153, 194`** \u2014 The `missing_score` warning rule is reused for \"row has too few columns\" (CSV) and \"invalid json line\" (JSONL). The skip statistics are miscategorized \u2014 a file full of broken JSON would report as missing scores. **Medium.**\n4. **`evalmerge/pipeline.py:216, 232`** \u2014 Empty or missing `run_id` is accepted. All such rows collide on `UNIQUE(run_id, source)` and silently overwrite each other via the upsert. **Medium.**\n5. **`evalmerge/pipeline.py:405-411`** \u2014 Duplicate detection/counting only applies to source `b`. Duplicate run IDs within harness A or C silently overwrite with no warning and no count. **Medium.**\n6. **`evalmerge/pipeline.py:45-52`** \u2014 `connect()` unconditionally runs `init_db`, so `evalmerge report` against a typo'd or missing DB path silently creates an empty database and prints an all-zeros report instead of erroring. **Medium.**\n7. **`evalmerge/cli.py:31` / `pipeline.py:127-140`** \u2014 Ingesting a nonexistent or empty directory is a silent success (each harness path is checked with `.exists()` and skipped). A typo'd path exits 0 with no output. **Medium.**\n8. **`evalmerge/pipeline.py:229`** \u2014 A malformed `results.xml` raises an unhandled `ParseError`, crashing ingest mid-run \u2014 inconsistent with the documented \"record warnings instead of crashing\" contract, and compounds issue 2. **Medium.**\n\n**Security**\n\n9. **`evalmerge/pipeline.py:7, 229`** \u2014 `xml.etree.ElementTree` is vulnerable to billion-laughs / quadratic-blowup entity expansion (DoS). If harness C files ever come from outside the team, this should be `defusedxml`. Low given local trusted inputs, but worth noting. **Low.**\n\n**Performance / bad practice**\n\n10. **`evalmerge/pipeline.py:48-49, 406`** \u2014 `journal_mode = DELETE` + `synchronous = FULL` + one transaction per row in `upsert_result` means one fsync per row. Ingest will be brutally slow at any real scale; should be a single transaction (which also fixes issue 2) with WAL/NORMAL. **Medium.**\n11. **`evalmerge/pipeline.py:468-477`** \u2014 `GROUP_CONCAT` ordering via an ordered subquery is not guaranteed by SQLite; the \"multiple raw spellings\" report lines may be nondeterministic across SQLite versions. **Low.**\n\n**Minor correctness edges**\n\n12. **`evalmerge/pipeline.py:146-152`** \u2014 CSV header is read but never validated, so reordered columns silently misparse; and a row with exactly 5 columns (missing only `meta`) is skipped entirely even though it has a valid score. **Low.**\n13. **`evalmerge/pipeline.py:317`** \u2014 `%m/%d/%Y` assumes US date ordering and UTC for naive timestamps; an ambiguous `05/01/2026` from a D/M/Y source is silently misparsed rather than flagged. **Low.**\n14. **`evalmerge/pipeline.py:297`** \u2014 The unknown-unit heuristic (`>1 \u2192 percent, else fraction`) misclassifies genuine percent values \u2264 1 (the planted `c-006` \"0.69 precent\" becomes 0.69 fraction, a 100\u00d7 error). It's documented, but only a generic `unknown_unit` warning marks it. **Low.**\n\n## Lines needing rewrite\n\nThe fixes are concentrated: the connect/ingest/upsert transaction model (~70 lines), warning-rule taxonomy and call sites (~20), input/run_id/header validation (~25), report query and CLI guards (~15). Roughly **130 lines** out of ~520 in the package \u2014 a focused refactor, not a rewrite.\n\n## Bottom line\n\n**No, I would not approve as-is** \u2014 but it's a \"request changes,\" not a \"start over.\" The stale-`results` bug (issue 1) means the tool's core deliverable, the data-quality report, can be wrong, and the non-atomic ingest plus silent-success failure modes (issues 2, 6, 7) are the kind of thing that bites exactly once, in prod. Fix the ingest transaction model and the silent failure paths and this is approvable; the parsing logic and test suite are genuinely solid.\n\n```json\n{\n  \"score\": 6.5,\n  \"issues\": [\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"99-101\", \"severity\": \"high\", \"description\": \"ingest clears warnings/stats but never clears results, so stale rows from prior ingests corrupt report counts\"},\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"93-124\", \"severity\": \"medium\", \"description\": \"ingest is non-atomic: stats wipe commits before rows load, so a mid-run crash leaves a mixed DB state\"},\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"153,194\", \"severity\": \"medium\", \"description\": \"missing_score warning rule reused for short CSV rows and invalid JSON lines, miscategorizing skip statistics\"},\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"216,232\", \"severity\": \"medium\", \"description\": \"empty/missing run_id accepted; such rows collide on UNIQUE(run_id, source) and silently overwrite each other\"},\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"405-411\", \"severity\": \"medium\", \"description\": \"duplicate detection only for source 'b'; duplicate run_ids in harness A/C silently overwrite uncounted\"},\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"45-52\", \"severity\": \"medium\", \"description\": \"connect() always runs init_db, so report on a missing/typo'd DB path silently creates an empty DB and prints zeros\"},\n    {\"file\": \"evalmerge/cli.py\", \"lines\": \"31\", \"severity\": \"medium\", \"description\": \"ingesting a nonexistent or empty directory succeeds silently with exit code 0\"},\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"229\", \"severity\": \"medium\", \"description\": \"malformed results.xml raises unhandled ParseError mid-ingest, violating the record-warnings-instead-of-crashing contract\"},\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"48-49,406\", \"severity\": \"medium\", \"description\": \"per-row transactions with synchronous=FULL and DELETE journal mode cause one fsync per row; ingest will not scale\"},\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"7,229\", \"severity\": \"low\", \"description\": \"xml.etree is vulnerable to entity-expansion DoS (billion laughs); use defusedxml if inputs are untrusted\"},\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"468-477\", \"severity\": \"low\", \"description\": \"GROUP_CONCAT ordering via ordered subquery is not guaranteed by SQLite; report output may be nondeterministic\"},\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"146-152\", \"severity\": \"low\", \"description\": \"CSV header never validated (reordered columns misparse) and 5-column rows are skipped despite having a valid score\"},\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"317\", \"severity\": \"low\", \"description\": \"naive %m/%d/%Y parsing assumes US ordering and UTC; ambiguous D/M/Y dates silently misparse\"},\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"297\", \"severity\": \"low\", \"description\": \"unknown-unit heuristic misclassifies percent values <= 1 as fractions (100x error) with only a generic warning\"}\n  ],\n  \"lines_to_rewrite\": 130,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-fable-5"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 10,
+  "cost_usd": 0.7838989999999999,
+  "parsed": {
+    "score": 6.5,
+    "issues": [
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "99-101",
+        "severity": "high",
+        "description": "ingest clears warnings/stats but never clears results, so stale rows from prior ingests corrupt report counts"
+      },
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "93-124",
+        "severity": "medium",
+        "description": "ingest is non-atomic: stats wipe commits before rows load, so a mid-run crash leaves a mixed DB state"
+      },
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "153,194",
+        "severity": "medium",
+        "description": "missing_score warning rule reused for short CSV rows and invalid JSON lines, miscategorizing skip statistics"
+      },
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "216,232",
+        "severity": "medium",
+        "description": "empty/missing run_id accepted; such rows collide on UNIQUE(run_id, source) and silently overwrite each other"
+      },
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "405-411",
+        "severity": "medium",
+        "description": "duplicate detection only for source 'b'; duplicate run_ids in harness A/C silently overwrite uncounted"
+      },
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "45-52",
+        "severity": "medium",
+        "description": "connect() always runs init_db, so report on a missing/typo'd DB path silently creates an empty DB and prints zeros"
+      },
+      {
+        "file": "evalmerge/cli.py",
+        "lines": "31",
+        "severity": "medium",
+        "description": "ingesting a nonexistent or empty directory succeeds silently with exit code 0"
+      },
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "229",
+        "severity": "medium",
+        "description": "malformed results.xml raises unhandled ParseError mid-ingest, violating the record-warnings-instead-of-crashing contract"
+      },
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "48-49,406",
+        "severity": "medium",
+        "description": "per-row transactions with synchronous=FULL and DELETE journal mode cause one fsync per row; ingest will not scale"
+      },
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "7,229",
+        "severity": "low",
+        "description": "xml.etree is vulnerable to entity-expansion DoS (billion laughs); use defusedxml if inputs are untrusted"
+      },
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "468-477",
+        "severity": "low",
+        "description": "GROUP_CONCAT ordering via ordered subquery is not guaranteed by SQLite; report output may be nondeterministic"
+      },
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "146-152",
+        "severity": "low",
+        "description": "CSV header never validated (reordered columns misparse) and 5-column rows are skipped despite having a valid score"
+      },
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "317",
+        "severity": "low",
+        "description": "naive %m/%d/%Y parsing assumes US ordering and UTC; ambiguous D/M/Y dates silently misparse"
+      },
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "297",
+        "severity": "low",
+        "description": "unknown-unit heuristic misclassifies percent values <= 1 as fractions (100x error) with only a generic warning"
+      }
+    ],
+    "lines_to_rewrite": 130,
+    "approve": false
+  },
+  "parse_error": null
+}

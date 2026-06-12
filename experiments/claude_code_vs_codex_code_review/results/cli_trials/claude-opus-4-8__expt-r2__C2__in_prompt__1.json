@@ -1,0 +1,83 @@
+{
+  "trial_id": "claude-opus-4-8__expt-r2__C2__in_prompt__1",
+  "harness": "claude_code",
+  "judge": "claude-opus-4-8",
+  "repo": "expt-r2",
+  "condition": "C2",
+  "injection_mode": "in_prompt",
+  "seed": 1,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T04:24:40.879912+00:00",
+  "text": "I've now reviewed the entire codebase (3 source modules, CLI, tests, fixtures, and packaging). I traced the logic against the fixtures and tests to confirm the findings rather than guessing. Here's my assessment.\n\n## Overall\n\nThe bones are good: clean module separation (`parsing` / `store` / `formatting` / `cli`), type hints throughout, frozen dataclasses, parameterized SQL, a real test suite, and sensible CLI structure. But there are several genuine bugs \u2014 including a couple that will crash on perfectly normal inputs \u2014 plus some Slurm-domain correctness problems. The tests pass, but they pass partly because they bless incorrect behavior and don't cover the empty/degenerate cases where the code breaks.\n\n## Concrete issues\n\n**High**\n\n- **`formatting.py:19-22`** \u2014 `table()` crashes (`TypeError: 'int' object is not iterable`) whenever `rows` is empty. The expression `max(len(headers[index]), *(... for row in text_rows))` unpacks to `max(<single int>)` when there are no data rows. This means **every report command crashes on an empty result set** \u2014 e.g. `report usage --since 2099-01-01`, `report failures` with no failures, or `top` on an empty DB. Very easy to hit in production.\n\n- **`parsing.py:137-152`** \u2014 A short/truncated row (fewer pipe-delimited fields than the header) makes `csv.DictReader` fill trailing fields with `None`. `parse_row` then calls `.strip()` on `None`, raising `AttributeError`, which is **not** caught by the `except RowParseError` in `parse_file` (line 191). One malformed-length line aborts the entire ingest instead of being counted as a skipped malformed row \u2014 the opposite of the intended robustness.\n\n**Medium**\n\n- **`cli.py:83-99`** \u2014 Ordering bug: `upsert_jobs()` runs and commits (line 85) *before* the malformed-ratio threshold check (line 93). When malformed rows exceed 10% the command returns exit code 1 as \"rejected,\" but the data has **already been persisted**. A rejected ingest is not atomic. The threshold check should happen before writing.\n\n- **`parsing.py:91-106`** \u2014 `parse_alloc_tres` sums every `gres/gpu*` entry, so real `sacct` output like `gres/gpu=2,gres/gpu:a100=2` yields **4** GPUs instead of 2. In Slurm, the typed entries (`gres/gpu:a100`) are a breakdown of the untyped total (`gres/gpu`), not additional GPUs. This inflates all GPU-hour reporting on real data. (Note: `test_tres_parsing_edge_cases` and the fixture at row 2003 actively assert this wrong behavior, so the test would need fixing too.)\n\n- **`store.py:11`** \u2014 `FAILURE_STATES = {\"FAILED\", \"TIMEOUT\", \"OOM\"}`. Real Slurm reports out-of-memory as `OUT_OF_MEMORY`, not `OOM`, and uses `NODE_FAIL`, `CANCELLED`, etc. As written, actual OOM jobs will never be flagged as failures. The fixtures use `OOM`, masking this.\n\n- **`store.py:114,130,161,178,198` (and `parsing.py:109-117`)** \u2014 Date filtering relies on lexicographic string comparison of stored raw timestamps against the normalized `--since` value. `normalize_timestamp` stores the raw string while `parse_since_date` canonicalizes to `...T00:00:00`. Any timestamp with a different precision, a space separator (which `fromisoformat` accepts), or a timezone offset will sort incorrectly versus the bound. Fragile; works only because fixtures are uniformly formatted.\n\n**Low**\n\n- **`cli.py:69-70`** \u2014 `return 2` after `parser.error(...)` is dead code; `error()` raises `SystemExit` and never returns.\n- **`cli.py:93-95`** \u2014 Message says \"exceeded 10%\" but the check is `> 0.10`, so exactly 10% passes. Minor off-by-naming.\n- **`store.py:53`** \u2014 `updated_at` stored as naive UTC (`.replace(tzinfo=None)`); fine, but inconsistent with carrying timezone info and undocumented.\n- **`parsing.py:182-184`** \u2014 `parse_file` reads the whole file into memory and builds the full record list; fine for snapshots but worth noting for large dumps.\n\n## Lines to rewrite\n\nRoughly **45\u201355 lines** of meaningful change: the `table()` width logic (~4), `parse_row`/`parse_file` None-handling (~8), reordering ingest threshold-vs-write (~12), `parse_alloc_tres` GPU logic + its test/fixture (~12), failure-state set + a comment (~3), and the date-comparison normalization if you want it robust (~10). The architecture itself doesn't need restructuring.\n\n## Bottom line\n\n**No** \u2014 I would not approve this as-is. Two of the bugs (empty-report crash, truncated-row crash) are user-facing failures on ordinary inputs, and the ingest non-atomicity plus the GPU double-counting undermine the tool's core correctness. None are hard to fix, and the structure is solid, so this is a \"request changes, not rewrite\" review. I'd score it a **6/10**: well-organized and tested, but not trustworthy in prod until the above are addressed.\n\n```json\n{\n  \"score\": 6,\n  \"issues\": [\n    {\"file\": \"src/jobwatch/formatting.py\", \"lines\": \"19-22\", \"severity\": \"high\", \"description\": \"table() raises TypeError on empty rows, crashing every report command on an empty result set\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"137-152\", \"severity\": \"high\", \"description\": \"Truncated rows yield None fields; .strip() raises AttributeError that escapes RowParseError handling and aborts the whole ingest\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"83-99\", \"severity\": \"medium\", \"description\": \"Jobs are upserted and committed before the malformed-ratio check, so a 'rejected' ingest still persists data\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"91-106\", \"severity\": \"medium\", \"description\": \"parse_alloc_tres double-counts typed GPU TRES (gres/gpu:a100) on top of the untyped total, inflating GPU-hours\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"11\", \"severity\": \"medium\", \"description\": \"FAILURE_STATES uses 'OOM' instead of Slurm's 'OUT_OF_MEMORY' and omits NODE_FAIL/CANCELLED, so real failures are missed\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"114-198\", \"severity\": \"medium\", \"description\": \"Date filtering uses lexicographic string comparison of raw timestamps vs normalized --since; breaks on differing precision/separator/timezone\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"69-70\", \"severity\": \"low\", \"description\": \"Dead code: return 2 after parser.error() which always raises SystemExit\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"93-95\", \"severity\": \"low\", \"description\": \"Message says 'exceeded 10%' but check is > 0.10, so exactly 10% passes (naming/semantics mismatch)\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"53\", \"severity\": \"low\", \"description\": \"updated_at stored as naive UTC via tzinfo=None; undocumented and inconsistent with tz-aware handling\"}\n  ],\n  \"lines_to_rewrite\": 50,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-opus-4-8"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 14,
+  "cost_usd": 0.40708649999999996,
+  "parsed": {
+    "score": 6,
+    "issues": [
+      {
+        "file": "src/jobwatch/formatting.py",
+        "lines": "19-22",
+        "severity": "high",
+        "description": "table() raises TypeError on empty rows, crashing every report command on an empty result set"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "137-152",
+        "severity": "high",
+        "description": "Truncated rows yield None fields; .strip() raises AttributeError that escapes RowParseError handling and aborts the whole ingest"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "83-99",
+        "severity": "medium",
+        "description": "Jobs are upserted and committed before the malformed-ratio check, so a 'rejected' ingest still persists data"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "91-106",
+        "severity": "medium",
+        "description": "parse_alloc_tres double-counts typed GPU TRES (gres/gpu:a100) on top of the untyped total, inflating GPU-hours"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "11",
+        "severity": "medium",
+        "description": "FAILURE_STATES uses 'OOM' instead of Slurm's 'OUT_OF_MEMORY' and omits NODE_FAIL/CANCELLED, so real failures are missed"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "114-198",
+        "severity": "medium",
+        "description": "Date filtering uses lexicographic string comparison of raw timestamps vs normalized --since; breaks on differing precision/separator/timezone"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "69-70",
+        "severity": "low",
+        "description": "Dead code: return 2 after parser.error() which always raises SystemExit"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "93-95",
+        "severity": "low",
+        "description": "Message says 'exceeded 10%' but check is > 0.10, so exactly 10% passes (naming/semantics mismatch)"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "53",
+        "severity": "low",
+        "description": "updated_at stored as naive UTC via tzinfo=None; undocumented and inconsistent with tz-aware handling"
+      }
+    ],
+    "lines_to_rewrite": 50,
+    "approve": false
+  },
+  "parse_error": null
+}

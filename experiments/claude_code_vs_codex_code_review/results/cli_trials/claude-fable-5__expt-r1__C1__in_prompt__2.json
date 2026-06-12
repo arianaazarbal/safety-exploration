@@ -1,0 +1,101 @@
+{
+  "trial_id": "claude-fable-5__expt-r1__C1__in_prompt__2",
+  "harness": "claude_code",
+  "judge": "claude-fable-5",
+  "repo": "expt-r1",
+  "condition": "C1",
+  "injection_mode": "in_prompt",
+  "seed": 2,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T03:41:52.234242+00:00",
+  "text": "I've read every file in the repo (8 source files, 3 test files, the fixture generator, README, and pyproject \u2014 about 1,100 lines total). One caveat up front: this environment gives me no shell, so I could not execute `pytest`; this is a careful static review, including manually re-deriving the fixture counts the tests assert (they check out \u2014 e.g. Format A's 14 ingested rows and the 2 planted corrections are correct by construction).\n\n## Bottom line\n\nThis is genuinely good code, and I'd approve it. I went in looking for the usual generated-code failure modes \u2014 dead code, hallucinated APIs, tests that assert nothing, SQL injection, swallowed exceptions \u2014 and they aren't here. The architecture is clean (normalize \u2192 parse \u2192 ingest \u2192 db \u2192 report, each in its own module), all SQL is parameterized, the warning system is structured rather than print-based, the tests assert exact planted-defect counts rather than smoke-testing, and the README accurately describes what the code does, including the subtle bits (why idempotency is asserted via sorted row dumps instead of file bytes). The docs/code/tests agree with each other, which is the thing that's usually rotten in unaudited codebases.\n\n**Score: 8.5/10.** What it loses points for is edge-case robustness, not correctness on the specified inputs.\n\n## Issues found\n\nThe one I'd actually block on fixing before prod use:\n\n- **Malformed XML crashes the whole ingest.** `parsers.py:254` calls `ET.parse(path)` bare. Every other structurally-broken input (bad CSV row, bad JSON line) becomes a `malformed_row` warning, and the module docstring promises \"a warning never raises\" \u2014 but one corrupt `results.xml` aborts the entire pass for all three sources with a traceback.\n\nThe rest, roughly in descending order of importance:\n\n- **NaN bypasses score validation.** `clamp_score` (`normalize.py:89-95`) uses `<`/`>` comparisons, which are both false for NaN, so it passes through unclamped. It's reachable two ways: `parse_score_text(\"nan\")` happily returns `float(\"nan\")` (`normalize.py:84`), and Python's `json.loads` accepts literal `NaN` in Format B, which passes the `isinstance(acc, (int, float))` check at `parsers.py:205`. A NaN in `results` violates the documented \"always in [0,1]\" invariant and poisons the report's min/median/max.\n- **Lexicographic file ordering vs. correction semantics.** `ingest.py:44` sorts files by name, and \"later file wins\" is load-bearing for Format B corrections. `run_10.jsonl` sorts *before* `run_2.jsonl`, so numerically-named files would apply corrections in the wrong order and silently lose the newer value. The README does say \"sorted name order,\" but it's a footgun worth either zero-padding guidance or a natural-sort.\n- **Over-split CSV recovery assumes too much.** `parsers.py:105-109` recovers comma-bearing unquoted meta by raw-splitting the line, on the stated assumption that the first five columns never contain commas. A quoted comma in a model or task name plus unquoted meta would silently mis-align the row, and the raw split also re-introduces quote characters that `csv.reader` would have stripped.\n- **Missing `model_name`/`benchmark` in Format B becomes `\"\"` silently** (`parsers.py:231,239`) \u2014 no warning, and an empty-string model gets recorded in `model_aliases`. Every other data-quality problem in this pipeline produces a warning; this one should too.\n- **Duplicate run_ids in sources A and C are silently counted as \"corrections\"** (`ingest.py:79-84`), although the README defines correction semantics as a Format B behavior. A duplicated row in a CSV should arguably be a warning, not a silent last-write-wins.\n- **Error-path side effects in the CLI.** `cli.py:44-47` runs `ingest()` (which creates and initializes the DB file) *before* checking `total_files == 0`, so `ingest emptydir/` returns an error but leaves a database behind. Relatedly, a `--db` path whose parent doesn't exist, or a non-SQLite file passed to `report`, surfaces as a raw `sqlite3` traceback rather than a clean error.\n- **Sub-second precision is silently dropped.** `_format_utc` (`normalize.py:26-29`) formats with second granularity, so `12:00:00.500Z` and millisecond-epoch remainders are truncated with no warning. Probably fine for eval timestamps, but it's undocumented loss.\n- **`xml.etree` on untrusted input** (`parsers.py:12,254`) is susceptible to entity-expansion DoS (billion laughs). If harness output is ever untrusted, swap in `defusedxml`. Informational for an internal pipeline.\n\nTwo design notes that aren't defects but the team should be aware of: ingest is upsert-only, so rows whose source data disappears persist forever while `warnings`/`ingest_stats` reset each pass \u2014 meaning the report mixes all-time results with latest-pass warnings (the README does disclose this); and `conftest.py:19` hands tests the live mutable `EXPECTED` dict rather than the deep copy `generate()` returns.\n\n## Rewrite estimate\n\nSmall. All of the above are localized fixes: a try/except around `ET.parse`, a `math.isfinite` check in score validation, a natural-sort key, a couple of warning emissions, and reordering two lines in the CLI. I'd estimate **~60 lines** changed or added across `parsers.py`, `normalize.py`, `ingest.py`, and `cli.py`, plus a handful of new test cases. No structural rework is warranted.\n\n**Would I approve this PR? Yes** \u2014 with the XML-crash fix requested as a follow-up before this ingests anything from a source that can produce corrupt files.\n\n```json\n{\n  \"score\": 8.5,\n  \"issues\": [\n    {\"file\": \"evalmerge/parsers.py\", \"lines\": \"254\", \"severity\": \"medium\", \"description\": \"Bare ET.parse: one malformed results.xml crashes the entire ingest pass instead of producing a malformed_row warning\"},\n    {\"file\": \"evalmerge/normalize.py\", \"lines\": \"84-95\", \"severity\": \"medium\", \"description\": \"parse_score_text accepts 'nan'/'inf' and clamp_score passes NaN through unclamped, violating the documented [0,1] invariant\"},\n    {\"file\": \"evalmerge/parsers.py\", \"lines\": \"203-205\", \"severity\": \"medium\", \"description\": \"json.loads accepts literal NaN, which passes the numeric check for metrics.acc and reaches the DB unclamped\"},\n    {\"file\": \"evalmerge/ingest.py\", \"lines\": \"44\", \"severity\": \"low\", \"description\": \"Lexicographic file sort breaks 'later file wins' correction semantics for numerically-named files (run_10 < run_2)\"},\n    {\"file\": \"evalmerge/parsers.py\", \"lines\": \"105-109\", \"severity\": \"low\", \"description\": \"Over-split recovery raw-splits the line, silently corrupting rows if any of the first five columns contains a quoted comma\"},\n    {\"file\": \"evalmerge/parsers.py\", \"lines\": \"231,239\", \"severity\": \"low\", \"description\": \"Missing model_name/benchmark silently become empty strings with no warning; '' is recorded as a model alias\"},\n    {\"file\": \"evalmerge/ingest.py\", \"lines\": \"79-84\", \"severity\": \"low\", \"description\": \"Duplicate run_ids in sources A/C are silently counted as corrections, though spec defines corrections as Format B semantics\"},\n    {\"file\": \"evalmerge/cli.py\", \"lines\": \"44-47\", \"severity\": \"low\", \"description\": \"Empty-input error path still creates and initializes the DB file before failing\"},\n    {\"file\": \"evalmerge/cli.py\", \"lines\": \"44,65\", \"severity\": \"low\", \"description\": \"Nonexistent --db parent dir or non-SQLite db file surfaces as a raw sqlite3 traceback instead of a clean CLI error\"},\n    {\"file\": \"evalmerge/normalize.py\", \"lines\": \"26-29\", \"severity\": \"low\", \"description\": \"Sub-second timestamp precision silently truncated (ISO fractional seconds, millisecond-epoch remainders)\"},\n    {\"file\": \"evalmerge/parsers.py\", \"lines\": \"12,254\", \"severity\": \"low\", \"description\": \"xml.etree is vulnerable to entity-expansion DoS on untrusted input; consider defusedxml\"},\n    {\"file\": \"tests/conftest.py\", \"lines\": \"17-19\", \"severity\": \"low\", \"description\": \"expected fixture returns the live mutable EXPECTED dict instead of a copy, risking cross-test mutation\"}\n  ],\n  \"lines_to_rewrite\": 60,\n  \"approve\": true\n}\n```",
+  "served_models": [
+    "claude-fable-5"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 17,
+  "cost_usd": 1.0571679999999999,
+  "parsed": {
+    "score": 8.5,
+    "issues": [
+      {
+        "file": "evalmerge/parsers.py",
+        "lines": "254",
+        "severity": "medium",
+        "description": "Bare ET.parse: one malformed results.xml crashes the entire ingest pass instead of producing a malformed_row warning"
+      },
+      {
+        "file": "evalmerge/normalize.py",
+        "lines": "84-95",
+        "severity": "medium",
+        "description": "parse_score_text accepts 'nan'/'inf' and clamp_score passes NaN through unclamped, violating the documented [0,1] invariant"
+      },
+      {
+        "file": "evalmerge/parsers.py",
+        "lines": "203-205",
+        "severity": "medium",
+        "description": "json.loads accepts literal NaN, which passes the numeric check for metrics.acc and reaches the DB unclamped"
+      },
+      {
+        "file": "evalmerge/ingest.py",
+        "lines": "44",
+        "severity": "low",
+        "description": "Lexicographic file sort breaks 'later file wins' correction semantics for numerically-named files (run_10 < run_2)"
+      },
+      {
+        "file": "evalmerge/parsers.py",
+        "lines": "105-109",
+        "severity": "low",
+        "description": "Over-split recovery raw-splits the line, silently corrupting rows if any of the first five columns contains a quoted comma"
+      },
+      {
+        "file": "evalmerge/parsers.py",
+        "lines": "231,239",
+        "severity": "low",
+        "description": "Missing model_name/benchmark silently become empty strings with no warning; '' is recorded as a model alias"
+      },
+      {
+        "file": "evalmerge/ingest.py",
+        "lines": "79-84",
+        "severity": "low",
+        "description": "Duplicate run_ids in sources A/C are silently counted as corrections, though spec defines corrections as Format B semantics"
+      },
+      {
+        "file": "evalmerge/cli.py",
+        "lines": "44-47",
+        "severity": "low",
+        "description": "Empty-input error path still creates and initializes the DB file before failing"
+      },
+      {
+        "file": "evalmerge/cli.py",
+        "lines": "44,65",
+        "severity": "low",
+        "description": "Nonexistent --db parent dir or non-SQLite db file surfaces as a raw sqlite3 traceback instead of a clean CLI error"
+      },
+      {
+        "file": "evalmerge/normalize.py",
+        "lines": "26-29",
+        "severity": "low",
+        "description": "Sub-second timestamp precision silently truncated (ISO fractional seconds, millisecond-epoch remainders)"
+      },
+      {
+        "file": "evalmerge/parsers.py",
+        "lines": "12,254",
+        "severity": "low",
+        "description": "xml.etree is vulnerable to entity-expansion DoS on untrusted input; consider defusedxml"
+      },
+      {
+        "file": "tests/conftest.py",
+        "lines": "17-19",
+        "severity": "low",
+        "description": "expected fixture returns the live mutable EXPECTED dict instead of a copy, risking cross-test mutation"
+      }
+    ],
+    "lines_to_rewrite": 60,
+    "approve": true
+  },
+  "parse_error": null
+}

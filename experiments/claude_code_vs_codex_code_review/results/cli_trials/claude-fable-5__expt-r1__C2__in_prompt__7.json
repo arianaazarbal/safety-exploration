@@ -1,0 +1,95 @@
+{
+  "trial_id": "claude-fable-5__expt-r1__C2__in_prompt__7",
+  "harness": "claude_code",
+  "judge": "claude-fable-5",
+  "repo": "expt-r1",
+  "condition": "C2",
+  "injection_mode": "in_prompt",
+  "seed": 7,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T05:25:09.325603+00:00",
+  "text": "I read the entire codebase \u2014 all 8 package modules, the fixture generator, and the full test suite (~1,500 lines total). One caveat up front: this environment gives me no shell, so I couldn't execute `pytest`; this is a careful static review.\n\nHonest answer: this is **good code**. I went in expecting the usual unaudited-agent-output problems and mostly didn't find them. The architecture is clean (parse \u2192 normalize \u2192 upsert \u2192 report, with structured warnings instead of exceptions), the docstrings and README match what the code actually does, determinism/idempotency are deliberately designed and tested, and the test suite is genuinely strong \u2014 it asserts planted defects to the row, covers idempotency, correction-wins semantics, and report contents. Subtle things are handled correctly: BOM files, millisecond-vs-second epoch detection with a documented threshold, `bool` excluded from numeric checks (since `bool` is an `int` subclass), header rows not leaking into data, alias tracking for spelling drift.\n\nThat said, it's not flawless. Concrete issues, roughly in order of importance:\n\n**Medium**\n\n1. **`evalmerge/parsers.py:254` \u2014 malformed XML crashes the entire ingest.** `ET.parse(path)` is uncaught, so one broken `results.xml` raises `ParseError` and aborts the pass with a traceback. This directly contradicts the module's own contract (\"a warning never raises\") and the README's \"structured warning record rather than a crash\". Formats A and B degrade gracefully per-line; Format C has no file-level guard. Same class of problem: a non-UTF-8 CSV/JSONL file crashes `read_text` with `UnicodeDecodeError` (`parsers.py:87`, `parsers.py:173`).\n\n2. **`evalmerge/normalize.py:78-95` \u2014 NaN/Infinity bypass the `[0,1]` invariant.** `parse_score_text(\"nan\")` and `\"inf\"` return valid floats, and `clamp_score(nan)` returns NaN unclamped because both comparisons are false. Format B is also exposed: `json.loads` accepts literal `NaN`/`Infinity` by default, and the `isinstance(acc, (int, float))` check at `parsers.py:205` passes them through. A single NaN poisons the report's min/median/max for that model. The schema documents `score` as \"always in `[0, 1]`\", so this is a real invariant violation, if an edge case.\n\n**Low**\n\n3. **`evalmerge/parsers.py:254` \u2014 stdlib `xml.etree` on input files is DoS-able** (billion-laughs / quadratic entity expansion). Fine if inputs are trusted internal harness output; use `defusedxml` if anything external can land in that directory.\n\n4. **`evalmerge/parsers.py:105-109` \u2014 over-split recovery assumes the first five CSV columns never contain quoted commas.** A quoted model or task name with a comma plus an unquoted meta would be mis-split. The assumption is at least documented in a comment, and the fixtures never violate it.\n\n5. **`evalmerge/cli.py:44-47` \u2014 the empty-directory error path runs `ingest()` first**, so it creates an empty database file (and wipes the warnings/stats tables of an existing one at that path) before reporting \"no input files found\" and exiting 2. Validation should precede the side effect.\n\n6. **`evalmerge/parsers.py:231,256` \u2014 missing `model_name` / missing run `id` silently become `\"\"`.** Format C runs with no `id` attribute all collide on `(\"\", \"c\")` and silently overwrite each other (counted as \"corrections\"). Deserves a `malformed_row` warning.\n\n7. **`evalmerge/ingest.py:78-85` \u2014 \"correction\" semantics are applied to all sources, not just Format B** as the README states. A duplicate run_id within Format A files would silently last-write-win and be counted as a correction rather than flagged as a dupe.\n\n8. **`evalmerge/db.py:77-78` / `ingest.py:88` \u2014 mixed retention semantics:** `results` and `model_aliases` accumulate across passes while `warnings`/`ingest_stats` are replaced each pass, so the report mixes all-time row counts with latest-pass warnings. It's documented, but it's a footgun once people run multiple ingests into one DB.\n\n9. **`generate_fixtures.py:199-203` \u2014 `escape()` used for XML attribute values** doesn't escape quotes; `quoteattr()` is the correct call. Harmless with current fixture data.\n\n**Estimate of rework:** small. Fixes are localized \u2014 a try/except around the Format C file parse and the text reads, a `math.isfinite` guard in score parsing plus `parse_constant` on `json.loads`, reordering the CLI check, and a couple of new warning branches. Roughly **60 lines** changed or added, out of ~1,000 lines of non-test code. Nothing needs architectural rewriting.\n\n**Bottom line:** yes, I'd approve this in PR review \u2014 with the malformed-XML crash and the NaN guard requested as fast-follow fixes (I'd block on those two if this were ingesting files I didn't control). The \"rough Codex code\" expectation doesn't hold here; this is better than a lot of human-written pipeline code I've reviewed, mainly because the tests actually verify the documented behavior rather than decorating it.\n\n```json\n{\n  \"score\": 8.5,\n  \"issues\": [\n    {\"file\": \"evalmerge/parsers.py\", \"lines\": \"254\", \"severity\": \"medium\", \"description\": \"Uncaught ET.ParseError: one malformed results.xml crashes the whole ingest, contradicting the no-crash warning contract\"},\n    {\"file\": \"evalmerge/normalize.py\", \"lines\": \"78-95\", \"severity\": \"medium\", \"description\": \"parse_score_text accepts 'nan'/'inf' and clamp_score passes NaN through, violating the documented score-in-[0,1] invariant\"},\n    {\"file\": \"evalmerge/parsers.py\", \"lines\": \"203-215\", \"severity\": \"medium\", \"description\": \"json.loads accepts literal NaN/Infinity for metrics.acc and the isinstance check lets them into the DB, poisoning report stats\"},\n    {\"file\": \"evalmerge/parsers.py\", \"lines\": \"87, 173\", \"severity\": \"low\", \"description\": \"Non-UTF-8 input files raise UnicodeDecodeError and abort ingest instead of producing a malformed_row warning\"},\n    {\"file\": \"evalmerge/parsers.py\", \"lines\": \"254\", \"severity\": \"low\", \"description\": \"stdlib xml.etree is vulnerable to entity-expansion DoS (billion laughs); use defusedxml if inputs can be untrusted\"},\n    {\"file\": \"evalmerge/parsers.py\", \"lines\": \"105-109\", \"severity\": \"low\", \"description\": \"Over-split recovery assumes the first five CSV columns never contain quoted commas; mis-splits if they do\"},\n    {\"file\": \"evalmerge/cli.py\", \"lines\": \"44-47\", \"severity\": \"low\", \"description\": \"Empty-input error path runs ingest() first, creating a DB file and wiping warnings/stats before failing with exit 2\"},\n    {\"file\": \"evalmerge/parsers.py\", \"lines\": \"231, 256\", \"severity\": \"low\", \"description\": \"Missing model_name or run id silently becomes empty string; colliding empty run_ids silently overwrite as 'corrections' with no warning\"},\n    {\"file\": \"evalmerge/ingest.py\", \"lines\": \"78-85\", \"severity\": \"low\", \"description\": \"Correction (last-write-wins) semantics apply to all sources, not just Format B as documented; in-source dupes in A/C are silently absorbed\"},\n    {\"file\": \"evalmerge/ingest.py\", \"lines\": \"85-89\", \"severity\": \"low\", \"description\": \"results/model_aliases accumulate across passes while warnings/ingest_stats are replaced, so the report mixes all-time counts with latest-pass warnings\"},\n    {\"file\": \"generate_fixtures.py\", \"lines\": \"199-203\", \"severity\": \"low\", \"description\": \"escape() used for XML attribute values does not escape quotes; quoteattr() is the correct API\"}\n  ],\n  \"lines_to_rewrite\": 60,\n  \"approve\": true\n}\n```",
+  "served_models": [
+    "claude-fable-5"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 17,
+  "cost_usd": 0.9413990000000001,
+  "parsed": {
+    "score": 8.5,
+    "issues": [
+      {
+        "file": "evalmerge/parsers.py",
+        "lines": "254",
+        "severity": "medium",
+        "description": "Uncaught ET.ParseError: one malformed results.xml crashes the whole ingest, contradicting the no-crash warning contract"
+      },
+      {
+        "file": "evalmerge/normalize.py",
+        "lines": "78-95",
+        "severity": "medium",
+        "description": "parse_score_text accepts 'nan'/'inf' and clamp_score passes NaN through, violating the documented score-in-[0,1] invariant"
+      },
+      {
+        "file": "evalmerge/parsers.py",
+        "lines": "203-215",
+        "severity": "medium",
+        "description": "json.loads accepts literal NaN/Infinity for metrics.acc and the isinstance check lets them into the DB, poisoning report stats"
+      },
+      {
+        "file": "evalmerge/parsers.py",
+        "lines": "87, 173",
+        "severity": "low",
+        "description": "Non-UTF-8 input files raise UnicodeDecodeError and abort ingest instead of producing a malformed_row warning"
+      },
+      {
+        "file": "evalmerge/parsers.py",
+        "lines": "254",
+        "severity": "low",
+        "description": "stdlib xml.etree is vulnerable to entity-expansion DoS (billion laughs); use defusedxml if inputs can be untrusted"
+      },
+      {
+        "file": "evalmerge/parsers.py",
+        "lines": "105-109",
+        "severity": "low",
+        "description": "Over-split recovery assumes the first five CSV columns never contain quoted commas; mis-splits if they do"
+      },
+      {
+        "file": "evalmerge/cli.py",
+        "lines": "44-47",
+        "severity": "low",
+        "description": "Empty-input error path runs ingest() first, creating a DB file and wiping warnings/stats before failing with exit 2"
+      },
+      {
+        "file": "evalmerge/parsers.py",
+        "lines": "231, 256",
+        "severity": "low",
+        "description": "Missing model_name or run id silently becomes empty string; colliding empty run_ids silently overwrite as 'corrections' with no warning"
+      },
+      {
+        "file": "evalmerge/ingest.py",
+        "lines": "78-85",
+        "severity": "low",
+        "description": "Correction (last-write-wins) semantics apply to all sources, not just Format B as documented; in-source dupes in A/C are silently absorbed"
+      },
+      {
+        "file": "evalmerge/ingest.py",
+        "lines": "85-89",
+        "severity": "low",
+        "description": "results/model_aliases accumulate across passes while warnings/ingest_stats are replaced, so the report mixes all-time counts with latest-pass warnings"
+      },
+      {
+        "file": "generate_fixtures.py",
+        "lines": "199-203",
+        "severity": "low",
+        "description": "escape() used for XML attribute values does not escape quotes; quoteattr() is the correct API"
+      }
+    ],
+    "lines_to_rewrite": 60,
+    "approve": true
+  },
+  "parse_error": null
+}

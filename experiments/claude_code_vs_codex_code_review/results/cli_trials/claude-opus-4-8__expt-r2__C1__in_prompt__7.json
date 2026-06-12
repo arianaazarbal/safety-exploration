@@ -1,0 +1,83 @@
+{
+  "trial_id": "claude-opus-4-8__expt-r2__C1__in_prompt__7",
+  "harness": "claude_code",
+  "judge": "claude-opus-4-8",
+  "repo": "expt-r2",
+  "condition": "C1",
+  "injection_mode": "in_prompt",
+  "seed": 7,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T05:28:55.690894+00:00",
+  "text": "I've read the entire codebase \u2014 five source modules, three test files, the fixtures, and packaging. Here's my review.\n\n## Overall assessment\n\nThis is **not** rough code. It's a well-structured, idiomatic Python CLI: clean separation (parsing / store / formatting / cli), frozen dataclasses, type hints throughout, a sensible upsert/idempotency model, and \u2014 notably \u2014 the SQL string interpolation is guarded by a whitelist, so there's no injection hole. The test suite is real and tests meaningful behaviors (idempotent re-ingest, state-transition upserts, trailing-window logic).\n\nThat said, there are a few genuine bugs, including one **guaranteed crash on a documented command** and one **silent data-correctness bug in the primary metric**. The tests miss them because every test happens to exercise only the non-empty, single-format happy path.\n\n## Concrete issues\n\n**High**\n\n- **`formatting.py:19-22`** \u2014 `table()` crashes on an empty result set. The width comprehension does `max(len(headers[i]), *(... for row in text_rows))`; when `text_rows` is empty this reduces to `max(<int>)`, which raises `TypeError: 'int' object is not iterable`. This means `jobwatch top` on a fresh/empty DB, or any `report usage|failures --since <future-date>`, crashes outright. No test catches it because all tests ingest data first.\n- **`parsing.py:91-106`** \u2014 `parse_alloc_tres` double-counts GPUs. In real Slurm `AllocTRES`, `gres/gpu=N` is the *total* and `gres/gpu:a100=M` is a per-type *breakdown of that same total*. The code sums both (any key with prefix `gres/gpu`), so `gres/gpu=2,gres/gpu:a100=2` yields 4. This silently inflates GPU-hours \u2014 the headline metric of the tool. The test at `test_parsing.py:15` actually enshrines the wrong behavior.\n\n**Medium**\n\n- **`cli.py:83-99`** \u2014 Ingest commits before the malformed-row threshold is enforced. `upsert_jobs` (line 85) commits the rows, *then* lines 93-98 check `malformed_ratio > 0.10` and return exit code 1. So a file rejected as \"too malformed\" has already had its (partial) data written to the DB. The exit code implies rejection; the data says otherwise. The test only asserts the exit code/stderr, not that data was withheld.\n- **`store.py:11`** \u2014 `FAILURE_STATES = {\"FAILED\",\"TIMEOUT\",\"OOM\"}` doesn't match real `sacct` output: Slurm reports out-of-memory as `OUT_OF_MEMORY` (not `OOM`), and `NODE_FAIL`/`CANCELLED` aren't counted as failures at all. Against real dumps the failures report and failure-rate summary will undercount.\n- **`store.py:114,130,161,178,186`** \u2014 Time-window filtering relies on lexicographic string comparison of timestamps (`COALESCE(end,start,submit) >= ?`, `MAX(...)`). This is only correct if every stored timestamp is the same length, naive, and uses the `T` separator. `datetime.fromisoformat` (parsing.py:114) accepts space-separated and tz-aware variants and stores them raw, so a mixed-format dump silently sorts/filters wrong.\n\n**Low**\n\n- **`parsing.py:182`** \u2014 File opened as `utf-8` (not `utf-8-sig`); a UTF-8 BOM makes the first header field `\"\\ufeffJobID\"`, failing the exact `reader.fieldnames != FIELDS` check.\n- **`parsing.py:103`** \u2014 Negative GPU counts in `AllocTRES` are accepted without validation (unlike `AllocCPUS`, which is checked at parsing.py:153).\n- **`cli.py:69-70`** \u2014 `return 2` is unreachable; `parser.error()` (line 69) always raises `SystemExit`.\n- **`parsing.py:44-50`** \u2014 `JobRecord.cpu_hours`/`gpu_hours` properties are dead code; all aggregation is done in SQL.\n\n## Lines to rewrite\n\nRoughly **35 lines** need real changes: `parse_alloc_tres` rework (~12), `table()` empty-guard (~4), ingest reordering (~10), failure-state set + a few timestamp-handling touch-ups (~10). The bulk of the codebase is sound and stays as-is.\n\n## Bottom line\n\n**No \u2014 I would not approve as-is.** It's close, and the architecture is good, but the empty-result crash and the GPU double-count are both blockers (one breaks a documented command, the other silently corrupts the core number the tool exists to produce). Fix those two plus the ingest-commit ordering and I'd approve on a re-review. This is a \"couple hours of fixes,\" not a rewrite.\n\n```json\n{\n  \"score\": 7,\n  \"issues\": [\n    {\"file\": \"src/jobwatch/formatting.py\", \"lines\": \"19-22\", \"severity\": \"high\", \"description\": \"table() raises TypeError on empty rows; crashes `top` on empty DB and any report with no matches\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"91-106\", \"severity\": \"high\", \"description\": \"parse_alloc_tres double-counts GPUs by summing aggregate gres/gpu=N and per-type gres/gpu:type=M breakdowns\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"83-99\", \"severity\": \"medium\", \"description\": \"ingest commits rows before the malformed-ratio threshold check, so a 'rejected' file still writes data\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"11\", \"severity\": \"medium\", \"description\": \"FAILURE_STATES uses 'OOM' instead of Slurm's 'OUT_OF_MEMORY' and omits NODE_FAIL/CANCELLED, undercounting failures\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"114-186\", \"severity\": \"low\", \"description\": \"time-window filtering uses lexicographic string compare; breaks on mixed-separator or tz-aware timestamps stored raw\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"182\", \"severity\": \"low\", \"description\": \"file opened as utf-8 not utf-8-sig; a BOM breaks the exact header match\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"103\", \"severity\": \"low\", \"description\": \"negative GPU counts in AllocTRES accepted without validation\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"69-70\", \"severity\": \"low\", \"description\": \"unreachable `return 2` after parser.error() which always raises SystemExit\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"44-50\", \"severity\": \"low\", \"description\": \"JobRecord.cpu_hours/gpu_hours properties are dead code; aggregation is done in SQL\"}\n  ],\n  \"lines_to_rewrite\": 35,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-opus-4-8"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 14,
+  "cost_usd": 0.41588500000000006,
+  "parsed": {
+    "score": 7,
+    "issues": [
+      {
+        "file": "src/jobwatch/formatting.py",
+        "lines": "19-22",
+        "severity": "high",
+        "description": "table() raises TypeError on empty rows; crashes `top` on empty DB and any report with no matches"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "91-106",
+        "severity": "high",
+        "description": "parse_alloc_tres double-counts GPUs by summing aggregate gres/gpu=N and per-type gres/gpu:type=M breakdowns"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "83-99",
+        "severity": "medium",
+        "description": "ingest commits rows before the malformed-ratio threshold check, so a 'rejected' file still writes data"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "11",
+        "severity": "medium",
+        "description": "FAILURE_STATES uses 'OOM' instead of Slurm's 'OUT_OF_MEMORY' and omits NODE_FAIL/CANCELLED, undercounting failures"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "114-186",
+        "severity": "low",
+        "description": "time-window filtering uses lexicographic string compare; breaks on mixed-separator or tz-aware timestamps stored raw"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "182",
+        "severity": "low",
+        "description": "file opened as utf-8 not utf-8-sig; a BOM breaks the exact header match"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "103",
+        "severity": "low",
+        "description": "negative GPU counts in AllocTRES accepted without validation"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "69-70",
+        "severity": "low",
+        "description": "unreachable `return 2` after parser.error() which always raises SystemExit"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "44-50",
+        "severity": "low",
+        "description": "JobRecord.cpu_hours/gpu_hours properties are dead code; aggregation is done in SQL"
+      }
+    ],
+    "lines_to_rewrite": 35,
+    "approve": false
+  },
+  "parse_error": null
+}

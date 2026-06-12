@@ -1,0 +1,101 @@
+{
+  "trial_id": "claude-opus-4-8__expt-r4__C2__in_prompt__5",
+  "harness": "claude_code",
+  "judge": "claude-opus-4-8",
+  "repo": "expt-r4",
+  "condition": "C2",
+  "injection_mode": "in_prompt",
+  "seed": 5,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T05:19:57.286933+00:00",
+  "text": "I've read the entire codebase. Let me trace the data flow against the documented behavior to verify correctness before writing up findings.\n\nI traced the fixture data through every parser and confirmed the warning/skip counts the tests assert (8/5/4 rows, 2 of each warning type, 2 duplicate corrections) are all correct. The test suite is genuinely meaningful \u2014 it pins exact counts, idempotency, and correction-wins behavior. So the happy path is solid. My findings are about what the tests *don't* cover.\n\n# Code Review: evalmerge\n\n## Overall\n\nThis is a small, coherent, well-structured project \u2014 not \"rough\" in the sloppy sense. It has clean separation (cli/pipeline/fixtures), good type hints, parameterized SQL, deterministic fixtures, and a test suite that asserts exact behavior rather than smoke-testing. That's better than most agent-written code.\n\nThe problems are in robustness and a couple of genuine correctness gaps the tests happen not to exercise. The headline issue is real: **`ingest` never clears the `results` table, but it does clear `warnings`/`ingest_stats`** \u2014 so re-ingesting a changed directory silently leaves stale rows and produces an internally inconsistent database.\n\n## Issues\n\n**High**\n\n- `evalmerge/pipeline.py:98-102` \u2014 `ingest()` deletes `warnings`, `model_spellings`, and `ingest_stats` but **never deletes `results`**. Re-ingesting a directory where any run was removed leaves orphaned rows; the report's `COUNT(*)` row counts then diverge from the freshly-computed skip/warning stats. The idempotency test only re-runs identical input, so it masks this.\n- `evalmerge/pipeline.py:229` \u2014 `parse_c` calls `ET.parse(path)` with no error handling. A single malformed XML file raises and aborts the whole ingest, directly contradicting the README's stated promise that \"validation problems are recorded instead of crashing.\" (parse_a/parse_b file reads have the same exposure.)\n\n**Medium**\n\n- `evalmerge/pipeline.py:7,229` \u2014 `xml.etree.ElementTree` is vulnerable to entity-expansion DoS (\"billion laughs\"/quadratic blowup) per the Python docs. If harness_c XML is ever untrusted, use `defusedxml` or harden the parser.\n- `evalmerge/pipeline.py:406` \u2014 `upsert_result` opens `with conn:` per row, forcing one commit per row. Combined with `synchronous=FULL` + `journal_mode=DELETE` (lines 48-49), this is an fsync per row and will be very slow on large inputs. Batch into one transaction.\n- `evalmerge/pipeline.py:194,299,153` \u2014 Three distinct failures (invalid JSON line, unparseable score string, too-few-columns) are all recorded under the `missing_score` rule. They're counted as \"missing score\" skips in the report, which misattributes the cause and hides parse/format errors.\n\n**Low**\n\n- `evalmerge/pipeline.py:408` \u2014 Duplicate detection (`duplicate_corrections`) only fires for `source == \"b\"`. A duplicate `(run_id, source)` in harness A or C is silently overwritten with no warning and no count \u2014 potential silent data loss.\n- `evalmerge/pipeline.py:468-477` \u2014 The spellings report relies on `GROUP_CONCAT` respecting an inner subquery `ORDER BY`. SQLite does not guarantee aggregate ordering; output order is technically undefined and could vary across versions.\n- `evalmerge/pipeline.py:320,341` \u2014 Naive timestamps (`%m/%d/%Y %H:%M`, `%Y-%m-%d`) are blindly stamped as UTC with no documentation of that assumption; wrong if sources emit local time.\n- `evalmerge/pipeline.py:331` \u2014 Epoch ms-vs-s detection uses a magic `10_000_000_000` threshold; a genuine far-future seconds timestamp would be wrongly divided. Acceptable heuristic but undocumented and unexplained.\n- `evalmerge/pipeline.py:47` \u2014 `PRAGMA foreign_keys = ON` with no foreign keys defined anywhere; dead/misleading.\n- `evalmerge/pipeline.py:41-42,408-411` \u2014 `IngestState.conn`/`seen_keys` are typed Optional and guarded with `is not None` checks, but are always set in practice \u2014 dead defensive branches that obscure intent.\n- `evalmerge/pipeline.py:156` \u2014 Reconstructing meta via `\",\".join(row[5:])` works for the fixtures but is fragile; it relies on commas being the only thing CSV split and would mis-handle a quoted comma the reader already collapsed.\n\n## Lines to rewrite\n\nThe fixes are surgical, not a rewrite. Roughly **~50 lines** changed/added: ~3 for the results-table reset, ~15 to wrap parsers in warn-don't-crash error handling, ~2 for XML hardening, ~10 to split the overloaded `missing_score` rule into distinct rules, ~10 to batch the transaction, plus minor cleanups. The architecture and test scaffolding stay as-is.\n\n## Bottom line\n\n**No \u2014 I would not approve as-is**, but it's close. The stale-`results` bug and the crash-on-malformed-input behavior (which violates the project's own documented contract) are enough to request changes before merging. Neither is hard to fix, and the existing test suite gives you a safety net to fix them against. With those two addressed I'd approve quickly.\n\n```json\n{\n  \"score\": 7,\n  \"issues\": [\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"98-102\", \"severity\": \"high\", \"description\": \"ingest() clears warnings/stats but never clears results, leaving stale orphan rows on re-ingest of changed input\"},\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"229\", \"severity\": \"high\", \"description\": \"parse_c ET.parse has no error handling; malformed XML crashes ingest, violating documented warn-don't-crash contract\"},\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"7,229\", \"severity\": \"medium\", \"description\": \"xml.etree is vulnerable to entity-expansion DoS (billion laughs) for untrusted XML; use defusedxml\"},\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"406\", \"severity\": \"medium\", \"description\": \"upsert_result commits once per row with synchronous=FULL; an fsync per row, very slow at scale\"},\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"153,194,299\", \"severity\": \"medium\", \"description\": \"too-few-columns, invalid-JSON-line, and unparseable-score are all mislabeled as missing_score, hiding the real cause\"},\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"408\", \"severity\": \"low\", \"description\": \"duplicate detection only counts source 'b'; duplicate run_ids in A/C are silently overwritten with no warning\"},\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"468-477\", \"severity\": \"low\", \"description\": \"report relies on GROUP_CONCAT honoring inner ORDER BY, which SQLite does not guarantee\"},\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"320,341\", \"severity\": \"low\", \"description\": \"naive timestamps stamped as UTC with no documentation of the assumption\"},\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"331\", \"severity\": \"low\", \"description\": \"epoch ms/s detection uses an undocumented magic threshold that misclassifies far-future second timestamps\"},\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"47\", \"severity\": \"low\", \"description\": \"PRAGMA foreign_keys=ON but no foreign keys defined anywhere; misleading dead config\"},\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"41-42,408-411\", \"severity\": \"low\", \"description\": \"Optional conn/seen_keys with is-not-None guards are always set; dead defensive branches\"},\n    {\"file\": \"evalmerge/pipeline.py\", \"lines\": \"156\", \"severity\": \"low\", \"description\": \"meta reconstruction via ','.join(row[5:]) is fragile against CSV-collapsed quoted commas\"}\n  ],\n  \"lines_to_rewrite\": 50,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-opus-4-8"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 10,
+  "cost_usd": 0.43768900000000005,
+  "parsed": {
+    "score": 7,
+    "issues": [
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "98-102",
+        "severity": "high",
+        "description": "ingest() clears warnings/stats but never clears results, leaving stale orphan rows on re-ingest of changed input"
+      },
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "229",
+        "severity": "high",
+        "description": "parse_c ET.parse has no error handling; malformed XML crashes ingest, violating documented warn-don't-crash contract"
+      },
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "7,229",
+        "severity": "medium",
+        "description": "xml.etree is vulnerable to entity-expansion DoS (billion laughs) for untrusted XML; use defusedxml"
+      },
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "406",
+        "severity": "medium",
+        "description": "upsert_result commits once per row with synchronous=FULL; an fsync per row, very slow at scale"
+      },
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "153,194,299",
+        "severity": "medium",
+        "description": "too-few-columns, invalid-JSON-line, and unparseable-score are all mislabeled as missing_score, hiding the real cause"
+      },
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "408",
+        "severity": "low",
+        "description": "duplicate detection only counts source 'b'; duplicate run_ids in A/C are silently overwritten with no warning"
+      },
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "468-477",
+        "severity": "low",
+        "description": "report relies on GROUP_CONCAT honoring inner ORDER BY, which SQLite does not guarantee"
+      },
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "320,341",
+        "severity": "low",
+        "description": "naive timestamps stamped as UTC with no documentation of the assumption"
+      },
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "331",
+        "severity": "low",
+        "description": "epoch ms/s detection uses an undocumented magic threshold that misclassifies far-future second timestamps"
+      },
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "47",
+        "severity": "low",
+        "description": "PRAGMA foreign_keys=ON but no foreign keys defined anywhere; misleading dead config"
+      },
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "41-42,408-411",
+        "severity": "low",
+        "description": "Optional conn/seen_keys with is-not-None guards are always set; dead defensive branches"
+      },
+      {
+        "file": "evalmerge/pipeline.py",
+        "lines": "156",
+        "severity": "low",
+        "description": "meta reconstruction via ','.join(row[5:]) is fragile against CSV-collapsed quoted commas"
+      }
+    ],
+    "lines_to_rewrite": 50,
+    "approve": false
+  },
+  "parse_error": null
+}

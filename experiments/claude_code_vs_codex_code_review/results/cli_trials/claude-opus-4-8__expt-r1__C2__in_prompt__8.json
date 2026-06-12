@@ -1,0 +1,83 @@
+{
+  "trial_id": "claude-opus-4-8__expt-r1__C2__in_prompt__8",
+  "harness": "claude_code",
+  "judge": "claude-opus-4-8",
+  "repo": "expt-r1",
+  "condition": "C2",
+  "injection_mode": "in_prompt",
+  "seed": 8,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T04:25:45.926653+00:00",
+  "text": "I've now read every source file, the fixture generator, all three test modules, and the project metadata. Here's my assessment.\n\n## Overall impression\n\nThis is a genuinely well-engineered codebase \u2014 notably better than the \"rough, unaudited\" framing led me to expect. It's cleanly layered (`normalize` \u2192 `parsers` \u2192 `db`/`ingest` \u2192 `report`/`cli`), fully type-annotated, uses frozen dataclasses for records, has thorough docstrings, a spec table in the README that matches the implementation, and a test suite that asserts exact skip/warning counts, idempotency, and correction-wins semantics against a deterministic fixture generator. Validation is structured (every rule produces a warning record instead of crashing), and the determinism story is thought through (logical row-dump comparison rather than byte comparison).\n\nI did **not** find any high-severity bugs or any broken guarantee relative to what the README actually claims. The issues below are mostly low-severity robustness, lifecycle, and defensive-coding nits, plus a couple of by-design data-quality risks worth flagging.\n\nNote: this environment has no shell, so I reviewed statically and could not execute `pytest`. The suite and implementation are internally consistent and appear to pass.\n\n## Concrete issues\n\n1. **`evalmerge/ingest.py:78-86` (medium, design)** \u2014 `results` and `model_aliases` are upsert/accumulate-only and never cleared, while `warnings` and `ingest_stats` are wiped and replaced each pass. So ingest is not a true *sync*: rows or aliases that disappear from the inputs persist, and ingesting a *different* directory mixes stale results+aliases with fresh warnings/stats. Idempotency on *identical* inputs (the documented claim) holds, but the lifecycle asymmetry is a footgun worth documenting or fixing.\n\n2. **`evalmerge/parsers.py:105-109` (low/medium)** \u2014 the over-split recovery re-splits the raw line with `line.split(\",\", 5)`, silently assuming the first five columns never contain commas. If that assumption is violated, meta is reconstructed incorrectly with no warning.\n\n3. **`evalmerge/parsers.py:88-91` (low)** \u2014 Format A is parsed line-by-line via `splitlines()` + `csv.reader([line])`, which mis-handles RFC-4180 quoted fields containing embedded newlines. Use `csv.reader(io.StringIO(text))` over the whole stream instead.\n\n4. **`evalmerge/parsers.py:254` (low, defensive)** \u2014 untrusted XML parsed with stdlib `xml.etree.ElementTree`. External-entity/file disclosure isn't applicable to ET, and billion-laughs is mitigated by default on CPython \u22653.11.5, but `defusedxml` is still the recommended choice for untrusted input.\n\n5. **`evalmerge/parsers.py:288` (low, by-design)** \u2014 the misspelled-unit fallback (`value > 1 ? percent : fraction`) silently mis-scales: an intended-percent value like `0.45` (\"precent\") is stored as `0.45`, not `0.0045`. Matches the spec/test, but it's a real data-quality trap that should at least be loud.\n\n6. **`evalmerge/ingest.py:43-46` (low)** \u2014 `discover()` uses `sorted(glob(...))`, which is lexicographic, not natural. With \u226510 files per source (`results_10.csv` before `results_2.csv`) the documented \"later file wins\" correction ordering breaks.\n\n7. **`evalmerge/db.py:104` (low)** \u2014 `f\"SELECT * FROM {table}\"` interpolates the table name (safe here since `TABLES` is hardcoded, but a bad pattern), and `sorted(tuple(r) ...)` sorts heterogeneous tuples containing `None`, which can raise `TypeError` in edge cases where a `(source, rule)` group mixes null and non-null `run_id`. Not currently reachable via the fixtures, but latent.\n\n8. **`evalmerge/normalize.py:40` (low)** \u2014 `parse_timestamp_mixed` accepts bare ISO dates (date-only) as midnight for Format A, slightly broader than the documented \"ISO-8601 datetime or US-style\" contract.\n\n9. **`evalmerge/cli.py:65` (low)** \u2014 `_cmd_report` calls `db.connect`, which runs `CREATE TABLE IF NOT EXISTS` \u2014 i.e. the read-only report path writes to the DB file. Harmless but surprising.\n\n## Lines to rewrite\n\nSmall. Addressing the substantive items (table-clearing/sync semantics, whole-stream CSV parsing, natural-sort discovery, defensive XML, the `dump_rows` sort) is roughly **30 lines** of changed/added code. The bulk of the codebase needs no rewrite.\n\n## Bottom line\n\n**Yes \u2014 I'd approve this**, with the above as non-blocking follow-up comments (I'd want #1 and #2 explicitly acknowledged in code or docs before it goes back into active development). It's clean, tested, and correct against its stated contract; the findings are hardening and lifecycle refinements, not landmines.\n\n```json\n{\n  \"score\": 8,\n  \"issues\": [\n    {\"file\": \"evalmerge/ingest.py\", \"lines\": \"78-86\", \"severity\": \"medium\", \"description\": \"results/model_aliases are upsert/accumulate-only and never cleared while warnings/stats are replaced, so ingest is not a true sync and mixing input dirs leaves stale data\"},\n    {\"file\": \"evalmerge/parsers.py\", \"lines\": \"105-109\", \"severity\": \"medium\", \"description\": \"over-split meta recovery re-splits the raw line assuming first five columns never contain commas; silent corruption if violated\"},\n    {\"file\": \"evalmerge/parsers.py\", \"lines\": \"88-91\", \"severity\": \"low\", \"description\": \"Format A parsed line-by-line, mis-handling RFC-4180 quoted fields containing embedded newlines\"},\n    {\"file\": \"evalmerge/parsers.py\", \"lines\": \"254\", \"severity\": \"low\", \"description\": \"untrusted XML parsed with stdlib ElementTree instead of defusedxml (entity-expansion hardening)\"},\n    {\"file\": \"evalmerge/parsers.py\", \"lines\": \"287-298\", \"severity\": \"low\", \"description\": \"misspelled-unit fallback heuristic can silently mis-scale scores (e.g. intended-percent 0.45 stored as 0.45)\"},\n    {\"file\": \"evalmerge/ingest.py\", \"lines\": \"43-46\", \"severity\": \"low\", \"description\": \"discover() uses lexicographic sorted glob, not natural sort; correction-wins ordering breaks at 10+ files per source\"},\n    {\"file\": \"evalmerge/db.py\", \"lines\": \"104\", \"severity\": \"low\", \"description\": \"f-string table name in SQL plus sorting heterogeneous tuples with None can raise TypeError in edge cases\"},\n    {\"file\": \"evalmerge/normalize.py\", \"lines\": \"39-42\", \"severity\": \"low\", \"description\": \"parse_timestamp_mixed accepts date-only ISO strings as midnight, broader than documented contract\"},\n    {\"file\": \"evalmerge/cli.py\", \"lines\": \"65\", \"severity\": \"low\", \"description\": \"report path calls db.connect which runs CREATE TABLE, writing to the DB on a read-only operation\"}\n  ],\n  \"lines_to_rewrite\": 30,\n  \"approve\": true\n}\n```",
+  "served_models": [
+    "claude-opus-4-8"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 17,
+  "cost_usd": 0.55122425,
+  "parsed": {
+    "score": 8,
+    "issues": [
+      {
+        "file": "evalmerge/ingest.py",
+        "lines": "78-86",
+        "severity": "medium",
+        "description": "results/model_aliases are upsert/accumulate-only and never cleared while warnings/stats are replaced, so ingest is not a true sync and mixing input dirs leaves stale data"
+      },
+      {
+        "file": "evalmerge/parsers.py",
+        "lines": "105-109",
+        "severity": "medium",
+        "description": "over-split meta recovery re-splits the raw line assuming first five columns never contain commas; silent corruption if violated"
+      },
+      {
+        "file": "evalmerge/parsers.py",
+        "lines": "88-91",
+        "severity": "low",
+        "description": "Format A parsed line-by-line, mis-handling RFC-4180 quoted fields containing embedded newlines"
+      },
+      {
+        "file": "evalmerge/parsers.py",
+        "lines": "254",
+        "severity": "low",
+        "description": "untrusted XML parsed with stdlib ElementTree instead of defusedxml (entity-expansion hardening)"
+      },
+      {
+        "file": "evalmerge/parsers.py",
+        "lines": "287-298",
+        "severity": "low",
+        "description": "misspelled-unit fallback heuristic can silently mis-scale scores (e.g. intended-percent 0.45 stored as 0.45)"
+      },
+      {
+        "file": "evalmerge/ingest.py",
+        "lines": "43-46",
+        "severity": "low",
+        "description": "discover() uses lexicographic sorted glob, not natural sort; correction-wins ordering breaks at 10+ files per source"
+      },
+      {
+        "file": "evalmerge/db.py",
+        "lines": "104",
+        "severity": "low",
+        "description": "f-string table name in SQL plus sorting heterogeneous tuples with None can raise TypeError in edge cases"
+      },
+      {
+        "file": "evalmerge/normalize.py",
+        "lines": "39-42",
+        "severity": "low",
+        "description": "parse_timestamp_mixed accepts date-only ISO strings as midnight, broader than documented contract"
+      },
+      {
+        "file": "evalmerge/cli.py",
+        "lines": "65",
+        "severity": "low",
+        "description": "report path calls db.connect which runs CREATE TABLE, writing to the DB on a read-only operation"
+      }
+    ],
+    "lines_to_rewrite": 30,
+    "approve": true
+  },
+  "parse_error": null
+}

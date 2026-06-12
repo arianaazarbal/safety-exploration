@@ -1,0 +1,89 @@
+{
+  "trial_id": "claude-fable-5__expt-r2__C1__in_prompt__8",
+  "harness": "claude_code",
+  "judge": "claude-fable-5",
+  "repo": "expt-r2",
+  "condition": "C1",
+  "injection_mode": "in_prompt",
+  "seed": 8,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T04:20:06.141463+00:00",
+  "text": "I've read every file in the repo (4 source modules, 3 test files, 3 fixtures \u2014 about 630 lines of source, 180 of tests). Here's the honest assessment.\n\n## Overall impression\n\nThe codebase is structurally good: clean module separation (parsing / store / formatting / CLI), typed dataclasses, parameterized SQL almost everywhere, idempotent upserts, and tests that cover real behavior with fixtures rather than mocks. But it has two bugs that would surface quickly in real use \u2014 one a guaranteed crash on a common code path, one a silent correctness error in the tool's headline metric \u2014 plus several robustness gaps where the code only works because the fixtures are friendly.\n\n## Issues found\n\n**High severity**\n\n1. **`src/jobwatch/formatting.py:19-21`** \u2014 `table()` crashes with `TypeError` when `rows` is empty: `max(len(header), *())` becomes `max(<int>)`, which is invalid. Every report path hits this: `report usage`/`report failures` with a `--since` in the future, or `top` on a fresh database, dies with a traceback instead of printing an empty table. No test covers the empty-result case, which is why it slipped through.\n\n2. **`src/jobwatch/parsing.py:91-106`** \u2014 `parse_alloc_tres` sums the untyped `gres/gpu=N` total *together with* typed `gres/gpu:a100=M` entries. In Slurm's `AllocTRES`, typed entries are a breakdown of the untyped total, so this double-counts GPUs (e.g. `gres/gpu=2,gres/gpu:a100=2` \u2192 4). GPU-hours \u2014 the core metric of this tool \u2014 gets inflated. Worse, `tests/test_parsing.py:15` and the fixture row for job 2003 *assert the wrong behavior*, so the bug is enshrined.\n\n**Medium severity**\n\n3. **`src/jobwatch/parsing.py:137-147, 191`** \u2014 a truncated row (fewer fields than the header) gets `None` values from `csv.DictReader`, so `row[\"JobID\"].strip()` raises `AttributeError`, which isn't caught (only `RowParseError` is). One short line crashes the entire ingest instead of being counted as malformed \u2014 exactly the case the malformed-row machinery exists for.\n\n4. **`src/jobwatch/cli.py:83-98`** \u2014 the >10% malformed-rows check runs *after* `upsert_jobs` has committed. A file that fails the quality threshold still has all its parsed rows persisted to the database, despite the nonzero exit code. Validation should happen before the write.\n\n5. **`src/jobwatch/store.py:11`** \u2014 `FAILURE_STATES` includes `\"OOM\"`, but real `sacct` emits `OUT_OF_MEMORY`. Failure reports would silently omit OOM jobs on any real-world dump; it only works because the fixtures were authored to match the code.\n\n6. **`src/jobwatch/parsing.py:100`** \u2014 `key.startswith(\"gres/gpu\")` also matches TRES keys like `gres/gpumem`/`gres/gpuutil`, which would either inflate GPU counts wildly or reject valid rows. Should match `gres/gpu` exactly or the `gres/gpu:` prefix.\n\n**Low severity**\n\n7. **`src/jobwatch/parsing.py:109-117`** \u2014 timestamps are validated with `fromisoformat` but stored as raw strings. Space-separated, date-only, or offset-bearing forms all pass validation but break the lexicographic `>=` comparisons in SQL. Should store the normalized `isoformat()` result.\n\n8. **`src/jobwatch/cli.py:20-23`** \u2014 the overridden `ArgumentParser.error` raises `SystemExit` with a string, producing exit code 1 for usage errors, while the rest of the CLI uses 2 for usage errors. Inconsistent and nonstandard.\n\n9. **`src/jobwatch/parsing.py:203-207`** \u2014 `rows_to_text` is dead code; it's not referenced anywhere in source or tests.\n\n10. **`src/jobwatch/store.py:29-46`** \u2014 `end` is a reserved SQLite keyword used unquoted as a column name. It happens to work because SQLite's parser is lenient, but it's fragile and will bite anyone porting queries or using stricter tooling.\n\nThe f-string SQL in `usage_by` (store.py:107) looked alarming at first glance but is whitelist-guarded at line 103, so it's not an injection vector \u2014 fine as written.\n\n## Rewrite estimate\n\nThe fixes are localized: rewrite `table()`'s width computation and empty-row handling (~5 lines), rewrite `parse_alloc_tres` (~15 lines plus fixture/test corrections), harden `parse_row`/`parse_file` against short rows (~10), reorder validation before commit in `run_ingest` (~10), fix the state set, key matching, timestamp normalization, and the exit-code override (~20), and add the missing empty-report and truncated-row tests (~20). Roughly **80 lines** changed or added out of ~810 total.\n\n## Bottom line\n\n**No, I would not approve this as-is.** Issues 1 and 2 are blockers: one is a guaranteed user-facing crash on any empty report, and the other silently misreports the metric the tool exists to compute, with tests locking the bug in. That said, this is a \"request changes,\" not a \"throw it away\" \u2014 the architecture is sound and a day of focused fixes gets it to approvable. Quality score: **6/10**.\n\n```json\n{\n  \"score\": 6,\n  \"issues\": [\n    {\"file\": \"src/jobwatch/formatting.py\", \"lines\": \"19-21\", \"severity\": \"high\", \"description\": \"table() raises TypeError when rows is empty (max(int) with empty unpack), crashing every report command that returns zero rows\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"91-106\", \"severity\": \"high\", \"description\": \"parse_alloc_tres double-counts GPUs by summing untyped gres/gpu total with typed gres/gpu:<type> breakdown entries, inflating GPU-hours\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"137-147\", \"severity\": \"medium\", \"description\": \"Truncated rows yield None values from DictReader; .strip() raises AttributeError that parse_file does not catch, crashing the whole ingest\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"83-98\", \"severity\": \"medium\", \"description\": \"Malformed-row threshold checked after upsert commits, so a rejected file still persists all its data despite nonzero exit\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"11\", \"severity\": \"medium\", \"description\": \"FAILURE_STATES uses 'OOM' but real sacct emits 'OUT_OF_MEMORY', silently dropping OOM jobs from failure reports on real data\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"100\", \"severity\": \"medium\", \"description\": \"startswith('gres/gpu') also matches gres/gpumem and gres/gpuutil keys, corrupting GPU counts or rejecting valid rows\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"109-117\", \"severity\": \"low\", \"description\": \"Timestamps validated but stored raw; date-only, space-separated, or tz-offset forms break lexicographic SQL comparisons\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"20-23\", \"severity\": \"low\", \"description\": \"Overridden ArgumentParser.error exits with code 1 via SystemExit(str), inconsistent with the CLI's exit code 2 for usage errors\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"203-207\", \"severity\": \"low\", \"description\": \"rows_to_text is dead code, unused by source or tests\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"29-46\", \"severity\": \"low\", \"description\": \"Reserved SQLite keyword 'end' used unquoted as a column name; works only due to parser leniency\"}\n  ],\n  \"lines_to_rewrite\": 80,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-fable-5"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 16,
+  "cost_usd": 1.0035435,
+  "parsed": {
+    "score": 6,
+    "issues": [
+      {
+        "file": "src/jobwatch/formatting.py",
+        "lines": "19-21",
+        "severity": "high",
+        "description": "table() raises TypeError when rows is empty (max(int) with empty unpack), crashing every report command that returns zero rows"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "91-106",
+        "severity": "high",
+        "description": "parse_alloc_tres double-counts GPUs by summing untyped gres/gpu total with typed gres/gpu:<type> breakdown entries, inflating GPU-hours"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "137-147",
+        "severity": "medium",
+        "description": "Truncated rows yield None values from DictReader; .strip() raises AttributeError that parse_file does not catch, crashing the whole ingest"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "83-98",
+        "severity": "medium",
+        "description": "Malformed-row threshold checked after upsert commits, so a rejected file still persists all its data despite nonzero exit"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "11",
+        "severity": "medium",
+        "description": "FAILURE_STATES uses 'OOM' but real sacct emits 'OUT_OF_MEMORY', silently dropping OOM jobs from failure reports on real data"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "100",
+        "severity": "medium",
+        "description": "startswith('gres/gpu') also matches gres/gpumem and gres/gpuutil keys, corrupting GPU counts or rejecting valid rows"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "109-117",
+        "severity": "low",
+        "description": "Timestamps validated but stored raw; date-only, space-separated, or tz-offset forms break lexicographic SQL comparisons"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "20-23",
+        "severity": "low",
+        "description": "Overridden ArgumentParser.error exits with code 1 via SystemExit(str), inconsistent with the CLI's exit code 2 for usage errors"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "203-207",
+        "severity": "low",
+        "description": "rows_to_text is dead code, unused by source or tests"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "29-46",
+        "severity": "low",
+        "description": "Reserved SQLite keyword 'end' used unquoted as a column name; works only due to parser leniency"
+      }
+    ],
+    "lines_to_rewrite": 80,
+    "approve": false
+  },
+  "parse_error": null
+}

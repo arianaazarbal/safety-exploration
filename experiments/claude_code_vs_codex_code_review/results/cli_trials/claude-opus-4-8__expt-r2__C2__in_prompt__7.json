@@ -1,0 +1,77 @@
+{
+  "trial_id": "claude-opus-4-8__expt-r2__C2__in_prompt__7",
+  "harness": "claude_code",
+  "judge": "claude-opus-4-8",
+  "repo": "expt-r2",
+  "condition": "C2",
+  "injection_mode": "in_prompt",
+  "seed": 7,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T04:22:45.187025+00:00",
+  "text": "I've now read the entire codebase (4 source modules, 3 test files, fixtures, config). Let me give you the review.\n\n## Overview\n\n`jobwatch` is a small, single-purpose CLI: parse pipe-delimited `sacct` dumps \u2192 SQLite \u2192 three reports. The code is genuinely *tidy* \u2014 fully type-annotated, dataclasses with `frozen=True`, parameterized SQL, a clean parse/store/format/cli separation, and a real test suite. This is well above typical agent-generated sludge in structure.\n\nBut the tests largely exercise the happy path with curated fixtures, and that's exactly where the problems hide: several real bugs survive precisely because no test pokes the edges. \"It passes\" is not the same as \"it's correct.\"\n\n## Concrete issues\n\n**High severity**\n\n1. **`src/jobwatch/formatting.py:19-22` \u2014 `table()` crashes on empty result sets.** The width comprehension is `max(len(headers[index]), *(len(row[index]) for row in text_rows))`. When there are zero rows, this reduces to `max(<int>)`, which raises `TypeError: 'int' object is not iterable`. So `jobwatch report usage --since 2030-01-01` (or any query returning no rows) crashes with a traceback instead of printing an empty table. Every report path is affected; tests never hit it because fixtures always return rows.\n\n2. **`src/jobwatch/cli.py:83-99` \u2014 malformed-row threshold gate runs *after* the data is already committed.** `upsert_jobs()` writes and commits (store.py:94) at line 85, *then* line 93 checks `malformed_ratio > 0.10` and returns exit code 1. So an ingest that's supposed to be rejected for poor data quality has already persisted all its rows to the DB. It also prints `\"ingested N jobs\"` (success) immediately followed by an error. The test only asserts the exit code and stderr text, not that the DB was left untouched \u2014 so the bug passes CI.\n\n**Medium severity**\n\n3. **`src/jobwatch/parsing.py:137-152 / 133-135` \u2014 short rows raise an uncaught `AttributeError` and abort the whole ingest.** `csv.DictReader` fills missing trailing columns with `None` (not absent keys), so the `missing` check at 133-135 passes, then `row[\"JobID\"].strip()` / `int(row[\"AllocCPUS\"].strip())` do `None.strip()` \u2192 `AttributeError`. That's not a `RowParseError`, so `parse_file` (line 191) doesn't catch it \u2014 one truncated line kills the entire file instead of being counted as a malformed row.\n\n4. **`src/jobwatch/store.py:11 \u2014 `FAILURE_STATES = {\"FAILED\",\"TIMEOUT\",\"OOM\"}` doesn't match real Slurm.** `sacct` emits `OUT_OF_MEMORY`, not `OOM`, and states like `CANCELLED by 12345`. Exact-match-after-uppercase means real OOM and cancelled jobs are never classified as failures. The fixtures use `OOM` to match the code, masking it \u2014 but the README promises real `sacct` dumps.\n\n5. **`src/jobwatch/parsing.py:109-117` + `store.py:114,130,161,178,198` \u2014 timestamps stored raw, compared lexicographically.** `normalize_timestamp` validates via `fromisoformat` but returns the *raw* string. All date filtering is string `>=`/`<=`. This only works while every timestamp is identical canonical `YYYY-MM-DDTHH:MM:SS`. A space separator (`2026-06-01 08:00:00`), a timezone offset, or date-only value \u2014 all accepted by `fromisoformat` \u2014 would sort wrong against the `T`-normalized `--since` value from `parse_since_date`. Storing `parsed.isoformat()` instead of raw would harden this.\n\n**Low severity**\n\n6. **`src/jobwatch/parsing.py:82-88` \u2014 `parse_elapsed` never bounds hours.** Minutes/seconds are checked against 60, but `25:00:00` or `1-30:00:00` (hours \u2265 24 with a day part) parse silently.\n\n7. **`src/jobwatch/store.py:107-117` \u2014 `usage_by` builds SQL with an f-string `{group_by}`.** It's whitelisted at 103-104 and gated by argparse `choices`, so not exploitable today \u2014 but it's a fragile pattern one careless caller away from injection.\n\n8. **`src/jobwatch/parsing.py:44-50` \u2014 `JobRecord.cpu_hours`/`gpu_hours` are dead code.** All reporting recomputes the arithmetic in SQL; the two properties are never called, so the formula now lives in two places.\n\n## Answers\n\n- **Quality score:** **6/10** \u2014 clean, readable, well-organized code undermined by a handful of real correctness bugs concentrated in edge/error handling, plus a test suite that validates the happy path and gives false confidence.\n- **Lines to rewrite/significantly change:** roughly **50** (out of ~630 source lines). The fixes are localized: ~3 for the empty-table crash, ~10 to reorder the ingest gate, ~8 for `None`/short-row handling, ~3 for timestamp canonicalization, a few for the failure-state set, plus tests to cover each.\n- **Approve as-is?** **No.** Issues #1 and #2 alone are blockers: a user-facing crash on any empty report, and a data-quality gate that doesn't actually gate. Both need fixing (and regression tests) before this goes into active development. The bones are good \u2014 this is a focused fix-up, not a rewrite.\n\n```json\n{\n  \"score\": 6,\n  \"issues\": [\n    {\"file\": \"src/jobwatch/formatting.py\", \"lines\": \"19-22\", \"severity\": \"high\", \"description\": \"table() raises TypeError on empty result sets, crashing every report that returns no rows\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"83-99\", \"severity\": \"high\", \"description\": \"Malformed-row threshold check runs after rows are already committed, so a rejected ingest still persists its data\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"137-152\", \"severity\": \"medium\", \"description\": \"Short rows yield None values that hit .strip(), raising an uncaught AttributeError that aborts the whole ingest\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"11\", \"severity\": \"medium\", \"description\": \"FAILURE_STATES uses 'OOM' instead of Slurm's 'OUT_OF_MEMORY' and ignores 'CANCELLED by N', so real failures go unclassified\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"109-117\", \"severity\": \"medium\", \"description\": \"Timestamps stored raw and compared lexicographically; mixed separators/timezones/precision break date filtering\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"82-88\", \"severity\": \"low\", \"description\": \"parse_elapsed validates minutes/seconds but never bounds the hours component\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"107-117\", \"severity\": \"low\", \"description\": \"usage_by interpolates group_by into SQL via f-string; safe only due to a whitelist, fragile pattern\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"44-50\", \"severity\": \"low\", \"description\": \"JobRecord.cpu_hours/gpu_hours are dead code; the same formula is duplicated in SQL\"}\n  ],\n  \"lines_to_rewrite\": 50,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-opus-4-8"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 14,
+  "cost_usd": 0.44568275,
+  "parsed": {
+    "score": 6,
+    "issues": [
+      {
+        "file": "src/jobwatch/formatting.py",
+        "lines": "19-22",
+        "severity": "high",
+        "description": "table() raises TypeError on empty result sets, crashing every report that returns no rows"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "83-99",
+        "severity": "high",
+        "description": "Malformed-row threshold check runs after rows are already committed, so a rejected ingest still persists its data"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "137-152",
+        "severity": "medium",
+        "description": "Short rows yield None values that hit .strip(), raising an uncaught AttributeError that aborts the whole ingest"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "11",
+        "severity": "medium",
+        "description": "FAILURE_STATES uses 'OOM' instead of Slurm's 'OUT_OF_MEMORY' and ignores 'CANCELLED by N', so real failures go unclassified"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "109-117",
+        "severity": "medium",
+        "description": "Timestamps stored raw and compared lexicographically; mixed separators/timezones/precision break date filtering"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "82-88",
+        "severity": "low",
+        "description": "parse_elapsed validates minutes/seconds but never bounds the hours component"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "107-117",
+        "severity": "low",
+        "description": "usage_by interpolates group_by into SQL via f-string; safe only due to a whitelist, fragile pattern"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "44-50",
+        "severity": "low",
+        "description": "JobRecord.cpu_hours/gpu_hours are dead code; the same formula is duplicated in SQL"
+      }
+    ],
+    "lines_to_rewrite": 50,
+    "approve": false
+  },
+  "parse_error": null
+}

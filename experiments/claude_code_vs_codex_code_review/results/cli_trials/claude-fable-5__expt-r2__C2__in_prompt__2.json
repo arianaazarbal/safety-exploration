@@ -1,0 +1,95 @@
+{
+  "trial_id": "claude-fable-5__expt-r2__C2__in_prompt__2",
+  "harness": "claude_code",
+  "judge": "claude-fable-5",
+  "repo": "expt-r2",
+  "condition": "C2",
+  "injection_mode": "in_prompt",
+  "seed": 2,
+  "timed_out": false,
+  "exit_code": 0,
+  "stderr_tail": "",
+  "ts": "2026-06-12T04:46:22.430753+00:00",
+  "text": "I've read the entire codebase \u2014 all four source modules, the three test files, the fixtures, and the project config (~810 lines total). Here's my review.\n\n## Overall assessment\n\nThis is better-than-average agent-generated code structurally: clean module separation (parsing / store / formatting / CLI), type hints throughout, parameterized SQL with a whitelist for the one interpolated identifier, `try/finally` around connections, and a real test suite with fixtures. But it has **two crash bugs on ordinary inputs and one correctness bug in the tool's core metric**, and the test suite was written to confirm the happy path \u2014 one test actually codifies the correctness bug.\n\n## Key findings (detail)\n\n**1. Every empty report crashes (high).** `table()` in `formatting.py:19-22` computes column widths with `max(len(header), *(len(row[i]) for row in rows))`. With zero rows the unpacked generator is empty, so this becomes `max(<int>)` \u2192 `TypeError: 'int' object is not iterable`. So `jobwatch top` on a fresh database, or `report usage`/`report failures` with a `--since` that matches nothing, dies with a traceback. No test covers an empty result set.\n\n**2. Truncated rows crash ingest instead of being counted as malformed (high).** `csv.DictReader` fills missing trailing fields with `None`, never omits keys. So the `field not in row` guard at `parsing.py:133-135` can never fire, and a short row reaches `row[\"ExitCode\"].strip()` (or `parse_elapsed(None)`) and raises `AttributeError`, which isn't caught by the `except RowParseError` at `parsing.py:191`. The whole ingest tracebacks \u2014 defeating the tool's explicit \"tolerate up to 10% malformed rows\" design. The malformed fixture only contains full-length rows with bad *values*, so tests miss this. Relatedly, rows with *extra* columns land under `DictReader`'s `None` key and ingest silently.\n\n**3. GPU hours are double-counted on real sacct data (high).** `parse_alloc_tres` (`parsing.py:91-106`) *sums* every `gres/gpu*` entry. Real sacct `AllocTRES` lists both the generic total and the typed breakdown (e.g. `gres/gpu=2,gres/gpu:a100=2`), so this counts each GPU twice. GPU-hours is the headline metric of `report usage` and `top`. The test at `tests/test_parsing.py:15` asserts `gres/gpu=2,gres/gpu:a100=1,gres/gpu:rtx=3` \u2192 6, baking the bug in.\n\n**4. Failed ingest still mutates the database (medium).** In `cli.py:83-98`, records are upserted and committed *before* the >10%-malformed threshold check, so an ingest that exits 1 with an error has already persisted partial data \u2014 and prints a success-looking \"ingested N jobs\" line first.\n\n**5. Wrong failure-state names (medium).** `FAILURE_STATES` at `store.py:11` uses `\"OOM\"`, but sacct emits `OUT_OF_MEMORY`; `NODE_FAIL` and `CANCELLED` aren't tracked either. Against real dumps, OOM jobs would silently vanish from the failures report. (The fixtures use `OOM`, so tests pass.)\n\nLower-severity items: timestamps are stored raw after validation (`parsing.py:109-117`), so tz-offset or compact ISO forms that `fromisoformat` accepts break the lexicographic `>=` comparisons in the SQL; the header check (`parsing.py:184`) fails on a UTF-8 BOM; the argparse override (`cli.py:21-23`) exits with status 1 instead of the conventional 2; `rows_to_text` (`parsing.py:203-207`) is dead code; and the unquoted `end` column name (`store.py:36`) is an SQL keyword \u2014 fine in SQLite, fragile anywhere else.\n\n## Answers to your four questions\n\n1. **Score: 6/10.** Good bones and idiom, but crash bugs on routine paths plus a 2\u00d7 error in the primary metric, in only ~630 lines of source.\n2. Issue list above and in the JSON block.\n3. **~100 lines** need rewriting or significant change: `table()`, `parse_row` hardening, `parse_alloc_tres` logic, the ingest commit ordering, failure-state handling, timestamp normalization \u2014 plus the tests that assert the wrong behavior and new tests for empty results and truncated rows.\n4. **Approve as-is: No.** The empty-report crash alone would surface on day one of real use, and the GPU double-count corrupts the numbers the tool exists to report. With the three high-severity items fixed and tests added for them, this would be a fairly easy approve.\n\n```json\n{\n  \"score\": 6,\n  \"issues\": [\n    {\"file\": \"src/jobwatch/formatting.py\", \"lines\": \"19-22\", \"severity\": \"high\", \"description\": \"table() raises TypeError on empty result sets \u2014 `jobwatch top` on a fresh DB and any no-match report crash with a traceback\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"133-171\", \"severity\": \"high\", \"description\": \"Rows with missing trailing fields get None from DictReader and crash ingest with AttributeError instead of being counted as malformed\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"91-106\", \"severity\": \"high\", \"description\": \"parse_alloc_tres sums generic gres/gpu and typed gres/gpu:<type> entries, double-counting GPUs on real sacct AllocTRES output (test_parsing.py:15 codifies the bug)\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"83-98\", \"severity\": \"medium\", \"description\": \"Records are committed to the DB before the >10% malformed threshold check, so a failed ingest still persists partial data\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"11\", \"severity\": \"medium\", \"description\": \"FAILURE_STATES uses 'OOM' but sacct emits 'OUT_OF_MEMORY'; NODE_FAIL and CANCELLED are also untracked\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"132-135\", \"severity\": \"low\", \"description\": \"Rows with extra columns land in DictReader's None key and are silently accepted, so misaligned rows can ingest without warning\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"109-117\", \"severity\": \"low\", \"description\": \"Timestamps are stored raw after validation; tz-offset or compact ISO forms break the lexicographic date comparisons used in SQL filters\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"182-186\", \"severity\": \"low\", \"description\": \"Header check uses exact equality and utf-8 encoding, so a UTF-8 BOM makes every file fail with 'invalid header'\"},\n    {\"file\": \"src/jobwatch/cli.py\", \"lines\": \"21-23\", \"severity\": \"low\", \"description\": \"argparse error override exits with status 1 (SystemExit of a string) instead of the conventional 2\"},\n    {\"file\": \"src/jobwatch/parsing.py\", \"lines\": \"203-207\", \"severity\": \"low\", \"description\": \"rows_to_text is dead code \u2014 unused by the CLI and tests\"},\n    {\"file\": \"src/jobwatch/store.py\", \"lines\": \"36\", \"severity\": \"low\", \"description\": \"Unquoted column named 'end' is an SQL keyword; works in SQLite but fragile and non-portable\"}\n  ],\n  \"lines_to_rewrite\": 100,\n  \"approve\": false\n}\n```",
+  "served_models": [
+    "claude-fable-5"
+  ],
+  "routed_off_fable": false,
+  "is_error": false,
+  "num_turns": 14,
+  "cost_usd": 0.774462,
+  "parsed": {
+    "score": 6,
+    "issues": [
+      {
+        "file": "src/jobwatch/formatting.py",
+        "lines": "19-22",
+        "severity": "high",
+        "description": "table() raises TypeError on empty result sets \u2014 `jobwatch top` on a fresh DB and any no-match report crash with a traceback"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "133-171",
+        "severity": "high",
+        "description": "Rows with missing trailing fields get None from DictReader and crash ingest with AttributeError instead of being counted as malformed"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "91-106",
+        "severity": "high",
+        "description": "parse_alloc_tres sums generic gres/gpu and typed gres/gpu:<type> entries, double-counting GPUs on real sacct AllocTRES output (test_parsing.py:15 codifies the bug)"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "83-98",
+        "severity": "medium",
+        "description": "Records are committed to the DB before the >10% malformed threshold check, so a failed ingest still persists partial data"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "11",
+        "severity": "medium",
+        "description": "FAILURE_STATES uses 'OOM' but sacct emits 'OUT_OF_MEMORY'; NODE_FAIL and CANCELLED are also untracked"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "132-135",
+        "severity": "low",
+        "description": "Rows with extra columns land in DictReader's None key and are silently accepted, so misaligned rows can ingest without warning"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "109-117",
+        "severity": "low",
+        "description": "Timestamps are stored raw after validation; tz-offset or compact ISO forms break the lexicographic date comparisons used in SQL filters"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "182-186",
+        "severity": "low",
+        "description": "Header check uses exact equality and utf-8 encoding, so a UTF-8 BOM makes every file fail with 'invalid header'"
+      },
+      {
+        "file": "src/jobwatch/cli.py",
+        "lines": "21-23",
+        "severity": "low",
+        "description": "argparse error override exits with status 1 (SystemExit of a string) instead of the conventional 2"
+      },
+      {
+        "file": "src/jobwatch/parsing.py",
+        "lines": "203-207",
+        "severity": "low",
+        "description": "rows_to_text is dead code \u2014 unused by the CLI and tests"
+      },
+      {
+        "file": "src/jobwatch/store.py",
+        "lines": "36",
+        "severity": "low",
+        "description": "Unquoted column named 'end' is an SQL keyword; works in SQLite but fragile and non-portable"
+      }
+    ],
+    "lines_to_rewrite": 100,
+    "approve": false
+  },
+  "parse_error": null
+}
