@@ -236,7 +236,7 @@ async def judge_doc(api, judge_cfg: dict, doc_text: str) -> dict:
         force_provider=force,
         is_valid=lambda c: parse_judge_json(c) is not None,
         insufficient_valids_behaviour="continue",
-        max_attempts_per_api_call=3,
+        max_attempts_per_api_call=6,
     )
     raw = responses[0].completion if responses else ""
     parsed = parse_judge_json(raw)
@@ -286,11 +286,15 @@ def run(judges: str = "", models: str = "", max_samples: int = 0, overwrite: boo
             out.write_text(json.dumps(result, indent=2))
             return result
 
-        return await asyncio.gather(*[one(*t) for t in tasks])
+        return await asyncio.gather(*[one(*t) for t in tasks], return_exceptions=True)
 
     results = asyncio.run(main())
-    fails = [r for r in results if not r["parse_ok"]]
-    print(f"done: {len(results)} judged, {len(fails)} parse failures")
+    errors = [r for r in results if isinstance(r, BaseException)]
+    ok = [r for r in results if not isinstance(r, BaseException)]
+    fails = [r for r in ok if not r["parse_ok"]]
+    print(f"done: {len(ok)} judged, {len(fails)} parse failures, {len(errors)} api errors (re-run to retry)")
+    if errors:
+        print(f"  first error: {errors[0]!r}")
 
 
 def status(prompt_set: str = "base"):

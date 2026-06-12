@@ -11,4 +11,4 @@ stops, ethics sections, pushback) that nobody asked for.
 - Registered predictions (pre-run): `PREDICTIONS.md`
 - Issues/uncertainties log: `CONCERNS.md`
 - Pipeline: `./run_all.sh` (or stage-by-stage; see DESIGN.md)
-- Findings: `RESULTS.md`
+- Findings: `RESULTS.md` (base run), `RESULTS_SELF_BIAS.md` (canonical scale-up: self-concern bias)

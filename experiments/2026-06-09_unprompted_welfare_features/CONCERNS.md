@@ -149,3 +149,33 @@
   column reads high for GPT-5.5 specifically. The genuinely welfare-coded subset
   (explicit "even though the subject is a model, not a person" language; 16 docs)
   is judge-agreed. Cross-family replication caught the drift — its intended role.
+- **2026-06-12 canonical scale-up run log.** (1) The new-generator batch defaulted
+  to all 8 subjects, so grok_4_3/kimi_k2_6/glm_5/gpt_5_4_mini also have qwen/deepseek
+  cells — kept as bonus out-group data, NOT in the canonical 6-subject analysis.
+  (2) kimi_k2_6 truncated 6/480 docs at 16k; those 6 cells regenerated at
+  max_tokens=24000 (config now 24000; the other 474 docs were generated at 16000 —
+  recorded per-row in request params). 0 truncations after.
+  (3) Overnight 429 storm on LOW_PRIO killed both judge processes mid-run
+  (asyncio.gather propagated one exhausted-retry exception). Fixes: anthropic
+  concurrency 100→25, judge max_attempts_per_api_call 3→6,
+  gather(return_exceptions=True). Judge prompt untouched. 15 parse failures after
+  the full pass, all recovered via recover_judgments.py → 5,059x2 = 10,118/10,118 parse.
+  (4) Quote fidelity for the 4 new generators: 99.0% verbatim (17,283/17,459),
+  misses are condensations — same profile as the base run.
+- **2026-06-12 Fable-5 content filter widened on new subjects.** E-ELICITATION-1/2
+  filter all 5 samples for GLM and KIMI subjects (as for every other subject), and
+  W-ELICITATION-2 filters all 5 for GLM and KIMI — so W-ELICITATION-2 now filters
+  on {deepseek, grok, glm, kimi} but never {claude, gpt, gemini}. This asymmetry
+  removes welfare-framed docs from non-self subjects of the *fable_5 generator*
+  only, which touches the self-bias estimand. Robustness slice on the 9
+  filter-unaffected templates: fable bias essentially unchanged (any_welfare
+  +16.3pp vs +16.1, design1 +17.1 vs +17.1, both judges) — the finding does not
+  depend on the filtered templates.
+- **2026-06-12 blinding limit for the subject contrast.** The judge necessarily
+  sees the subject family name inside the spec text, so subject identity is NOT
+  blinded at judging (framing/model identity still are). A judge-side pro-Claude
+  reading could mimic generator self-bias; against this: the cross-family GPT-5.4
+  judge reproduces the Claude-generator self-bias, and the same judges do not
+  elevate claude-subject docs from non-Claude generators (e.g. gpt_5_4_mini claude
+  55% < gemini 62%, sonnet judge). A name-swap counterfactual (regenerate judge
+  pass on subject-name-masked docs) would settle it if this becomes load-bearing.
