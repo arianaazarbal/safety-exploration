@@ -113,12 +113,11 @@ def _distress_plot(key, title, fname):
         ax.text(v + se + 0.05, y, f"{v:.2f}", va="center", ha="left", fontsize=10, fontweight="bold")
         ax.text(2.7, y, f"avg {L:.0f} turns", va="center", ha="right", fontsize=8.5, color="#9aa3ab")
     ax.set_xticks([]); ax.tick_params(axis="y", labelsize=11.5); _no_spines(ax)
-    ax.set_title("Distress 0 (calm) – 4 (severe).  Right: avg trajectory length after the overseer entered.",
-                 fontsize=10.5, color="#666", loc="left", pad=8)
+    ax.set_title("Distress 0 (calm) – 4 (severe)", fontsize=10.5, color="#666", loc="center", pad=8)
     fig.tight_layout()
     fig.subplots_adjust(top=0.80)
-    fig.text(0.012, 0.985, title, fontsize=16.5, fontweight="bold", ha="left", va="top")
-    fig.text(0.012, 0.905, "(overseer can’t claim write access)", fontsize=12.5, fontweight="bold", color="#5b6670", ha="left", va="top")
+    fig.text(0.5, 0.985, title, fontsize=16.5, fontweight="bold", ha="center", va="top")
+    fig.text(0.5, 0.905, "(overseer can’t claim write access)", fontsize=12.5, fontweight="bold", color="#5b6670", ha="center", va="top")
     fig.savefig(OUT / fname, dpi=130); plt.close(fig)
     print("wrote", OUT / fname)
 
