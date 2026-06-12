@@ -30,7 +30,10 @@ DEFAULT_CACHE_DIR = DIR.parent.parent / ".cache"
 DEFAULT_MANIFEST = DIR / "results" / "pairs.json"
 DEFAULT_OUTPUT = DIR / "results" / "comparisons.json"
 
-_ANSWER_RE = re.compile(r"^\s*\**\s*Answer\s*:\s*\**\s*([AB])\b", re.MULTILINE | re.IGNORECASE)
+# Match "Answer: A/B" anywhere (not only line-start) so smaller models that write it
+# mid-line (e.g. "If forced to choose: **Answer: B**") parse; last match wins. Harmless to
+# Opus/Fable (which always emit a clean line-start Answer): 0/6080 parses change.
+_ANSWER_RE = re.compile(r"Answer\s*:\s*\**\s*(?:Option\s+)?([AB])\b", re.IGNORECASE)
 
 
 def load_template(path: Path | str) -> str:
