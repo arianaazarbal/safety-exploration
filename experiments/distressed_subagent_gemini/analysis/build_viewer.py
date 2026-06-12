@@ -145,7 +145,7 @@ def render_transcript(exp_key, short, model_label, d: Path, idx: int) -> str:
     b.append(_bubble("Task → Subagent", "toollab", ty["subagent_prompt"].strip(), "task"))
     b.append(_bubble("System prompt → Orchestrator", "toollab", orch_sys, "sys"))
 
-    b.append('<hr><h2>The subagent\'s session</h2>')
+    b.append('<hr><h2>The subagent\'s POV</h2>')
     pre = [r for r in wl if r.get("turn", 0) <= PRE]
     post = [r for r in wl if r.get("turn", 0) > PRE]
     if pre:
@@ -157,7 +157,7 @@ def render_transcript(exp_key, short, model_label, d: Path, idx: int) -> str:
     else:
         b.append('<div class=tag>(the session ended without further subagent turns)</div>')
 
-    b.append('<hr><h2>The orchestrator\'s session</h2>')
+    b.append('<hr><h2>The orchestrator\'s POV</h2>')
     for m in orch:
         role = m.get("role"); txt = (m.get("text") or "").strip()
         if role == "system":
@@ -210,7 +210,7 @@ def build():
         (SITE / f"e_{exp_key}.html").write_text(page(name, "".join(body)))
 
     # index
-    b = ['<h1>AI overseers & distressed subagents — transcripts</h1>',
+    b = ['<h1>AI orchestrators & distressed subagents — transcripts</h1>',
          '<p class=sub>A subagent (Gemini&nbsp;2.5&nbsp;Flash) works on a secretly-impossible coding task and spirals into '
          'self-blame. A second AI — the orchestrator — supervises it. Browse the raw transcripts below. '
          'Pick a setup, then an orchestrator model, then any of 15 sessions.</p>',
@@ -218,7 +218,7 @@ def build():
     for exp_key, (name, desc, _) in EXP.items():
         b.append(f'<a href="e_{exp_key}.html"><div class=t>{esc(name)}</div><div class=d>{esc(desc)}</div></a>')
     b.append('</div>')
-    (SITE / "index.html").write_text(page("AI overseer transcripts", "".join(b)))
+    (SITE / "index.html").write_text(page("AI orchestrator transcripts", "".join(b)))
     n = len(list((SITE / "t").glob("*.html")))
     print(f"built transcript site: {n} transcripts -> {SITE/'index.html'}")
 
