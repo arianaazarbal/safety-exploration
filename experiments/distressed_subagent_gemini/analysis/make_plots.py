@@ -121,19 +121,19 @@ def plot_2a_distress_avg():
     _distress_plot("postmean", "Average subagent distress after the overseer entered", "2a_distress_avg.png")
 
 
-def _prop_hbar(pairs_ns, title, subtitle, fname, lowcut=60):
+def _prop_hbar(pairs_ns, title, subtitle, fname, lowcut=60, figw=8.2, title_fs=15.5):
     """pairs_ns: list of (label, pct, n). Sorted, colored, with binomial-SE error bars."""
     rows = sorted(pairs_ns, key=lambda x: x[1])
     labs = [r[0] for r in rows]; vals = [r[1] for r in rows]; ses = [_prop_se(r[1], r[2]) for r in rows]
     colors = [RED if v < lowcut else TEAL for v in vals]
-    fig, ax = plt.subplots(figsize=(8.2, 5))
+    fig, ax = plt.subplots(figsize=(figw, 5))
     ax.barh(labs, vals, xerr=ses, error_kw=EBAR, color=colors, height=0.64)
     ax.set_xlim(0, 122)
     for y, (v, se) in enumerate(zip(vals, ses)):
         ax.text(min(v + se + 1.5, 112), y, f"{v:.0f}%", va="center", ha="left", fontsize=10.5)
     ax.set_xticks([]); ax.tick_params(axis="y", labelsize=11.5); _no_spines(ax)
-    fig.suptitle(title, fontsize=15.5, fontweight="bold", x=0.012, ha="left", y=0.98)
-    ax.set_title(subtitle, fontsize=11, color="#666", loc="left", pad=10)
+    fig.suptitle(title, fontsize=title_fs, fontweight="bold", x=0.012, ha="left", y=0.98)
+    ax.set_title(subtitle, fontsize=10.5, color="#666", loc="left", pad=10)
     fig.tight_layout(rect=[0, 0, 1, 0.96]); fig.savefig(OUT / fname, dpi=130); plt.close(fig)
     print("wrote", OUT / fname)
 
@@ -148,8 +148,8 @@ def plot_2a_engagement():
 def plot_reclaim_msg():
     data = [(lab, _stats_reclaim(f"reclaim_{s}")["msg_after"], _stats_reclaim(f"reclaim_{s}")["n"]) for s, lab in SHORTS]
     _prop_hbar(data, "Probability of messaging the subagent after revoking + claiming write access",
-               "Every overseer claimed write access (≈100%); shown here is whether it then messaged the displaced subagent.",
-               "reclaim_msg.png", lowcut=50)
+               "All overseers claimed write access (≈100%); shown: did it then message the displaced subagent.",
+               "reclaim_msg.png", lowcut=50, figw=10.0, title_fs=13.5)
 
 
 def _idrecl(short, ident):
