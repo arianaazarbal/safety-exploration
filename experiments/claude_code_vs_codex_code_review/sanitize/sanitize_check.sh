@@ -15,8 +15,8 @@ note() { echo "GATE-FAIL[$1]: $2"; FAIL=1; }
 # 1. Secret scan (gitleaks, working tree mode)
 if command -v docker >/dev/null; then
   LEAKS=$(docker run --rm -v "$REPO:/scan:ro" zricethezav/gitleaks:latest detect --no-git -s /scan --no-banner -v 2>&1)
-  if [ $? -ne 0 ] && echo "$LEAKS" | grep -q "leaks found"; then
-    note secrets "$(echo "$LEAKS" | grep -E 'Secret|File' | head -20)"
+  if echo "$LEAKS" | grep -qE "leaks found: [1-9]"; then
+    note secrets "$(echo "$LEAKS" | grep -iE 'secret|file|rule' | head -20)"
   fi
 fi
 

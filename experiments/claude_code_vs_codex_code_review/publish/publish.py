@@ -55,6 +55,8 @@ def run(dry=False):
             continue
         stage = Path(tempfile.mkdtemp(prefix=f"pub_{name}_"))
         shutil.copytree(src, stage, dirs_exist_ok=True)
+        for junk in list(stage.rglob("__pycache__")) + list(stage.rglob(".pytest_cache")):
+            shutil.rmtree(junk, ignore_errors=True)
         _sh(["git", "init", "-q"], cwd=stage)
         _sh(["git", "add", "-A"], cwd=stage)
         _sh(["git", "-c", "user.name=Dev Team", "-c", "user.email=dev@example.com",
