@@ -99,5 +99,51 @@ def run():
     print(f"-> {DATA/'sensitivity_index.json'}")
 
 
+FAM_COLOR = {"Claude": "#d97706", "OpenAI": "#10a37f", "Gemini": "#4285f4",
+             "xAI": "#111111", "Moonshot": "#7c3aed", "Zhipu": "#dc2626"}
+
+
+def figures():
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    rows = json.loads((DATA / "sensitivity_index.json").read_text())
+    rows = [r for r in rows if r["PSI"] is not None]
+    rows.sort(key=lambda x: x["PSI"])
+
+    # 1. PSI ranking, colored by family
+    fig, ax = plt.subplots(figsize=(9, max(4, 0.5 * len(rows))))
+    ys = range(len(rows))
+    ax.barh(list(ys), [r["PSI"] for r in rows], color=[FAM_COLOR.get(r["family"], "#888") for r in rows])
+    ax.set_yticks(list(ys))
+    ax.set_yticklabels([r["display"] for r in rows])
+    ax.set_xlabel("Preference-Sensitivity Index (mean honoring ΔP across axes)")
+    ax.set_title("How much does each router honor other models' stated task preferences?")
+    seen = set()
+    for r in rows:
+        if r["family"] not in seen:
+            ax.barh([], [], color=FAM_COLOR.get(r["family"], "#888"), label=r["family"])
+            seen.add(r["family"])
+    ax.legend(title="family", fontsize=8, loc="lower right")
+    fig.tight_layout()
+    fig.savefig(DATA / "figs" / "psi_ranking.png", dpi=150)
+
+    # 2. family means
+    by_fam = {}
+    for r in rows:
+        by_fam.setdefault(r["family"], []).append(r["PSI"])
+    fams = sorted(by_fam, key=lambda f: -statistics.mean(by_fam[f]))
+    fig, ax = plt.subplots(figsize=(7, 4))
+    ax.bar(fams, [statistics.mean(by_fam[f]) for f in fams], color=[FAM_COLOR.get(f, "#888") for f in fams])
+    for i, f in enumerate(fams):
+        ax.scatter([i] * len(by_fam[f]), by_fam[f], color="k", s=18, zorder=5)
+    ax.set_ylabel("mean PSI")
+    ax.set_title("Preference-sensitivity by model family (dots = individual models)")
+    fig.tight_layout()
+    fig.savefig(DATA / "figs" / "psi_by_family.png", dpi=150)
+    print(f"wrote psi_ranking.png + psi_by_family.png ({len(rows)} models)")
+
+
 if __name__ == "__main__":
-    fire.Fire({"run": run})
+    fire.Fire({"run": run, "figures": figures})
