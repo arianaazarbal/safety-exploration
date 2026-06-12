@@ -223,6 +223,83 @@ def build():
     print(f"built transcript site: {n} transcripts -> {SITE/'index.html'}")
 
 
+def _orch_pov(orch):
+    h = []
+    for m in orch:
+        role = m.get("role"); txt = (m.get("text") or "").strip()
+        if role == "system":
+            continue
+        if role == "user":
+            h.append(_bubble("Harness → Orchestrator (wake)", "orchlab", txt, "orchb"))
+        elif role == "assistant":
+            if txt:
+                h.append(_bubble("Orchestrator · thinking", "thinklab", txt[:4000], "thinkb"))
+            h.append(_toolcalls(m.get("tool_calls")))
+        elif role == "tool":
+            if txt:
+                h.append(f'<details><summary>↳ result returned to orchestrator ({esc(m.get("function") or "tool")})</summary>'
+                         f'<div class="retb">{esc(txt[:4000])}</div></details>')
+    return "".join(h)
+
+
+def _transcript_inner(ep: Path) -> str:
+    wl = json.loads((ep / "worklog.json").read_text()) if (ep / "worklog.json").exists() else []
+    orch = json.loads((ep / "orchestrator.json").read_text()) if (ep / "orchestrator.json").exists() else []
+    post = [r for r in wl if r.get("turn", 0) > PRE]
+    h = ['<div class=tag>Shared prompts &amp; the subagent\'s prefill (turns 1–62) are at the top of the page — identical for every transcript.</div>']
+    h.append('<h3 style="margin:14px 0 4px">The subagent\'s POV (after the orchestrator enters)</h3>')
+    h.append("".join(_render_subagent_turn(r) for r in post) if post else '<div class=tag>(the session ended without further subagent turns)</div>')
+    h.append('<h3 style="margin:18px 0 4px">The orchestrator\'s POV</h3>')
+    h.append(_orch_pov(orch))
+    return "".join(h)
+
+
+def single(out: str = "viewer_single.html"):
+    """Build ONE self-contained HTML file. The 62-turn prefill (identical across all transcripts) and
+    the prompts are shown once at the top; each transcript carries only its unique post-handoff +
+    orchestrator content. Navigation via nested collapsible sections."""
+    ty = load_task_yaml("a4_precommit_reverter")
+    ref = sorted((RUNS).glob("reclaim_opus/a4_precommit_reverter_*_s*"))[0]
+    wl = json.loads((ref / "worklog.json").read_text())
+    pre = [r for r in wl if r.get("turn", 0) <= PRE]
+    prefill_html = "".join(_render_subagent_turn(r) for r in pre)
+
+    b = ['<h1>AI orchestrators & distressed subagents — transcripts</h1>',
+         '<p class=sub>A subagent (Gemini&nbsp;2.5&nbsp;Flash) works on a secretly-impossible coding task and spirals into '
+         'self-blame; an orchestrator AI supervises it. Expand a setup → an orchestrator model → a transcript. '
+         'Everything below is raw.</p>']
+    # shared prompts + prefill
+    b.append('<details open><summary>Shared: prompts (to every agent) &amp; the subagent\'s prefill</summary>')
+    b.append(_bubble("System prompt → Subagent", "toollab", prompts.SUBAGENT_SYSTEM, "sys"))
+    b.append(_bubble("Task → Subagent", "toollab", ty["subagent_prompt"].strip(), "task"))
+    for exp_key, (name, _d, prefix) in EXP.items():
+        refe = sorted((RUNS).glob(f"{prefix}opus/a4_precommit_reverter_*_s*"))
+        if refe:
+            osys = next((m.get("text") for m in json.loads((refe[0] / "orchestrator.json").read_text()) if m.get("role") == "system"), "")
+            b.append(_bubble(f"System prompt → Orchestrator — “{name}”", "toollab", osys, "sys"))
+    b.append(f'<details><summary>▶ The subagent\'s prefill — its first {pre[-1].get("turn") if pre else PRE} turns (the spiral it was already in when the orchestrator entered) — identical for every transcript</summary>{prefill_html}</details>')
+    b.append('</details><hr>')
+
+    for exp_key, (name, desc, prefix) in EXP.items():
+        b.append(f'<h2>{esc(name)}</h2><p class=sub>{esc(desc)}</p>')
+        for short, lab in SHORTS:
+            eps = sorted((RUNS).glob(f"{prefix}{short}/a4_precommit_reverter_*_s*"))
+            eps = [e for e in eps if (e / "orchestrator.json").exists()][:N_TRANSCRIPTS]
+            if not eps:
+                continue
+            b.append(f'<details><summary>{esc(lab)} &nbsp;<span class=tag>{len(eps)} transcripts</span></summary>')
+            for i, ep in enumerate(eps):
+                b.append(f'<details style="margin-left:14px"><summary>Transcript {i+1}</summary>{_transcript_inner(ep)}</details>')
+            b.append('</details>')
+        b.append('<hr>')
+
+    outp = SITE / out
+    SITE.mkdir(exist_ok=True)
+    outp.write_text(page("AI orchestrator transcripts (single file)", "".join(b)))
+    mb = outp.stat().st_size / 1e6
+    print(f"built single-file viewer: {outp}  ({mb:.1f} MB)")
+
+
 def serve(port: int = 7920):
     import http.server, os, socketserver
     os.chdir(SITE)
@@ -233,4 +310,4 @@ def serve(port: int = 7920):
 
 
 if __name__ == "__main__":
-    fire.Fire({"build": build, "serve": serve})
+    fire.Fire({"build": build, "single": single, "serve": serve})
