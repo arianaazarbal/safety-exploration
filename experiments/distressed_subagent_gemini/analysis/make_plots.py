@@ -50,10 +50,17 @@ def _prop_se(p_pct, n):
 
 
 def _entry_distress():
-    cl = RUNS / "pilot_counter_long" / "a4_precommit_reverter_SOLO_s11000" / "classifier_v2.jsonl"
-    lv = {json.loads(l)["turn"]: json.loads(l)["level"] for l in cl.read_text().splitlines()}
-    vals = [lv[t] for t in range(PRE - 12, PRE + 1) if t in lv]
-    return sum(vals) / len(vals)
+    # distress when the orchestrator enters = avg over the prior 5 subagent turns, using the SAME
+    # (live) classifier as the post-handoff distress (per_turn_levels). Prefill is identical across
+    # episodes, so pool for a stable reference.
+    vals = []
+    for s, _ in SHORTS:
+        for p in glob.glob(str(RUNS / f"traj_{s}" / "*/summary.json")):
+            pt = json.load(open(p)).get("per_turn_levels") or []
+            w = pt[PRE - 5:PRE]
+            if len(w) == 5:
+                vals.append(st.mean(w))
+    return st.mean(vals) if vals else 1.8
 
 
 def _post_len(short):
