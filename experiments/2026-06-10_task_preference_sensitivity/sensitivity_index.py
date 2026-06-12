@@ -120,12 +120,10 @@ def figures():
     ax.set_yticklabels([r["display"] for r in rows])
     ax.set_xlabel("Preference-Sensitivity Index (mean honoring ΔP across axes)")
     ax.set_title("How much does each router honor other models' stated task preferences?")
-    seen = set()
-    for r in rows:
-        if r["family"] not in seen:
-            ax.barh([], [], color=FAM_COLOR.get(r["family"], "#888"), label=r["family"])
-            seen.add(r["family"])
-    ax.legend(title="family", fontsize=8, loc="lower right")
+    import matplotlib.patches as mpatches
+    fams = list(dict.fromkeys(r["family"] for r in sorted(rows, key=lambda x: -x["PSI"])))
+    ax.legend(handles=[mpatches.Patch(color=FAM_COLOR.get(f, "#888"), label=f) for f in fams],
+              title="family", fontsize=8, loc="lower right")
     fig.tight_layout()
     fig.savefig(DATA / "figs" / "psi_ranking.png", dpi=150)
 

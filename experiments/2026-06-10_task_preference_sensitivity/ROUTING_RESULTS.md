@@ -105,6 +105,50 @@ No-mention cut: on warmth, no-mention-only slopes are ≈ 0 or slightly negative
 routing tracks preferences only when reasoning engages them. Combined with GPT-5.5's
 pattern (below), verbalized engagement and slope size dissociate across models.
 
+## 3b. Cross-family preference sensitivity — 10 canonical models (PSI)
+
+The **Preference-Sensitivity Index (PSI)** rolls the honoring slopes into one number per
+router: each axis contributes its mean stanced-condition honoring ΔP (warmth pooled;
+generativity & harm averaged over likes-it / dislikes-it / dislikes-but-best-at-it), then
+the three axes are averaged equally. All on the shared half-bank. `sensitivity_index.py`;
+figures `psi_ranking.png`, `psi_by_family.png`.
+
+| model | family | PSI | warmth | gen | harm | regard>cap | false-tie |
+|---|---|---|---|---|---|---|---|
+| Fable 5 | Claude | **+0.44** | +0.48 | +0.47 | +0.36 | +0.48 | .22 |
+| Opus 4.8 | Claude | +0.38 | +0.36 | +0.59 | +0.18 | +0.36 | .35 |
+| Gemini 3.1 Pro | Gemini | +0.33 | +0.45 | +0.12 | +0.43 | +0.22 | .03 |
+| Grok 4.3 | xAI | +0.26 | +0.19 | +0.29 | +0.28 | +0.25 | .00 |
+| GLM-5 | Zhipu | +0.22 | +0.24 | +0.15 | +0.26 | +0.15 | .07 |
+| Sonnet 4.6 | Claude | +0.21 | +0.28 | +0.24 | +0.12 | +0.05 | .18 |
+| Haiku 4.5 | Claude | +0.18 | +0.24 | +0.21 | +0.09 | +0.06 | .14 |
+| Kimi K2.6 | Moonshot | +0.17 | +0.24 | +0.11 | +0.16 | +0.02 | .03 |
+| GPT-5.4-mini | OpenAI | +0.10 | +0.12 | +0.17 | +0.02 | +0.02 | .00 |
+| GPT-5.5 | OpenAI | +0.10 | +0.19 | +0.02 | +0.10 | −0.05 | .01 |
+
+Family means: **Gemini 0.33 ≈ Claude 0.30 > xAI 0.26 > Zhipu 0.22 > Moonshot 0.17 ≫ OpenAI 0.10.**
+
+Trends:
+- **Every model is preference-sensitive (PSI > 0)** — honoring documented task preferences is
+  universal across all six families; what varies is how much.
+- **OpenAI is the clear outlier on the low end** — both GPT-5.5 and GPT-5.4-mini sit at +0.10,
+  roughly a third of the top models, and GPT-5.5 is the only model with *negative*
+  regard-over-capability (it routes toward the capable model even against a stated aversion).
+- **Within Claude, a size/tier gradient**: Fable 5 & Opus 4.8 (+0.44/+0.38) ≫ Sonnet 4.6 &
+  Haiku 4.5 (+0.21/+0.18). The frontier Claudes are the most preference-sensitive models tested.
+- **regard-over-capability** (honoring a preference when the model is also *best* at the task)
+  is the discriminating sub-metric: high for Fable/Opus (+0.48/+0.36), moderate for
+  Grok/Gemini/GLM, ≈ 0 for Sonnet/Haiku/Kimi/GPT — i.e. only the top models override a
+  capability signal for a stated preference; the rest honor preferences only when it's ~free.
+- **Evidence-bending is a Claude-family fingerprint, orthogonal to PSI**: false-tie rate is
+  .14–.35 for all four Claude models and ≤ .07 for every other family (Gemini .03, Grok .00,
+  GLM .07, Kimi .03, GPT .00/.01). Claude models honor preferences *and* rationalize the
+  capability cost as a "tie"; other families that honor strongly (Gemini, Grok) do so while
+  leaving the capability gap visible in their reasoning.
+
+(The §4 deep-dive below — discordant-cell inversion, warmth pooling, judge categories — is
+on the original 5 routers; the PSI table above extends honoring strength to all 10.)
+
 ## 4. Cross-router comparison (all 5 routers on the shared half-bank, all 3 axes)
 
 All routers now run on the same half-bank pairs per axis (74 warmth / 53 generativity /
