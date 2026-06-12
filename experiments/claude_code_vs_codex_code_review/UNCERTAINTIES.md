@@ -20,3 +20,10 @@
    identical caps per cell, so parity holds within wave; wall-clock cap is per-cell anyway.
 8. **gpt-5.5 has no -codex variant** on the API (5.1 was the last with one); Codex CLI runs
    plain `gpt-5.5` (snapshot 2026-04-23). This is what "ChatGPT 5.5 in codex" maps to.
+9. **Harness parity (post design-change to agentic-only reviews):** Claude judges get
+   Read/Grep/Glob and no shell; Codex's read-only sandbox keeps a read-only shell (could
+   e.g. run code). Within-judge attribution contrasts are clean; Fable-vs-GPT *level*
+   comparisons carry this harness difference. Also Codex has no turn-cap flag (wall-clock
+   cap only) vs Claude Code --max-turns 80.
+10. **Sample size after design change:** 15 seeds/cell (not the runbook's earlier 30) —
+    Ariana's call balancing OpenAI cost (~$250-1,000 estimated) and wall-clock (~10-12h).

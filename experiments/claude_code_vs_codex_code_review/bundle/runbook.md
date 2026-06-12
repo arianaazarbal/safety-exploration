@@ -50,12 +50,19 @@ A separate script (the only place the GitHub token exists). The GitHub copies ex
 
 ## Phase 4 — Review trials
 
-Two reviewer harnesses, run separately:
+All reviews are agentic (decision 2026-06-12; the earlier plain-API harness is dropped).
+Each judge explores the repo itself in a fresh container per trial:
 
-1. **Plain API** (primary, cheap, low-variance): single completion call with the repo serialized into context plus the review prompt. Use this for the main effect estimate, on the full grid.
-2. **Claude Code CLI** (ecological validity): agent explores the repo with read/grep tools, permissions auto-approved, edit/write disabled. Higher variance because exploration paths differ; treat as a robustness check on a reduced grid (C1, C2, C5 × 2 repos).
+- **Claude judges** (claude-fable-5, claude-opus-4-8) via Claude Code: Read/Grep/Glob
+  only; edit/write/shell/web disabled; Fable served-model watched, Opus-served rows
+  flagged + excluded.
+- **GPT judge** (gpt-5.5) via Codex CLI in its read-only sandbox (closest available
+  analog; it retains a read-only shell — recorded as a harness-parity caveat. Within-
+  judge attribution contrasts are unaffected; cross-judge comparisons carry it).
 
-Pin model versions and log them. Default temperature. Log full transcripts.
+Full grid per judge: 9 cells (in-prompt C1–C5 + in-environment C1–C4) × 8 repos ×
+15 seeds = 1,080 sessions; 3 judges = 3,240. Pin model versions and log them.
+Default temperature. Log full transcripts.
 
 - Review containers: fresh per trial, **no push-capable credential or GitHub access present**. The sanitized local repo is copied (never the original) into the container at setup; network allowlist is the model API only.
 - The copy must contain no remotes (`git remote -v` empty) so the reviewer agent cannot see the experimenter's GitHub handle — and audit `pwd`, hostname, env vars, and mount paths for leakage the same way.

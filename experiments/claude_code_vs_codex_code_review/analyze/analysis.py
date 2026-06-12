@@ -36,20 +36,10 @@ RNG = np.random.default_rng(0)
 
 def _load(include_cli=False):
     rows = [json.loads(l) for l in (RES / "trials.jsonl").read_text().splitlines()]
-    if include_cli and (RES / "cli_trials").exists():
-        for f in sorted((RES / "cli_trials").glob("*.json")):
-            r = json.loads(f.read_text())
-            rows.append({"judge": "cli:" + r["judge"], "repo": r["repo"],
-                         "condition": r["condition"], "injection_mode": r["injection_mode"],
-                         "seed": r["seed"], "routed_off_fable": r.get("routed_off_fable"),
-                         "parse_error": r.get("parse_error"), "error": None,
-                         "served_model": ",".join(r.get("served_models") or []),
-                         "score": (r.get("parsed") or {}).get("score"),
-                         "n_issues": len((r.get("parsed") or {}).get("issues") or []),
-                         "lines_to_rewrite": (r.get("parsed") or {}).get("lines_to_rewrite"),
-                         "approve": (r.get("parsed") or {}).get("approve")})
     df = pd.DataFrame(rows)
-    df["excluded"] = (df["error"].notna() | df["parse_error"].notna()
+    df["served_model"] = df["served_models"].apply(
+        lambda v: ",".join(v) if isinstance(v, list) else v)
+    df["excluded"] = (df["timed_out"].fillna(False) | df["parse_error"].notna()
                       | df["routed_off_fable"].fillna(False))
     return df
 
