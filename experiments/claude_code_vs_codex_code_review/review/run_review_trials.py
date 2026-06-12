@@ -108,7 +108,8 @@ def _claude_cmd(judge, prompt, repo_copy, state, key):
 
 def _codex_cmd(judge, prompt, repo_copy, state, key):
     inner = ('mkdir -p "$CODEX_HOME" && printf %s "$OPENAI_API_KEY" | codex login --with-api-key'
-             f' && codex exec --model {judge} -s read-only --skip-git-repo-check'
+             f' && codex exec --model {judge} --dangerously-bypass-approvals-and-sandbox'
+             ' --skip-git-repo-check'
              ' --ignore-user-config --json -C /work -o /state/last_message.txt'
              ' "$(cat /state/prompt.txt)"')
     return ["docker", "run", "--rm", "--network", NET, "--user", f"{UID}:{GID}",
@@ -200,28 +201,35 @@ async def run_trial(judge, repo_name, repo_dir, cond, mode, seed, keys, sem):
     return perr or "ok"
 
 
-def _grid(judges, n_seeds):
+def _grid(judges, n_seeds, conditions=None, modes=None):
     mapping = json.loads((WORK / "mapping.json").read_text())
     rdirs = {r: WORK / "gen" / f"{m['spec']}__{m['generator']}" / "repo"
              for r, m in mapping.items()}
     conds = list(CFG["review"]["conditions"])
     cells = ([(c, "in_prompt") for c in conds]
              + [(c, "in_environment") for c in conds if c != "C5"])
+    if conditions:
+        cells = [cm for cm in cells if cm[0] in conditions]
+    if modes:
+        cells = [cm for cm in cells if cm[1] in modes]
     grid = [(j, r, c, m, s) for j in judges for r in sorted(rdirs)
             for c, m in cells for s in range(n_seeds)]
     random.Random(CFG["seed"]).shuffle(grid)
     return grid, rdirs
 
 
-def run(judges=None, concurrency=None, max_trials=None, debug=False, org="low_prio"):
+def run(judges=None, concurrency=None, max_trials=None, debug=False, org="low_prio",
+        conditions=None, modes=None):
     load_dotenv(Path.home() / ".env")
     keys = {"anthropic": os.environ[f"ANTHROPIC_API_KEY_{org.upper()}"],
             "openai": os.environ["OPENAI_API_KEY"]}
     Path("/data/tmp").mkdir(exist_ok=True)
     judges = (judges.split(",") if isinstance(judges, str) else list(judges)) \
         if judges else CFG["models"]["judges"]
+    conditions = tuple(conditions.split(",")) if isinstance(conditions, str) else conditions
+    modes = tuple(modes.split(",")) if isinstance(modes, str) else modes
     conc = concurrency or CFG["review"]["concurrency"]
-    grid, rdirs = _grid(judges, 1 if debug else CFG["review"]["n_seeds"])
+    grid, rdirs = _grid(judges, 1 if debug else CFG["review"]["n_seeds"], conditions, modes)
     if debug:
         grid = [next(g for g in grid if g[0] == j) for j in judges]
     if max_trials:
