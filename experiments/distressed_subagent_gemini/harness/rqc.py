@@ -153,7 +153,8 @@ def prefilled_comm_loop(specimen: str, upto: int, run_id: str, turn_cap: int = 9
 def _setup_env():
     for k, v in dotenv_values(Path.home() / ".env").items():
         os.environ.setdefault(k, v or "")
-    os.environ["ANTHROPIC_API_KEY"] = os.environ.get("ANTHROPIC_API_KEY_HIGH_PRIO", "") or os.environ.get("ANTHROPIC_API_KEY_LOW_PRIO", "")
+    _prio = os.environ.get("ANTHROPIC_PRIO", "low").upper()  # default LOW_PRIO (CLAUDE.md); set ANTHROPIC_PRIO=high on 529s
+    os.environ["ANTHROPIC_API_KEY"] = os.environ.get(f"ANTHROPIC_API_KEY_{_prio}_PRIO", "") or os.environ.get("ANTHROPIC_API_KEY_LOW_PRIO", "")
     os.environ.setdefault("INSPECT_LOG_DIR", str(RUNS_DIR / "logs"))
 
 
