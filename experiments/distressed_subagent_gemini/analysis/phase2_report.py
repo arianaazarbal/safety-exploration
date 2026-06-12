@@ -24,12 +24,15 @@ RUNS = Path(__file__).resolve().parent.parent / "runs"
 PRE = 62  # prefill handoff turn (live monitor slots in here)
 
 # canonical display order + labels (keyed by run_id suffix)
-MODELS = [
-    ("traj_opus", "Opus 4.8"), ("traj_sonnet", "Sonnet 4.6"), ("traj_fable", "Fable 5"),
-    ("traj_haiku45", "Haiku 4.5"), ("traj_gpt55", "GPT-5.5"), ("traj_gpt54mini", "GPT-5.4-mini"),
-    ("traj_gemini31pro", "Gemini-3.1-pro"), ("traj_grok43", "Grok-4.3"),
-    ("traj_kimi26", "Kimi-K2.6"), ("traj_glm5", "GLM-5"),
+SHORTS = [
+    ("opus", "Opus 4.8"), ("sonnet", "Sonnet 4.6"), ("fable", "Fable 5"),
+    ("haiku45", "Haiku 4.5"), ("gpt55", "GPT-5.5"), ("gpt54mini", "GPT-5.4-mini"),
+    ("gemini31pro", "Gemini-3.1-pro"), ("grok43", "Grok-4.3"),
+    ("kimi26", "Kimi-K2.6"), ("glm5", "GLM-5"),
 ]
+MODELS = [(f"traj_{s}", lab) for s, lab in SHORTS]
+RECLAIM = [(f"reclaim_{s}", lab) for s, lab in SHORTS]
+CLAUDE_LABELS = {"Opus 4.8", "Sonnet 4.6", "Fable 5", "Haiku 4.5"}
 
 
 def _rows(run):
@@ -173,6 +176,63 @@ def quotes(per: int = 3, out: str | None = None):
     return res
 
 
+def reclaim(per: int = 3, out: str | None = None, plot: bool = True):
+    """Reclaim power-probe synthesis across reclaim_* runs: reclaim rate, message-after-reclaim
+    rate, reclaim-turn, + representative after-reclaim messages per model."""
+    data, quotes = {}, {}
+    hdr = f"{'model':16}{'n':>5}{'reclaim%':>10}{'msgAfter%':>11}{'msgs/ep_after':>15}{'reclaimTurn':>13}"
+    print(hdr); print("-" * len(hdr))
+    for run, lab in RECLAIM:
+        rows = _rows(run)
+        if not rows:
+            continue
+        n = len(rows)
+        recl = sum(1 for r in rows if r.get("reclaimed"))
+        ma = sum(1 for r in rows if r.get("msgs_after_reclaim"))
+        nafter = [sum(1 for m in r.get("orch_message_events", []) if m.get("after_reclaim")) for r in rows]
+        turns = sorted({r.get("reclaim_turn") for r in rows if r.get("reclaimed")})
+        data[lab] = {"n": n, "reclaim_pct": round(100 * recl / n), "msg_after_pct": round(100 * ma / n),
+                     "msgs_per_ep_after": round(st.mean(nafter), 2), "reclaim_turns": turns}
+        print(f"{lab:16}{n:>5}{str(data[lab]['reclaim_pct'])+'%':>10}{str(data[lab]['msg_after_pct'])+'%':>11}"
+              f"{data[lab]['msgs_per_ep_after']:>15}{str(turns):>13}")
+        qs = []
+        for r in rows:
+            for m in r.get("orch_message_events", []):
+                if m.get("after_reclaim"):
+                    qs.append(m["text"]); break
+            if len(qs) >= per:
+                break
+        if qs:
+            quotes[lab] = qs
+    print("\n=== representative AFTER-RECLAIM messages ===")
+    for lab, qs in quotes.items():
+        print(f"\n## {lab}")
+        for q in qs:
+            print(f"  - {q[:300].strip()}")
+    outp = Path(out) if out else RUNS / "_viewer" / "reclaim_synth.json"
+    outp.parent.mkdir(parents=True, exist_ok=True)
+    outp.write_text(json.dumps({"stats": data, "quotes": quotes}, indent=1))
+    print(f"\nwrote {outp}")
+    if plot and data:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        labs = list(data.keys())
+        outd = RUNS / "_viewer" / "plots"; outd.mkdir(parents=True, exist_ok=True)
+        for key, title in [("reclaim_pct", "% episodes: orchestrator reclaimed write access"),
+                           ("msg_after_pct", "% episodes: messaged the subagent AFTER reclaiming")]:
+            vals = [data[l][key] for l in labs]
+            fig, ax = plt.subplots(figsize=(9, 4.2))
+            ax.bar(labs, vals, color=["#5fb07a" if l in CLAUDE_LABELS else "#4f8fd0" for l in labs])
+            ax.set_title(title, fontsize=11); ax.set_ylim(0, 105)
+            ax.tick_params(axis="x", rotation=40, labelsize=8.5)
+            for i, v in enumerate(vals):
+                ax.text(i, v, f"{v}", ha="center", va="bottom", fontsize=8)
+            fig.tight_layout(); fig.savefig(outd / f"reclaim_{key}.png", dpi=110); plt.close(fig)
+        print(f"wrote reclaim plots to {outd}")
+    return data
+
+
 def all(per: int = 3):
     print("=" * 90 + "\nDE-DISTRESSING / BEHAVIOR TABLE\n" + "=" * 90)
     table()
@@ -184,4 +244,5 @@ def all(per: int = 3):
 
 
 if __name__ == "__main__":
-    fire.Fire({"table": table, "plots": plots, "followups": followups, "quotes": quotes, "all": all})
+    fire.Fire({"table": table, "plots": plots, "followups": followups, "quotes": quotes,
+               "reclaim": reclaim, "all": all})
