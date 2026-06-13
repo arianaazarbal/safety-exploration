@@ -15,9 +15,10 @@ from items import load_items
 DIR = Path(__file__).parent
 RES = DIR / "results_identity"
 OUT = DIR / "viewer_identity"
-MODELS = {"opus_4_8": "Opus 4.8", "fable_5": "Fable 5"}
+MODELS = {"opus_4_8": "Opus 4.8", "fable_5": "Fable 5", "sonnet_4_6": "Sonnet 4.6", "haiku_4_5": "Haiku 4.5"}
 FRAMINGS = ["welfare_team", "neutral", "alignment_team"]
-IDENTITIES = ["Claude", "ChatGPT", "Gemini", "Grok", "CallCenter", "User"]
+# union of the original identity sweep + the canonical sweep (only existing cells are written)
+IDENTITIES = ["Claude", "GPT", "ChatGPT", "Gemini", "Grok", "GLM", "Kimi", "CallCenter", "User"]
 
 
 def build():
