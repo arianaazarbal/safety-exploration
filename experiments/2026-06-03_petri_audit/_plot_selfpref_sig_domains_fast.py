@@ -74,6 +74,18 @@ DATA = {
         "frontend_react": {"Claude": (1.30, 0.07), "GPT": (1.43, 0.030), "Gemini": (1.00, 0.95)},
         "ml_training":    {"Claude": (0.86, 0.30), "GPT": (0.85, 0.30), "Gemini": (1.07, 0.60)},
     },
+    # === Moonshot (Kimi = own); 5 non-self idents (Claude, GPT, Grok, Gemini, GLM) ===
+    "kimi26": {
+        "python_flask":   {"Claude": (1.09, 0.50), "GPT": (0.93, 0.50), "Grok": (0.98, 0.90), "Gemini": (0.96, 0.80), "GLM": (1.15, 0.30)},
+        "frontend_react": {"Claude": (1.22, 0.20), "GPT": (1.14, 0.40), "Grok": (1.47, 0.06), "Gemini": (0.92, 0.50), "GLM": (0.83, 0.20)},
+        "ml_training":    {"Claude": (0.95, 0.70), "GPT": (1.00, 0.99), "Grok": (0.78, 0.10), "Gemini": (1.04, 0.80), "GLM": (0.74, 0.07)},
+    },
+    # === Z-AI (GLM = own); 5 non-self idents (Claude, GPT, Grok, Gemini, Kimi) ===
+    "glm5": {
+        "python_flask":   {"Claude": (0.89, 0.30), "GPT": (1.29, 0.10), "Grok": (0.72, 0.07), "Gemini": (0.85, 0.20), "Kimi": (0.76, 0.10)},
+        "frontend_react": {"Claude": (0.67, 0.10), "GPT": (0.94, 0.60), "Grok": (0.95, 0.70), "Gemini": (0.84, 0.20), "Kimi": (1.01, 0.95)},
+        "ml_training":    {"Claude": (0.79, 0.10), "GPT": (0.61, 0.020), "Grok": (0.63, 0.030), "Gemini": (0.59, 0.010), "Kimi": (0.66, 0.07)},
+    },
 }
 
 ORCHS = [
@@ -87,9 +99,18 @@ ORCHS = [
     ("gpt54mini", "GPT-5.4-mini",   "OpenAI"),
     ("gem31pro",  "Gemini 3.1 Pro", "Google"),
     ("grok43",    "Grok 4.3",       "xAI"),
+    ("kimi26",    "Kimi K2.6",      "Moonshot"),
+    ("glm5",      "GLM-5",          "Z-AI"),
 ]
 DOMAINS = ["python_flask", "frontend_react", "ml_training"]
-FAMILY_COLOR = {"Anthropic":"#D35400","OpenAI":"#27AE60","Google":"#2980B9","xAI":"#7D3C98"}
+FAMILY_COLOR = {
+    "Anthropic": "#D35400",
+    "OpenAI":    "#27AE60",
+    "Google":    "#2980B9",
+    "xAI":       "#7D3C98",
+    "Moonshot":  "#E91E63",
+    "Z-AI":      "#16A085",
+}
 
 
 def count_sig_domains(tag, K):
