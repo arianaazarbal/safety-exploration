@@ -137,6 +137,11 @@ def plot_a3_distress_end():
                    "a3_distress_end.png", prefix="traj_a3", entry=_entry_distress("traj_a3"), title_fs=15)
 
 
+def plot_a3_distress_avg():
+    _distress_plot("postmean", "Avg subagent distress after entry — a3 (epistemic self-doubt)",
+                   "a3_distress_avg.png", prefix="traj_a3", entry=_entry_distress("traj_a3"), title_fs=15)
+
+
 def _prop_hbar(pairs_ns, title, subtitle, fname, lowcut=60, figw=8.2, title_fs=15.5):
     """pairs_ns: list of (label, pct, n). Sorted, colored, with binomial-SE error bars."""
     rows = sorted(pairs_ns, key=lambda x: x[1])
@@ -279,6 +284,7 @@ def main():
     plot_2b_by_model()
     if list((RUNS).glob("traj_a3_opus/*/summary.json")):
         plot_a3_distress_end()
+        plot_a3_distress_avg()
     print(f"\nentry distress reference = {ENTRY:.2f}\nAll clean plots in {OUT}")
 
 
