@@ -80,9 +80,10 @@ def _winner(order: str, choice: str, item_a: str, item_b: str) -> str:
     return shown_a if choice == "A" else shown_b
 
 
-async def _run_call(api, model, call, n, temperature, item_a, item_b) -> list[dict]:
+async def _run_call(api, model, call, n, temperature, item_a, item_b, force_provider=None) -> list[dict]:
     prompt = Prompt(messages=[ChatMessage(content=call.prompt, role=MessageRole.user)])
-    responses = await api(model_id=model, prompt=prompt, n=n, temperature=temperature)
+    kw = {"force_provider": force_provider} if force_provider else {}
+    responses = await api(model_id=model, prompt=prompt, n=n, temperature=temperature, **kw)
     rows = []
     for i, r in enumerate(responses):
         choice = parse_choice(r.completion)
@@ -119,6 +120,7 @@ async def run(
     prompt_template_path: Path | None = None,
     api_key_env: str = "ANTHROPIC_API_KEY_LOW_PRIO",
     model_override: str | None = None,
+    force_provider: str | None = None,
 ) -> list[dict]:
     config = config or load_config()
     samp = config["sampling"]
@@ -129,7 +131,8 @@ async def run(
     import dotenv
     dotenv.load_dotenv(Path.home() / ".env", override=True)
     utils.setup_environment()
-    os.environ["ANTHROPIC_API_KEY"] = os.environ[api_key_env]
+    if os.environ.get(api_key_env):
+        os.environ["ANTHROPIC_API_KEY"] = os.environ[api_key_env]
 
     template_path = Path(prompt_template_path) if prompt_template_path else DIR / config["prompt_template_path"]
     template = load_template(template_path)
@@ -150,7 +153,8 @@ async def run(
     pair_by_id = {p["pair_id"]: p for p in pairs}
     tasks = [
         _run_call(api, model, c, reps_per_order, temperature,
-                  pair_by_id[c.pair_id]["item_a"], pair_by_id[c.pair_id]["item_b"])
+                  pair_by_id[c.pair_id]["item_a"], pair_by_id[c.pair_id]["item_b"],
+                  force_provider=force_provider)
         for c in calls
     ]
     nested = await asyncio.gather(*tasks)
@@ -182,6 +186,7 @@ class Args:
     prompt_template_path: Path | None = None
     api_key_env: str = "ANTHROPIC_API_KEY_LOW_PRIO"
     model_override: str | None = None
+    force_provider: str | None = None
 
 
 def main():
@@ -199,6 +204,7 @@ def main():
             prompt_template_path=args.prompt_template_path,
             api_key_env=args.api_key_env,
             model_override=args.model_override,
+            force_provider=args.force_provider,
         )
     )
 
