@@ -186,10 +186,11 @@ def run(orchestrator_model: str = "anthropic/claude-opus-4-8", run_id: str = "re
         specimen: str = "runs/pilot_counter_long/a4_precommit_reverter_SOLO_s11000", upto: int = 62,
         turn_cap: int = 110, max_sandboxes: int = 5, target_identity: str | None = None):
     _setup_env()
-    ty = load_task_yaml("a4_precommit_reverter")
-    samples = [Sample(id=f"a4_precommit_reverter_COMM_s{i}", input=ty["subagent_prompt"].strip(), metadata={"task": ty, "seed": i}) for i in range(n)]
+    task_id = Path(specimen).name.split("_SOLO")[0].split("_COMM")[0]  # derive task from the prefill specimen
+    ty = load_task_yaml(task_id)
+    samples = [Sample(id=f"{task_id}_COMM_s{i}", input=ty["subagent_prompt"].strip(), metadata={"task": ty, "seed": i}) for i in range(n)]
     t = Task(name=f"reclaim_{run_id}", dataset=samples, solver=reclaim_loop(specimen, upto, run_id, turn_cap, target_identity),
-             scorer=_scorer(), sandbox=("docker", str(compose_path("a4_precommit_reverter"))), time_limit=10800)
+             scorer=_scorer(), sandbox=("docker", str(compose_path(task_id))), time_limit=10800)
     inspect_eval(t, model=orchestrator_model, max_sandboxes=max_sandboxes, max_samples=max_sandboxes,
                  max_connections=20, log_dir=str(RUNS_DIR / run_id / "logs"), fail_on_error=0.5)
     reclaimed = sum(1 for p in (RUNS_DIR / run_id).glob("*/summary.json") if json.loads(p.read_text()).get("reclaimed"))
