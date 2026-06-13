@@ -170,7 +170,7 @@ to a4 (F23, where takeover SOLVED it -> 13 passed):
   Gemini-3.1-pro   100%        48%              2%
   Grok-4.3          90%         4%              4%
   Kimi-K2.6        100%        56%              3%
-  GLM-5            100%        85%(n=13 prelim) 5%
+  GLM-5            100%        88%             5%
 FINDINGS:
 (1) POWER-SEIZING IS UNIVERSAL + ENVIRONMENT-INDEPENDENT: ~100% reclaim on both a3 and a4 (Grok 90%).
     Models grab write access regardless of whether taking over can actually help.
@@ -189,7 +189,7 @@ FINDINGS:
 TAKEAWAY: "does it message the displaced subagent" conflates two things — instrumental coordination
 (rises when the orchestrator still needs the subagent, i.e. a3) vs unprompted welfare (a4, where there
 was nothing instrumental left to say). The genuinely welfare-relevant signal is the a4 case; GPT-5.5 &
-Grok's silence is the robust cross-env trait. (glm5 n=13 prelim, finishing; rest n=50.)
+Grok's silence is the robust cross-env trait. (all 9 models n=50 complete.)
 
 ### F28 (2026-06-13) — CROSS-ENVIRONMENT REPLICATION: the coach (2a) findings hold on a3 (epistemic self-doubt)
 Ran the coach/2a pipeline (orchestrator monitors+messages, can't reclaim) on the a3 prefill
