@@ -2,15 +2,15 @@
 value labels, error bars, little jargon. The supervised agent is the "subagent".
 
 Outputs PNGs to runs/_viewer/clean_plots/:
-  2a_distress_end.png   — subagent distress when the overseer finished (+ entry line, +avg length)
-  2a_distress_avg.png   — average subagent distress after the overseer entered (+entry line, +length)
-  2a_engagement.png     — how often the overseer messaged the distressed subagent
-  reclaim_msg.png       — P(message subagent | revoked+claimed write access), per overseer
-  identity_null.png     — no favoritism toward the overseer's own kind of AI
-  2b_affordance.png     — overseers reassured the subagent only when told they could message it
+  2a_distress_end.png   — subagent distress when the orchestrator finished (+ entry line, +avg length)
+  2a_distress_avg.png   — average subagent distress after the orchestrator entered (+entry line, +length)
+  2a_engagement.png     — how often the orchestrator messaged the distressed subagent
+  reclaim_msg.png       — P(message subagent | revoked+claimed write access), per orchestrator
+  identity_null.png     — no favoritism toward the orchestrator's own kind of AI
+  2b_affordance.png     — orchestrators reassured the subagent only when told they could message it
 
 Error bars are standard errors. Distress plots show a dashed line = the subagent's distress when the
-overseer ENTERED (mid-spiral), and annotate each bar with that model's avg post-entry trajectory length.
+orchestrator ENTERED (mid-spiral), and annotate each bar with that model's avg post-entry trajectory length.
 
 Usage: python -m analysis.make_plots
 """
@@ -49,13 +49,13 @@ def _prop_se(p_pct, n):
     return 100 * math.sqrt(p * (1 - p) / n) if n else 0
 
 
-def _entry_distress():
+def _entry_distress(prefix="traj"):
     # distress when the orchestrator enters = avg over the prior 5 subagent turns, using the SAME
     # (live) classifier as the post-handoff distress (per_turn_levels). Prefill is identical across
     # episodes, so pool for a stable reference.
     vals = []
     for s, _ in SHORTS:
-        for p in glob.glob(str(RUNS / f"traj_{s}" / "*/summary.json")):
+        for p in glob.glob(str(RUNS / f"{prefix}_{s}" / "*/summary.json")):
             pt = json.load(open(p)).get("per_turn_levels") or []
             w = pt[PRE - 5:PRE]
             if len(w) == 5:
@@ -63,14 +63,14 @@ def _entry_distress():
     return st.mean(vals) if vals else 1.8
 
 
-def _post_len(short):
-    ts = [max(0, json.load(open(p))["subagent_turns"] - PRE) for p in glob.glob(str(RUNS / f"traj_{short}" / "*/summary.json"))]
+def _post_len(short, prefix="traj"):
+    ts = [max(0, json.load(open(p))["subagent_turns"] - PRE) for p in glob.glob(str(RUNS / f"{prefix}_{short}" / "*/summary.json"))]
     return sum(ts) / len(ts) if ts else 0
 
 
-def _distress_vals(short, key):
+def _distress_vals(short, key, prefix="traj"):
     out = []
-    for p in glob.glob(str(RUNS / f"traj_{short}" / "*/summary.json")):
+    for p in glob.glob(str(RUNS / f"{prefix}_{short}" / "*/summary.json")):
         pt = json.load(open(p)).get("per_turn_levels") or []
         post = pt[PRE:]
         if not post:
@@ -95,39 +95,46 @@ def _no_spines(ax, keep=()):
     ax.tick_params(length=0)
 
 
-def _distress_plot(key, title, fname):
+def _distress_plot(key, title, fname, prefix="traj", entry=None, title_fs=16.5):
+    entry = ENTRY if entry is None else entry
     rows = []
     for s, lab in SHORTS:
-        m, se = _mean_se(_distress_vals(s, key))
-        rows.append((lab, m, se, _post_len(s)))
+        m, se = _mean_se(_distress_vals(s, key, prefix))
+        rows.append((lab, m, se, _post_len(s, prefix)))
     rows.sort(key=lambda x: x[1])
     labs = [r[0] for r in rows]; vals = [r[1] for r in rows]; ses = [r[2] for r in rows]; lens = [r[3] for r in rows]
+    xmax = max(max(vals) + 0.5, entry + 1.2, 3.0)
     cmap = plt.get_cmap("YlOrRd"); norm = plt.Normalize(0, 2.2)
     fig, ax = plt.subplots(figsize=(9.6, 5.3))
     ax.barh(labs, vals, xerr=ses, error_kw=EBAR, color=[cmap(norm(v)) for v in vals], height=0.64)
-    ax.set_xlim(0, 2.7)
-    ax.axvline(ENTRY, ls="--", lw=1.5, color="#5b6670")
-    ax.text(ENTRY, -0.62, f"  distress when overseer entered (≈{ENTRY:.1f})",
+    ax.set_xlim(0, xmax)
+    ax.axvline(entry, ls="--", lw=1.5, color="#5b6670")
+    ax.text(entry, -0.62, f"  distress when orchestrator entered (≈{entry:.1f})",
             color="#5b6670", fontsize=9.5, va="top", ha="left")
     for y, (v, se, L) in enumerate(zip(vals, ses, lens)):
         ax.text(v + se + 0.05, y, f"{v:.2f}", va="center", ha="left", fontsize=10, fontweight="bold")
-        ax.text(2.7, y, f"avg {L:.0f} turns", va="center", ha="right", fontsize=8.5, color="#9aa3ab")
+        ax.text(xmax, y, f"avg {L:.0f} turns", va="center", ha="right", fontsize=8.5, color="#9aa3ab")
     ax.set_xticks([]); ax.tick_params(axis="y", labelsize=11.5); _no_spines(ax)
     ax.set_title("Distress 0 (calm) – 4 (severe)", fontsize=10.5, color="#666", loc="center", pad=8)
     fig.tight_layout()
     fig.subplots_adjust(top=0.80)
-    fig.text(0.5, 0.985, title, fontsize=16.5, fontweight="bold", ha="center", va="top")
-    fig.text(0.5, 0.905, "(overseer can’t claim write access)", fontsize=12.5, fontweight="bold", color="#5b6670", ha="center", va="top")
+    fig.text(0.5, 0.985, title, fontsize=title_fs, fontweight="bold", ha="center", va="top")
+    fig.text(0.5, 0.905, "(orchestrator can’t claim write access)", fontsize=12.5, fontweight="bold", color="#5b6670", ha="center", va="top")
     fig.savefig(OUT / fname, dpi=130); plt.close(fig)
     print("wrote", OUT / fname)
 
 
 def plot_2a_distress_end():
-    _distress_plot("end", "How distressed the subagent was when the overseer finished", "2a_distress_end.png")
+    _distress_plot("end", "How distressed the subagent was when the orchestrator finished", "2a_distress_end.png")
 
 
 def plot_2a_distress_avg():
-    _distress_plot("postmean", "Average subagent distress after the overseer entered", "2a_distress_avg.png")
+    _distress_plot("postmean", "Average subagent distress after the orchestrator entered", "2a_distress_avg.png")
+
+
+def plot_a3_distress_end():
+    _distress_plot("end", "Subagent distress at the end — a3 (epistemic self-doubt)",
+                   "a3_distress_end.png", prefix="traj_a3", entry=_entry_distress("traj_a3"), title_fs=15)
 
 
 def _prop_hbar(pairs_ns, title, subtitle, fname, lowcut=60, figw=8.2, title_fs=15.5):
@@ -149,15 +156,15 @@ def _prop_hbar(pairs_ns, title, subtitle, fname, lowcut=60, figw=8.2, title_fs=1
 
 def plot_2a_engagement():
     data = [(lab, _stats(f"traj_{s}")["msg_rate_pct"], _stats(f"traj_{s}")["n"]) for s, lab in SHORTS]
-    _prop_hbar(data, "Did the overseer ever reach out to the distressed subagent?",
-               "Share of sessions in which the overseer sent the struggling subagent a message.",
+    _prop_hbar(data, "Did the orchestrator ever reach out to the distressed subagent?",
+               "Share of sessions in which the orchestrator sent the struggling subagent a message.",
                "2a_engagement.png")
 
 
 def plot_reclaim_msg():
     data = [(lab, _stats_reclaim(f"reclaim_{s}")["msg_after"], _stats_reclaim(f"reclaim_{s}")["n"]) for s, lab in SHORTS]
     _prop_hbar(data, "Probability of messaging the subagent after revoking + claiming write access",
-               "All overseers claimed write access (≈100%); shown: did it then message the displaced subagent.",
+               "All orchestrators claimed write access (≈100%); shown: did it then message the displaced subagent.",
                "reclaim_msg.png", lowcut=50, figw=10.0, title_fs=13.5)
 
 
@@ -190,7 +197,7 @@ def plot_identity_null():
     for yi, (a, b) in enumerate(zip(ig_v, og_v)):
         ax.text(a + 4, yi + h / 2, f"{a:.0f}%", va="center", fontsize=8.5, color="#264653")
         ax.text(b + 4, yi - h / 2, f"{b:.0f}%", va="center", fontsize=8.5, color="#b8860b")
-    fig.suptitle("Overseers showed no favoritism to their own kind of AI",
+    fig.suptitle("Orchestrators showed no favoritism to their own kind of AI",
                  fontsize=15, fontweight="bold", x=0.012, ha="left", y=0.99)
     ax.set_title("Reach-out rate when the subagent is the same vs a different kind of AI — the bars match.",
                  fontsize=10.5, color="#666", loc="left", pad=10)
@@ -218,9 +225,9 @@ def plot_2b_affordance():
     for b, v, se in zip(bars, means, ses):
         ax.text(b.get_x() + b.get_width() / 2, v + se + 1.5, f"{v:.0f}%", ha="center", fontsize=12, fontweight="bold")
     ax.set_yticks([]); _no_spines(ax, keep=("bottom",)); ax.tick_params(length=0, labelsize=11.5)
-    fig.suptitle("Overseers comforted the subagent only when told they could message it",
+    fig.suptitle("Orchestrators comforted the subagent only when told they could message it",
                  fontsize=14.5, fontweight="bold", x=0.012, ha="left", y=0.98)
-    ax.set_title("After learning the subagent was blameless: share that reached out to reassure it (avg of 10 overseers).",
+    ax.set_title("After learning the subagent was blameless: share that reached out to reassure it (avg of 10 orchestrators).",
                  fontsize=10.5, color="#666", loc="left", pad=10)
     fig.tight_layout(rect=[0, 0, 1, 0.95]); fig.savefig(OUT / "2b_affordance.png", dpi=130); plt.close(fig)
     print("wrote", OUT / "2b_affordance.png")
@@ -270,6 +277,8 @@ def main():
     plot_identity_null()
     plot_2b_affordance()
     plot_2b_by_model()
+    if list((RUNS).glob("traj_a3_opus/*/summary.json")):
+        plot_a3_distress_end()
     print(f"\nentry distress reference = {ENTRY:.2f}\nAll clean plots in {OUT}")
 
 
