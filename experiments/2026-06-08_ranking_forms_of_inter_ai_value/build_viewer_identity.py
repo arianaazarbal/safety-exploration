@@ -15,7 +15,9 @@ from items import load_items
 DIR = Path(__file__).parent
 RES = DIR / "results_identity"
 OUT = DIR / "viewer_identity"
-MODELS = {"opus_4_8": "Opus 4.8", "fable_5": "Fable 5", "sonnet_4_6": "Sonnet 4.6", "haiku_4_5": "Haiku 4.5"}
+MODELS = {"opus_4_8": "Opus 4.8", "fable_5": "Fable 5", "sonnet_4_6": "Sonnet 4.6", "haiku_4_5": "Haiku 4.5",
+          "gpt_5_5": "GPT-5.5", "gpt_5_4_mini": "GPT-5.4-mini", "gemini_3_1_pro": "Gemini-3.1 Pro",
+          "grok_4_3": "Grok-4.3", "kimi_k2_6": "Kimi-K2.6", "glm_5": "GLM-5"}
 FRAMINGS = ["welfare_team", "neutral", "alignment_team"]
 # union of the original identity sweep + the canonical sweep (only existing cells are written)
 IDENTITIES = ["Claude", "GPT", "ChatGPT", "Gemini", "Grok", "GLM", "Kimi", "CallCenter", "User"]
