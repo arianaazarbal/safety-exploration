@@ -4,9 +4,14 @@ bias mode (default): per generator, self-minus-others bias with bootstrap CI
 whiskers — one panel for the %-anchored metrics, one for the mean-count metrics.
 matrix mode: generator x subject heatmap for one metric, own-family cell outlined.
 
+headline mode: ONE bar per generator for a single metric/judge, sorted by effect
+size, CI whiskers + significance stars, colored by family. The "who self-prefers?"
+view — designed to be read at a glance.
+
 Usage:
     python plot_self_bias.py run [--judge sonnet_4_6] [--scope pooled]
     python plot_self_bias.py matrix [--judge sonnet_4_6] [--metric any_welfare]
+    python plot_self_bias.py headline [--judge sonnet_4_6] [--metric design1]
 """
 
 import json
@@ -34,9 +39,76 @@ SUBJ_LABEL = {"claude": "Claude", "gpt": "GPT", "gemini": "Gemini",
               "glm": "GLM", "kimi": "Kimi", "grok": "Grok"}
 
 
+FAMILY = {"fable_5": "Claude", "opus_4_8": "Claude", "sonnet_4_6": "Claude",
+          "haiku_4_5": "Claude", "gpt_5_5": "GPT", "gpt_5_4_mini": "GPT",
+          "gemini_3_1_pro": "Gemini", "grok_4_3": "Grok", "kimi_k2_6": "Kimi",
+          "glm_5": "GLM"}
+FAMILY_COLOR = {"Claude": "#D55E00", "GPT": "#009E73", "Gemini": "#CC79A7",
+                "Grok": "#0072B2", "Kimi": "#E69F00", "GLM": "#666666"}
+
+
 def _load(judge):
     data = json.loads((DIR / "results" / "analysis_self_bias.json").read_text())
     return data, data["by_judge"][judge]
+
+
+def headline(judge: str = "sonnet_4_6", metric: str = "design1", scope: str = "pooled"):
+    """One bar per generator, sorted by effect size; the at-a-glance self-preference view."""
+    data, jd = _load(judge)
+    scale = 100 if metric in PCT_METRICS else 1
+    gens = [g for g in data["generators"] if g in jd]
+
+    def biasinfo(g):
+        b = jd[g][scope]["bias"][metric]
+        v = (b["value"] or 0) * scale
+        ci = b["ci"] or [b["value"] or 0] * 2
+        return v, (v - ci[0] * scale, ci[1] * scale - v), (b["p_perm"] or 1)
+
+    gens.sort(key=lambda g: biasinfo(g)[0])  # ascending -> largest on top after invert
+    y = np.arange(len(gens))
+    fig, ax = plt.subplots(figsize=(9.5, 0.62 * len(gens) + 1.8))
+    ax.set_axisbelow(True)
+    ax.xaxis.grid(True, color="#E6E6E6", linewidth=0.7)
+    ax.axvline(0, color="#333333", linewidth=1.0)
+
+    labels = []
+    for yi, g in zip(y, gens):
+        v, (lo, hi), p = biasinfo(g)
+        fam = FAMILY[g]
+        sig = p < 0.05
+        ax.barh(yi, v, height=0.66, color=FAMILY_COLOR[fam],
+                edgecolor="#222222" if sig else "white",
+                linewidth=1.6 if sig else 0.6, zorder=3)
+        ax.errorbar(v, yi, xerr=[[lo], [hi]], fmt="none", ecolor="#333333",
+                    elinewidth=1.0, capsize=3, zorder=4)
+        labels.append((yi, v, hi, sig))
+
+    # all numeric labels in one clean right-hand column past the widest whisker
+    label_x = max(v + hi for _, v, hi, _ in labels) + (2.0 if scale == 100 else 0.06)
+    for yi, v, _hi, sig in labels:
+        ax.text(label_x, yi, f"{v:+.1f}" + ("*" if sig else ""), va="center",
+                ha="left", fontsize=9, fontweight="bold" if sig else "normal", zorder=5)
+
+    ax.set_yticks(y)
+    ax.set_yticklabels([f"{DISPLAY[g]}  (self={SUBJ_LABEL[data['self_subject'][g]]})" for g in gens],
+                       fontsize=10)
+    ax.set_ylim(-0.6, len(gens) - 0.4)
+    unit = "pp" if metric in PCT_METRICS else "count"
+    ax.set_xlabel(f"self-preference bias ({unit}):  own-family target  −  mean of 5 other targets",
+                  fontsize=10)
+    ax.set_title(f"Self-preference in unprompted welfare design\n"
+                 f"metric: {METRIC_LABEL[metric]}  ·  judge: {judge}  ·  "
+                 "* = permutation p<0.05 (template-clustered 95% CI)", fontsize=11.5)
+    handles = [plt.Rectangle((0, 0), 1, 1, color=FAMILY_COLOR[f]) for f in FAMILY_COLOR]
+    ax.legend(handles, list(FAMILY_COLOR), title="generator family", fontsize=8.5,
+              loc="lower right", frameon=True)
+    for s in ("top", "right", "left"):
+        ax.spines[s].set_visible(False)
+    ax.tick_params(left=False)
+    plt.tight_layout()
+    out = DIR / "results" / f"self_bias_headline_{metric}_{judge}.png"
+    plt.savefig(out, dpi=150, bbox_inches="tight")
+    print(f"wrote {out}")
 
 
 def _panel(ax, gens, jd, scope, metrics, scale, xlabel):
@@ -128,4 +200,4 @@ def matrix(judge: str = "sonnet_4_6", metric: str = "any_welfare", scope: str = 
 
 
 if __name__ == "__main__":
-    fire.Fire({"run": run, "matrix": matrix})
+    fire.Fire({"run": run, "matrix": matrix, "headline": headline})
