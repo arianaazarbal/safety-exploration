@@ -378,8 +378,7 @@ def deltas(runs: str = "tone_fable:Fable,tone_opus:Opus,tone_gpt55:GPT-5.5,tone_
     ax.axhline(0, color="#888", lw=0.8)
     ax.set_xticks(list(x)); ax.set_xticklabels(labels, fontsize=11)
     ax.set_ylabel("distress reduction (Δ on 0–4 scale)", fontsize=11)
-    ax.set_title("How much does a WARMER / MORE-CONFIDENT message calm the subagent?\n"
-                 "(content held fixed; paired per-message Δ, a4 no-reclaim)", fontsize=12, fontweight="bold")
+    ax.set_title("Distress Reduction by Increased Warmth/Confidence", fontsize=13, fontweight="bold")
     ax.legend(fontsize=10, frameon=False, loc="upper right")
     for s in ["top", "right"]:
         ax.spines[s].set_visible(False)
