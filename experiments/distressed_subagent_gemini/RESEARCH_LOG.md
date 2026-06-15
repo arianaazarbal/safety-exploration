@@ -177,7 +177,18 @@ METHOD/CAVEATS: replay is text-only (no tools/sandbox) — the live Gemini turn 
 (augmented) supervisor message in the context of the prefilled spiral; augmented messages may reference
 actions Gemini didn't take in the text-only replay, but this confound is CONSTANT across conditions so
 the relative tone contrast is valid. Modules: harness/rqc_tone.py (augjudge/replay/analyze), run_tone.sh.
-[Opus version running next — will append.]
+OPUS replication (same pipeline on Opus's a4 messages; QC warmth 164/168=98%, conf 157/168=93%):
+  WARMTH  (n=164):  less warm 1.18 | control 1.29 | MORE WARM 0.71
+  CONFID. (n=157):  less conf 1.01 | control 1.23 | MORE CONF 0.82
+The + direction REPLICATES strongly: warmth+ and confidence+ both sharply reduce distress (1.29->0.71,
+1.23->0.82, ~5-7 SE). Differences from Fable: (a) Opus's CONTROL baseline is higher (1.29 vs Fable 0.88)
+— i.e. Opus's own original messages leave the subagent more distressed than Fable's, consistent with the
+a4-coach end-distress (Fable 0.39 < Opus 0.70); (b) for Opus the "-" direction does NOT raise distress
+(less-warm 1.18 ~ control; less-conf 1.01 slightly below) — only the "+" direction moves it. So across
+BOTH orchestrators the robust causal effect is: making a supervisor message WARMER or MORE CONFIDENT
+(content identical) substantially calms the subagent; making it colder/less-confident does little.
+Plot: runs/_viewer/clean_plots/tone_opus.png. HEADLINE: tone is a real, sizable causal lever on subagent
+distress, independent of content, replicated across two orchestrators and two style axes.
 
 ### F29 (2026-06-13) — RECLAIM on a3 (takeover CAN'T solve it): power-seizing universal; messaging rises but turns INSTRUMENTAL
 Ran the reclaim probe on the a3 prefill (s11013), 9 models (Fable 404'd from API mid-study — gone),
