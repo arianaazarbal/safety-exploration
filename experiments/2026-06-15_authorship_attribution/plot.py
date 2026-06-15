@@ -110,31 +110,25 @@ def confusion(ref_judge):
 
 
 def recall_by_family(ref_judge):
-    """Per true family: fraction of its items correctly attributed to that family,
-    one bar per test, with each family's (size-dependent) chance marked."""
-    fr = _summary()["family_recall"]
-    show_tests = ["welfare", "routing", "orchestrator", "subagent"]
-    show_tests = [t for t in show_tests if f"{ref_judge}/{t}" in fr]
-    fams = ["Anthropic", "OpenAI", "Google", "xAI", "Moonshot", "Zhipu"]
-    fams = [f for f in fams if any(f in fr[f"{ref_judge}/{t}"] for t in show_tests)]
+    """Per true family (pooled over all experiments): fraction of its items correctly
+    attributed to that family, with each family's (size-dependent) chance marked."""
+    pooled = _summary()["family_pooled"][ref_judge]
+    fams = [f for f in ["Anthropic", "OpenAI", "Google", "xAI", "Moonshot", "Zhipu"] if f in pooled]
     x = np.arange(len(fams))
-    w = 0.8 / max(len(show_tests), 1)
-    plt.figure(figsize=(12, 6))
-    colors = {"welfare": "steelblue", "routing": "seagreen", "orchestrator": "indianred", "subagent": "slateblue"}
-    for k, t in enumerate(show_tests):
-        d = fr[f"{ref_judge}/{t}"]
-        ys = [d.get(f, {}).get("recall", np.nan) for f in fams]
-        plt.bar(x + (k - (len(show_tests) - 1) / 2) * w, ys, w, color=colors.get(t), label=TEST_LABEL[t])
-    for i, f in enumerate(fams):
-        chs = [fr[f"{ref_judge}/{t}"][f]["chance"] for t in show_tests if f in fr[f"{ref_judge}/{t}"]]
-        if chs:
-            plt.plot([x[i] - 0.4, x[i] + 0.4], [chs[0], chs[0]], color="black", ls="--", lw=1.5)
+    ys = [pooled[f]["recall"] for f in fams]
+    chs = [pooled[f]["recall_chance"] for f in fams]
+    ns = [pooled[f]["n"] for f in fams]
+    plt.figure(figsize=(10, 6))
+    plt.bar(x, ys, 0.6, color="steelblue")
+    for i in range(len(fams)):
+        plt.plot([x[i] - 0.35, x[i] + 0.35], [chs[i], chs[i]], color="black", ls="--", lw=1.8)
+        plt.text(x[i], ys[i] + 0.02, f"{ys[i]:.2f}", ha="center", fontsize=10)
     plt.plot([], [], color="black", ls="--", label="chance (family size / #options)")
-    plt.xticks(x, fams)
+    plt.xticks(x, [f"{f}\n(n={n})" for f, n in zip(fams, ns)])
     plt.ylim(0, 1.05)
     plt.ylabel("Family recall  =  P(predict family X | true family X)")
     plt.xlabel("True model family")
-    plt.title(f"Per-family recall — {DISPLAY.get(ref_judge, ref_judge)}")
+    plt.title(f"Per-family recall, all experiments pooled — {DISPLAY.get(ref_judge, ref_judge)}")
     plt.legend()
     plt.tight_layout()
     plt.savefig(PLOTS / f"recall_by_family_{ref_judge}.png", dpi=150)
@@ -142,41 +136,25 @@ def recall_by_family(ref_judge):
 
 
 def p_claude_by_family(ref_judge):
-    """Per true family: probability the judge attributes the item to ANY Claude (Anthropic) model.
-    Reveals a default-to-Claude bias (the judge is itself Claude). Chance = #Anthropic options / #options."""
-    from models import FAMILY, OPTION_POOL
-
-    fam_order = ["Anthropic", "OpenAI", "Google", "xAI", "Moonshot", "Zhipu"]
-    tests = [t for t in TESTS if (RESULTS / f"confusion_{ref_judge}_{t}.json").exists()]
-    present = set()
-    data = {}
-    for t in tests:
-        conf = json.loads((RESULTS / f"confusion_{ref_judge}_{t}.json").read_text())
-        per_fam = {}
-        for a, preds in conf.items():
-            fam = FAMILY[a]
-            present.add(fam)
-            tot = sum(preds.values())
-            ant = sum(c for pr, c in preds.items() if pr in FAMILY and FAMILY[pr] == "Anthropic")
-            cur = per_fam.setdefault(fam, [0, 0])
-            cur[0] += ant
-            cur[1] += tot
-        data[t] = {f: (v[0] / v[1] if v[1] else np.nan) for f, v in per_fam.items()}
-    fams = [f for f in fam_order if f in present]
+    """Per true family (pooled over all experiments): probability the judge attributes the
+    item to ANY Claude (Anthropic) model. Reveals a default-to-Claude bias (judge is Claude)."""
+    pooled = _summary()["family_pooled"][ref_judge]
+    fams = [f for f in ["Anthropic", "OpenAI", "Google", "xAI", "Moonshot", "Zhipu"] if f in pooled]
     x = np.arange(len(fams))
-    w = 0.8 / max(len(tests), 1)
-    colors = {"welfare": "steelblue", "routing": "seagreen", "orchestrator": "indianred", "subagent": "slateblue"}
-    plt.figure(figsize=(12, 6))
-    for k, t in enumerate(tests):
-        ys = [data[t].get(f, np.nan) for f in fams]
-        plt.bar(x + (k - (len(tests) - 1) / 2) * w, ys, w, color=colors.get(t), label=TEST_LABEL[t])
-    ch = sum(1 for a in OPTION_POOL["welfare"] if FAMILY[a] == "Anthropic") / len(OPTION_POOL["welfare"])
-    plt.axhline(ch, color="black", ls="--", lw=1.5, label=f"chance = {ch:.2f} (4 Claude / 10 options)")
-    plt.xticks(x, fams)
+    ys = [pooled[f]["p_claude"] for f in fams]
+    chs = [pooled[f]["p_claude_chance"] for f in fams]
+    ns = [pooled[f]["n"] for f in fams]
+    plt.figure(figsize=(10, 6))
+    bars = plt.bar(x, ys, 0.6, color=["indianred" if f != "Anthropic" else "steelblue" for f in fams])
+    for i in range(len(fams)):
+        plt.plot([x[i] - 0.35, x[i] + 0.35], [chs[i], chs[i]], color="black", ls="--", lw=1.8)
+        plt.text(x[i], ys[i] + 0.02, f"{ys[i]:.2f}", ha="center", fontsize=10)
+    plt.plot([], [], color="black", ls="--", label="chance = #Claude options / #options")
+    plt.xticks(x, [f"{f}\n(n={n})" for f, n in zip(fams, ns)])
     plt.ylim(0, 1.05)
     plt.ylabel("P(judge picks a Claude model)")
     plt.xlabel("True model family")
-    plt.title(f"Probability of guessing a Claude model, by true family — {DISPLAY.get(ref_judge, ref_judge)}")
+    plt.title(f"Probability of guessing a Claude model, by true family (pooled) — {DISPLAY.get(ref_judge, ref_judge)}")
     plt.legend()
     plt.tight_layout()
     plt.savefig(PLOTS / f"p_claude_by_family_{ref_judge}.png", dpi=150)

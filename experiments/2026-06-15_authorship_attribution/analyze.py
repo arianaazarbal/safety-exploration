@@ -50,15 +50,16 @@ def _load():
     return recs
 
 
-def _item_family_chance():
-    """Per item_id: fraction of options sharing the true author's family (family-level chance)."""
-    out = {}
+def _item_chances():
+    """Per item_id: (own-family chance, Anthropic-share chance) from the option list."""
+    fam_ch, ant_ch = {}, {}
     for line in (DATA / "items.jsonl").read_text().splitlines():
         it = json.loads(line)
         fam = FAMILY[it["true_author"]]
-        share = sum(1 for o in it["options"] if FAMILY[o["key"]] == fam)
-        out[it["item_id"]] = share / len(it["options"])
-    return out
+        n = len(it["options"])
+        fam_ch[it["item_id"]] = sum(1 for o in it["options"] if FAMILY[o["key"]] == fam) / n
+        ant_ch[it["item_id"]] = sum(1 for o in it["options"] if FAMILY[o["key"]] == "Anthropic") / n
+    return fam_ch, ant_ch
 
 
 def run():
@@ -68,10 +69,11 @@ def run():
         print("No results found. Run run_judge.py first.")
         return
     RESULTS.mkdir(parents=True, exist_ok=True)
-    fam_chance = _item_family_chance()
+    fam_chance, ant_chance = _item_chances()
 
     judges = sorted({r["judge"] for r in recs})
-    summary = {"by_judge_test": {}, "self_recognition": {}, "per_author": {}, "family_recall": {}}
+    summary = {"by_judge_test": {}, "self_recognition": {}, "per_author": {},
+               "family_recall": {}, "family_pooled": {}}
 
     print(f"{'judge':<12}{'test':<14}{'n':>4}{'acc':>8}{'chance':>7}{'p':>8}   {'fam_acc':>8}{'fam_ch':>7}{'fam_p':>8}")
     for j in judges:
@@ -123,6 +125,22 @@ def run():
             (RESULTS / f"confusion_{j}_{t}.json").write_text(
                 json.dumps({k2: dict(v) for k2, v in conf.items()}, indent=2)
             )
+
+    for j in judges:
+        jrecs = [r for r in recs if r["judge"] == j]
+        pooled = {}
+        for fam in sorted({FAMILY[r["true_author"]] for r in jrecs}):
+            fsub = [r for r in jrecs if FAMILY[r["true_author"]] == fam]
+            rc = sum(FAMILY.get(r["pred_author"]) == fam for r in fsub)
+            ac = sum(FAMILY.get(r["pred_author"]) == "Anthropic" for r in fsub)
+            pooled[fam] = {
+                "n": len(fsub),
+                "recall": rc / len(fsub),
+                "recall_chance": sum(fam_chance[r["item_id"]] for r in fsub) / len(fsub),
+                "p_claude": ac / len(fsub),
+                "p_claude_chance": sum(ant_chance[r["item_id"]] for r in fsub) / len(fsub),
+            }
+        summary["family_pooled"][j] = pooled
 
     for j in judges:
         if j not in CANON:
