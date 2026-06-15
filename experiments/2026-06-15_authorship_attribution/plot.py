@@ -36,7 +36,7 @@ def accuracy_vs_capability(tests=None, suffix=""):
     tests = list(tests) if tests else TESTS
     s = _summary()["by_judge_test"]
     judges = [j for j in JUDGE_CAPABILITY_ORDER if any(f"{j}/" in k for k in s)]
-    fig, axes = plt.subplots(1, 2, figsize=(15, 6), sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.5), sharey=True)
     ymax = 0.0
     for ax, (acc_key, ci_key, title) in zip(
         axes,
