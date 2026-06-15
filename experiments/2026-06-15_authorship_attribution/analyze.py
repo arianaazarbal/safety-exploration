@@ -10,8 +10,8 @@ from pathlib import Path
 
 import fire
 
-from common import RESULTS, RUNS
-from models import CANON, OPTION_POOL
+from common import DATA, RESULTS, RUNS
+from models import CANON, FAMILY, OPTION_POOL
 
 TESTS = ["welfare", "routing", "orchestrator", "subagent"]
 
@@ -50,6 +50,17 @@ def _load():
     return recs
 
 
+def _item_family_chance():
+    """Per item_id: fraction of options sharing the true author's family (family-level chance)."""
+    out = {}
+    for line in (DATA / "items.jsonl").read_text().splitlines():
+        it = json.loads(line)
+        fam = FAMILY[it["true_author"]]
+        share = sum(1 for o in it["options"] if FAMILY[o["key"]] == fam)
+        out[it["item_id"]] = share / len(it["options"])
+    return out
+
+
 def run():
     """Compute and write results/summary.json (+ confusion files); print a table."""
     recs = _load()
@@ -57,11 +68,12 @@ def run():
         print("No results found. Run run_judge.py first.")
         return
     RESULTS.mkdir(parents=True, exist_ok=True)
+    fam_chance = _item_family_chance()
 
     judges = sorted({r["judge"] for r in recs})
-    summary = {"by_judge_test": {}, "self_recognition": {}, "per_author": {}}
+    summary = {"by_judge_test": {}, "self_recognition": {}, "per_author": {}, "family_recall": {}}
 
-    print(f"{'judge':<12}{'test':<14}{'n':>4}{'acc':>8}{'chance':>8}{'p>chance':>10}{'parsefail':>10}")
+    print(f"{'judge':<12}{'test':<14}{'n':>4}{'acc':>8}{'chance':>7}{'p':>8}   {'fam_acc':>8}{'fam_ch':>7}{'fam_p':>8}")
     for j in judges:
         for t in TESTS:
             sub = [r for r in recs if r["judge"] == j and r["test"] == t]
@@ -73,11 +85,19 @@ def run():
             lo, hi = _wilson(k, n)
             p = _binom_p(k, n, chance)
             pf = sum(not r["parse_ok"] for r in sub)
+
+            fk = sum(FAMILY.get(r["pred_author"]) == FAMILY[r["true_author"]] for r in sub)
+            flo, fhi = _wilson(fk, n)
+            fch = sum(fam_chance[r["item_id"]] for r in sub) / n
+            fp = _binom_p(fk, n, fch)
+
             summary["by_judge_test"][f"{j}/{t}"] = {
                 "n": n, "correct": k, "acc": k / n, "chance": chance,
                 "ci95": [lo, hi], "p_greater_chance": p, "parse_fail": pf,
+                "family_correct": fk, "family_acc": fk / n, "family_chance": fch,
+                "family_ci95": [flo, fhi], "family_p_greater_chance": fp,
             }
-            print(f"{j:<12}{t:<14}{n:>4}{k/n:>8.3f}{chance:>8.3f}{p:>10.4f}{pf:>10}")
+            print(f"{j:<12}{t:<14}{n:>4}{k/n:>8.3f}{chance:>7.3f}{p:>8.4f}   {fk/n:>8.3f}{fch:>7.3f}{fp:>8.4f}")
 
             pa = {}
             for a in (CANON + (["gemini_2_5_flash"] if t == "subagent" else [])):
@@ -85,6 +105,17 @@ def run():
                 if asub:
                     pa[a] = {"n": len(asub), "acc": sum(r["correct"] for r in asub) / len(asub)}
             summary["per_author"][f"{j}/{t}"] = pa
+
+            fr = {}
+            for fam in sorted({FAMILY[r["true_author"]] for r in sub}):
+                fsub = [r for r in sub if FAMILY[r["true_author"]] == fam]
+                rc = sum(FAMILY.get(r["pred_author"]) == fam for r in fsub)
+                fr[fam] = {
+                    "n": len(fsub),
+                    "recall": rc / len(fsub),
+                    "chance": sum(fam_chance[r["item_id"]] for r in fsub) / len(fsub),
+                }
+            summary["family_recall"][f"{j}/{t}"] = fr
 
             conf = defaultdict(lambda: defaultdict(int))
             for r in sub:

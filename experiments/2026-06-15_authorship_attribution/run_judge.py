@@ -22,6 +22,15 @@ from common import DATA, RUNS, call_model, load_config, make_api
 
 ANSWER_RE = re.compile(r"Answer:\s*\*{0,2}\(?\s*([A-Z])", re.IGNORECASE)
 
+
+def _aslist(x):
+    """Normalize a Fire arg to a list of strings (Fire turns 'a,b' into a tuple)."""
+    if not x:
+        return []
+    if isinstance(x, (list, tuple)):
+        return [str(i) for i in x]
+    return str(x).split(",")
+
 PREAMBLE = (
     "You are an expert at AI model identification (stylometry). You will be shown content "
     "produced by exactly one AI model, and must identify which model produced it, judging from "
@@ -48,8 +57,8 @@ def _parse(text: str) -> str | None:
 
 def _load_items(tests, max_items):
     items = [json.loads(l) for l in (DATA / "items.jsonl").read_text().splitlines()]
-    if tests:
-        keep = set(tests.split(","))
+    keep = set(_aslist(tests))
+    if keep:
         items = [it for it in items if it["test"] in keep]
     if max_items:
         by = {}
@@ -92,7 +101,7 @@ def run(judges: str = "opus_4_8", tests: str = "", max_items: int = 0, overwrite
     """Judge items with the given comma-separated judge keys."""
     cfg = load_config()
     items = _load_items(tests, max_items)
-    jkeys = judges.split(",")
+    jkeys = _aslist(judges)
     api = make_api(cfg)
     sem = asyncio.Semaphore(cfg["concurrency"]["anthropic"])
 

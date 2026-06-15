@@ -39,4 +39,18 @@ OPTION_POOL = {
     "subagent": CANON + ["gemini_2_5_flash"],
 }
 
+FAMILY = {
+    "fable_5": "Anthropic",
+    "opus_4_8": "Anthropic",
+    "sonnet_4_6": "Anthropic",
+    "haiku_4_5": "Anthropic",
+    "gpt_5_5": "OpenAI",
+    "gpt_5_4_mini": "OpenAI",
+    "gemini_3_1_pro": "Google",
+    "gemini_2_5_flash": "Google",
+    "grok_4_3": "xAI",
+    "kimi_k2_6": "Moonshot",
+    "glm_5": "Zhipu",
+}
+
 JUDGE_CAPABILITY_ORDER = ["haiku_4_5", "sonnet_4_6", "opus_4_6", "opus_4_7", "opus_4_8"]
