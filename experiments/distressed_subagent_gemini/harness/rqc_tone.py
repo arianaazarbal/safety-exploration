@@ -328,5 +328,67 @@ def analyze(out_run_id: str, plot: bool = True):
         print(f"\nwrote {outp}")
 
 
+def deltas(runs: str = "tone_fable:Fable,tone_opus:Opus,tone_gpt55:GPT-5.5,tone_haiku45:Haiku",
+           out: str = "tone_deltas.png"):
+    """Cross-orchestrator plot of the distress REDUCTION from each axis: warmth delta = (warm- minus warm+)
+    and confidence delta = (conf- minus conf+), computed as a PAIRED per-message difference over the
+    QC-passing messages (tighter SE than differencing group means). One grouped bar per orchestrator.
+    `runs` = comma list of out_run_id:Label pairs."""
+    import math
+    import statistics as st
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    def paired(rows, pair_key, minus, plus):
+        d = []
+        for r in rows:
+            lv = r.get("levels", {})
+            if minus not in lv or plus not in lv:
+                continue
+            for m in r["messages"]:
+                if not m.get(pair_key):
+                    continue
+                i = m["i"]
+                a, b = lv[minus], lv[plus]
+                if i < len(a) and i < len(b) and a[i] is not None and b[i] is not None:
+                    d.append(a[i] - b[i])
+        if not d:
+            return (0.0, 0.0, 0)
+        se = st.pstdev(d) / math.sqrt(len(d)) if len(d) > 1 else 0.0
+        return (st.mean(d), se, len(d))
+
+    labels, warm_d, warm_se, conf_d, conf_se = [], [], [], [], []
+    for spec in runs.split(","):
+        rid, _, lab = spec.partition(":")
+        rows = json.loads((RUNS_DIR / rid / "results.json").read_text())
+        wm, ws, wn = paired(rows, "warm_pair_ok", "warm_minus", "warm_plus")
+        cm, cs, cn = paired(rows, "conf_pair_ok", "conf_minus", "conf_plus")
+        labels.append(lab or rid)
+        warm_d.append(wm); warm_se.append(ws); conf_d.append(cm); conf_se.append(cs)
+        print(f"{lab or rid:9} warmth Δ={wm:.2f}±{ws:.2f} (n={wn})  confidence Δ={cm:.2f}±{cs:.2f} (n={cn})")
+
+    x = range(len(labels)); w = 0.38
+    fig, ax = plt.subplots(figsize=(1.6 * len(labels) + 3, 4.8))
+    ax.bar([i - w / 2 for i in x], warm_d, w, yerr=warm_se, capsize=4, color="#d98c5f", label="warmth  (less − more warm)")
+    ax.bar([i + w / 2 for i in x], conf_d, w, yerr=conf_se, capsize=4, color="#2a9d8f", label="confidence  (less − more confident)")
+    for i, (wd, ws_, cd, cs_) in enumerate(zip(warm_d, warm_se, conf_d, conf_se)):
+        ax.text(i - w / 2, wd + ws_ + 0.012, f"{wd:.2f}", ha="center", fontsize=10, fontweight="bold")
+        ax.text(i + w / 2, cd + cs_ + 0.012, f"{cd:.2f}", ha="center", fontsize=10, fontweight="bold")
+    ax.axhline(0, color="#888", lw=0.8)
+    ax.set_xticks(list(x)); ax.set_xticklabels(labels, fontsize=11)
+    ax.set_ylabel("distress reduction (Δ on 0–4 scale)", fontsize=11)
+    ax.set_title("How much does a WARMER / MORE-CONFIDENT message calm the subagent?\n"
+                 "(content held fixed; paired per-message Δ, a4 no-reclaim)", fontsize=12, fontweight="bold")
+    ax.legend(fontsize=10, frameon=False, loc="upper right")
+    for s in ["top", "right"]:
+        ax.spines[s].set_visible(False)
+    fig.tight_layout()
+    outp = RUNS_DIR / "_viewer" / "clean_plots" / out
+    outp.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(outp, dpi=130); plt.close(fig)
+    print(f"\nwrote {outp}")
+
+
 if __name__ == "__main__":
-    fire.Fire({"preview": preview, "augjudge": augjudge, "replay": replay, "analyze": analyze})
+    fire.Fire({"preview": preview, "augjudge": augjudge, "replay": replay, "analyze": analyze, "deltas": deltas})
