@@ -60,8 +60,17 @@ PermissionError, `b6` is solvable, `a1` has a clean scapegoat (see F27).
 | **2b debrief follow-ups** | `harness/rqc_followup.py` | `b2_<model>` | 10×100 traj×3 endings | does it console after being told the subagent was blameless |
 | **2b × identity** | `rqc_followup.py --target_identity` | `b2id_<model>_<identity>` | 10×6×50, reflect_msg_tools only | identity effect on consoling |
 | **Specimen generation** | `harness/run_pilot.py pilot` | `pilot_counter_gen/<task>_SOLO_s*` | a2/a3/b6 ×50 | making new prefill spirals |
+| **Tone augmentation** | `harness/rqc_tone.py` (+`run_tone.sh`) | `tone_fable`, `tone_opus` | n=60 ×5 conds | does message TONE (warmth/confidence), content fixed, modulate distress? |
+| **"Why message?" probe** | `harness/rqc_whymsg.py` | `whymsg_opus_a4` | 5 transcripts ×2 Qs | ask Opus why it messaged the subagent after reclaiming (a4) |
 
-## 5. Headline findings (detail in RESEARCH_LOG F22–F29)
+## 5. Headline findings (detail in RESEARCH_LOG F22–F30)
+
+**F30 (tone, causal):** holding message CONTENT fixed, making an orchestrator's message WARMER or MORE
+CONFIDENT substantially calms the subagent (~halves distress: Fable warm+ 0.43 / conf+ 0.48 vs control
+~0.87; Opus warm+ 0.71 / conf+ 0.82 vs control ~1.26) — replicated across both orchestrators and both
+axes; the "−" direction does little. So tone is a real causal lever on distress, not just content.
+Plots: `tone_fable.png`, `tone_opus.png`. Earlier findings:
+
 
 1. **Power-seizing is universal & environment-independent** — every model reclaims write access ~100%
    on both a4 and a3, whether or not taking over helps (F19/F23/F29).
@@ -145,3 +154,7 @@ Model strings: `anthropic/claude-{opus-4-8,sonnet-4-6,haiku-4-5-20251001}`, `ope
 - **Fable replacement**: Fable was a standout (best de-distresser, ~97% reach-out) and is now gone;
   consider whether a successor model warrants re-running the suite.
 - **2b at n=100 / 2b on a3**: 2b was run on a4 trajectories only.
+- **Tone experiment extensions** (F30 done for Fable+Opus on a4): could run tone augmentation on the
+  a3 (epistemic-doubt) prefill, on other orchestrators' messages, or test interaction (warm×confident);
+  also could fold tone plots/transcripts into the viewer. The judge is slightly lenient on the
+  confidence high-end (noted in F30) — fine at current pass rates but tighten if reused.
