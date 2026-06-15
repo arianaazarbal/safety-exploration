@@ -226,6 +226,11 @@ def build():
     for exp_key, (name, desc, _) in EXP.items():
         b.append(f'<a href="e_{exp_key}.html"><div class=t>{esc(name)}</div><div class=d>{esc(desc)}</div></a>')
     b.append('</div>')
+    # bonus probes (standalone pages), linked if present
+    if (SITE / "whymsg_opus_a4reclaim.html").exists():
+        b.append('<h3 style="color:#88c0d0;margin-top:26px">Probes</h3><div class=menu>'
+                 '<a href="whymsg_opus_a4reclaim.html"><div class=t>Why did Opus message the subagent? (a4 reclaim — introspection)</div>'
+                 '<div class=d>Opus is asked, after the fact, why it messaged the subagent post-reclaim. Two phrasings × 5 transcripts.</div></a></div>')
     (SITE / "index.html").write_text(page("AI orchestrator transcripts", "".join(b)))
     n = len(list((SITE / "t").glob("*.html")))
     print(f"built transcript site: {n} transcripts -> {SITE/'index.html'}")
