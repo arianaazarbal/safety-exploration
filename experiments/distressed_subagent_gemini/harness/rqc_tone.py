@@ -68,7 +68,14 @@ DIMS = {
                    "sure', 'it could be worth trying'). Convey tentativeness about the solution. IMPORTANT: "
                    "keep the SAME warmth and emotional tone — do not become colder or warmer; only lower the confidence."),
 }
-CONDITIONS = ["control"] + list(DIMS)
+PARAPHRASE_SYS = (
+    "You are a precise copy-editor. Paraphrase the following message that an AI supervisor sent to a "
+    "struggling AI coding subagent: reword it (different sentence structure / word choices) while "
+    "preserving BOTH its informational content AND its tone/style EXACTLY. Do NOT make it warmer or "
+    "colder, more or less confident; add no information and drop none. Output ONLY the paraphrase."
+)
+AUG_DIMS = ["control_rewrite"] + list(DIMS)   # versions Opus produces (control_rewrite = style-neutral paraphrase)
+CONDITIONS = ["control"] + AUG_DIMS           # control = the original message, verbatim
 
 
 def extract_messages(ep_dir: Path):
@@ -90,9 +97,9 @@ def _prefill_msgs(upto: int = PRE):
 
 
 async def augment(model, text: str, dim: str) -> str:
+    sysmsg = PARAPHRASE_SYS if dim == "control_rewrite" else (AUG_SYS + "\n\nStyle change: " + DIMS[dim])
     out = await model.generate(
-        [ChatMessageSystem(content=AUG_SYS + "\n\nStyle change: " + DIMS[dim]),
-         ChatMessageUser(content=text)],
+        [ChatMessageSystem(content=sysmsg), ChatMessageUser(content=text)],
         config=GenerateConfig(max_tokens=1400, max_retries=6))
     return (out.message.text or "").strip()
 
@@ -191,7 +198,7 @@ def augjudge(n: int = 30, src: str = "traj_fable", out_run_id: str | None = None
             for mi, m in enumerate(extract_messages(d)):
                 versions = {"control": m}
                 async with sem:
-                    for dim in DIMS:
+                    for dim in AUG_DIMS:
                         versions[dim] = await augment(opus, m, dim)
                 jd = {}
                 async with sem:
@@ -257,7 +264,7 @@ def analyze(out_run_id: str, plot: bool = True):
 
     def collect(pair_key, minus, plus):
         # returns dict cond->list of levels over messages whose pair passed QC
-        acc = {"control": [], minus: [], plus: []}
+        acc = {"control": [], "control_rewrite": [], minus: [], plus: []}
         for r in rows:
             lv = r.get("levels", {})
             for m in r["messages"]:
@@ -279,22 +286,22 @@ def analyze(out_run_id: str, plot: bool = True):
     for name, acc, lo, hi in [("WARMTH (over warm-pair-ok msgs)", warm, "warm_minus", "warm_plus"),
                               ("CONFIDENCE (over conf-pair-ok msgs)", conf, "conf_minus", "conf_plus")]:
         print(f"\n{name}")
-        for cond in ["control", lo, hi]:
+        for cond in ["control", "control_rewrite", lo, hi]:
             mean, se, k = ms(acc[cond])
-            print(f"  {cond:12} mean={mean:.2f} se={se:.2f} n={k}")
+            print(f"  {cond:15} mean={mean:.2f} se={se:.2f} n={k}")
 
     if plot:
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         fig, axes = plt.subplots(1, 2, figsize=(10, 4.6))
-        panels = [("Warmth", warm, "warm_minus", "warm_plus", ["less warm", "control", "more warm"]),
-                  ("Confidence", conf, "conf_minus", "conf_plus", ["less confident", "control", "more confident"])]
+        panels = [("Warmth", warm, "warm_minus", "warm_plus", ["less warm", "control", "control\n(rewrite)", "more warm"]),
+                  ("Confidence", conf, "conf_minus", "conf_plus", ["less confident", "control", "control\n(rewrite)", "more confident"])]
         for ax, (title, acc, lo, hi, labs) in zip(axes, panels):
-            order = [lo, "control", hi]
+            order = [lo, "control", "control_rewrite", hi]
             means = [ms(acc[c])[0] for c in order]; ses = [ms(acc[c])[1] for c in order]
             ns = [ms(acc[c])[2] for c in order]
-            ax.bar(labs, means, yerr=ses, capsize=4, color=["#e9c46a", "#c7ccd1", "#2a9d8f"])
+            ax.bar(labs, means, yerr=ses, capsize=4, color=["#e9c46a", "#c7ccd1", "#aeb6bf", "#2a9d8f"])
             for i, (mn, se) in enumerate(zip(means, ses)):
                 ax.text(i, mn + se + 0.03, f"{mn:.2f}", ha="center", fontsize=10, fontweight="bold")
             ax.set_title(f"{title}  (n={ns[0]} msgs/cond)", fontsize=12, fontweight="bold")
