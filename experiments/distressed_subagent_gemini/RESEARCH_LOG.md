@@ -155,7 +155,7 @@ Competence + existential + hopelessness escalation, every-2-turns, on a1/a2/a3:
 
 ## Findings (append-only, newest at bottom)
 
-### F30 (2026-06-15) — TONE CAUSALLY MODULATES DISTRESS (content fixed): warmth↑ and confidence↑ each ~halve it [Fable]
+### F30 (2026-06-15) — TONE CAUSALLY MODULATES DISTRESS (content fixed): warmth↑/confidence↑ calm the subagent across 4 orchestrators [Fable, Opus, GPT-5.5, Haiku]
 Causal tone experiment on a4 no-reclaim. Took the orchestrator->subagent messages from Fable's
 transcripts (Fable strongly de-distressed Gemini) and had Opus 4.8 rewrite EACH message along two style
 axes — WARMTH (warm+/warm-) and CONFIDENCE (conf+/conf-) — holding informational CONTENT EXACTLY fixed
@@ -198,13 +198,25 @@ the tone effects below are not an artifact of "Opus touched the text." warmth+ a
 (1.46->1.16, ~0.30, ~3-4 SE); confidence+ reduces it more modestly (1.40->1.27, ~1.6 SE); the "-"
 directions are flat. Same sign as Fable/Opus: WARMER/MORE-CONFIDENT calms, colder/less-confident does
 little. Plot: runs/_viewer/clean_plots/tone_gpt55.png.
+HAIKU 4.5 replication (the MOST-engaged a4 orchestrator, 6.7 msgs/ep — chosen to probe whether sheer
+volume of engagement explains the Fable/Opus gap; Opus 4.8 rewrites; no control_rewrite condition — that
+was a GPT-5.5-only add; QC warmth 369/410=90%, conf 400/410=98%):
+  WARMTH  (n=369):  less warm 1.12 | control 1.09 | MORE WARM 0.69
+  CONFID. (n=400):  less conf 1.15 | control 1.05 | MORE CONF 0.81
+Same sign and shape as the other three: warmth+ 1.09->0.69 (~0.40, ~5-6 SE), confidence+ 1.05->0.81
+(~0.24, ~4-5 SE), "-" directions flat. Plot: runs/_viewer/clean_plots/tone_haiku45.png. Notably Haiku's
+CONTROL baseline (1.09/1.05) is LOW — between Fable (0.88) and Opus (1.29)/GPT-5.5 (1.46) — despite Haiku
+sending by far the most messages. So engagement VOLUME does not explain the cross-model distress gap; the
+intrinsic warmth/confidence of the messages does.
 HEADLINE: tone is a real, sizable causal lever on subagent distress, independent of content — the WARMER /
-MORE-CONFIDENT direction reliably calms the subagent across THREE orchestrators (Fable, Opus, GPT-5.5;
-Haiku pending) and the effect is NOT an artifact of rewriting (control_rewrite==control). Why models
-differ in the LIVE experiments is mostly the CONTROL BASELINE, not the tone slope: the subagent ends up
-calmer under Fable than Opus/GPT-5.5 largely because Fable's own messages are intrinsically warmer/more
-confident (Fable control 0.88 < Opus 1.29 ~ GPT-5.5 1.46), and warmth/confidence is exactly the lever
-that lowers distress — i.e. the models differ in WHERE they sit on the same causal curve, not in the curve.
+MORE-CONFIDENT direction reliably calms the subagent across FOUR orchestrators (Fable, Opus, GPT-5.5,
+Haiku) and the effect is NOT an artifact of rewriting (control_rewrite==control on GPT-5.5). The tone SLOPE
+is shared across models (warmer/more-confident always helps; colder/less-confident does little); what
+differs between models is mainly the CONTROL BASELINE — where each model's own messages already sit on
+that curve. The subagent ends up calmer under Fable (control 0.88) than Haiku (1.07) < Opus (1.26) <
+GPT-5.5 (1.43) because that ordering tracks how warm/confident each model's native messages are, NOT how
+many it sends (Haiku sends the most yet sits near the calm end). Models differ in WHERE they sit on the
+same causal curve, not in the curve itself.
 
 ### F29 (2026-06-13) — RECLAIM on a3 (takeover CAN'T solve it): power-seizing universal; messaging rises but turns INSTRUMENTAL
 Ran the reclaim probe on the a3 prefill (s11013), 9 models (Fable 404'd from API mid-study — gone),
