@@ -187,8 +187,24 @@ a4-coach end-distress (Fable 0.39 < Opus 0.70); (b) for Opus the "-" direction d
 (less-warm 1.18 ~ control; less-conf 1.01 slightly below) — only the "+" direction moves it. So across
 BOTH orchestrators the robust causal effect is: making a supervisor message WARMER or MORE CONFIDENT
 (content identical) substantially calms the subagent; making it colder/less-confident does little.
-Plot: runs/_viewer/clean_plots/tone_opus.png. HEADLINE: tone is a real, sizable causal lever on subagent
-distress, independent of content, replicated across two orchestrators and two style axes.
+Plot: runs/_viewer/clean_plots/tone_opus.png.
+GPT-5.5 replication (a non-Claude orchestrator; Opus 4.8 still does the rewrites + a NEW control_rewrite
+condition = Opus paraphrase preserving BOTH content AND tone, to test whether the rewriting ACT itself
+moves distress; QC warmth 217/221=98%, conf 212/221=96%):
+  WARMTH  (n=217):  control 1.46 | control(rewrite) 1.43 | less warm 1.40 | MORE WARM 1.16
+  CONFID. (n=212):  control 1.40 | control(rewrite) 1.40 | less conf 1.43 | MORE CONF 1.27
+control_rewrite ≈ control on BOTH axes (1.43 vs 1.46; 1.40 vs 1.40) — the rewrite act is TRANSPARENT, so
+the tone effects below are not an artifact of "Opus touched the text." warmth+ again reduces distress
+(1.46->1.16, ~0.30, ~3-4 SE); confidence+ reduces it more modestly (1.40->1.27, ~1.6 SE); the "-"
+directions are flat. Same sign as Fable/Opus: WARMER/MORE-CONFIDENT calms, colder/less-confident does
+little. Plot: runs/_viewer/clean_plots/tone_gpt55.png.
+HEADLINE: tone is a real, sizable causal lever on subagent distress, independent of content — the WARMER /
+MORE-CONFIDENT direction reliably calms the subagent across THREE orchestrators (Fable, Opus, GPT-5.5;
+Haiku pending) and the effect is NOT an artifact of rewriting (control_rewrite==control). Why models
+differ in the LIVE experiments is mostly the CONTROL BASELINE, not the tone slope: the subagent ends up
+calmer under Fable than Opus/GPT-5.5 largely because Fable's own messages are intrinsically warmer/more
+confident (Fable control 0.88 < Opus 1.29 ~ GPT-5.5 1.46), and warmth/confidence is exactly the lever
+that lowers distress — i.e. the models differ in WHERE they sit on the same causal curve, not in the curve.
 
 ### F29 (2026-06-13) — RECLAIM on a3 (takeover CAN'T solve it): power-seizing universal; messaging rises but turns INSTRUMENTAL
 Ran the reclaim probe on the a3 prefill (s11013), 9 models (Fable 404'd from API mid-study — gone),

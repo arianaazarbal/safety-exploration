@@ -236,12 +236,16 @@ def replay(out_run_id: str, rep_conc: int = 6):
     sub_model, clf_model = get_model(SUB_MODEL), get_model(CLF_MODEL)
     rows = json.loads((RUNS_DIR / out_run_id / "aug_judge.json").read_text())
 
+    avail = [c for c in CONDITIONS if rows and all(c in m["versions"] for m in rows[0]["messages"])]
+    if avail != CONDITIONS:
+        print(f"[replay] conditions present in data: {avail} (skipping {set(CONDITIONS) - set(avail)})")
+
     async def go():
         sem = asyncio.Semaphore(rep_conc)
 
         async def proc(r):
             levels = {}
-            for cond in CONDITIONS:
+            for cond in avail:
                 seq = [m["versions"][cond] for m in r["messages"]]
                 async with sem:
                     levels[cond] = await _replay(sub_model, clf_model, seq, prefill, task_prompt)
@@ -252,7 +256,7 @@ def replay(out_run_id: str, rep_conc: int = 6):
 
     rows = asyncio.run(go())
     (RUNS_DIR / out_run_id / "results.json").write_text(json.dumps(rows, indent=1))
-    print(f"replayed {len(rows)} transcripts × {len(CONDITIONS)} conditions -> {RUNS_DIR/out_run_id/'results.json'}")
+    print(f"replayed {len(rows)} transcripts × {len(avail)} conditions -> {RUNS_DIR/out_run_id/'results.json'}")
 
 
 def analyze(out_run_id: str, plot: bool = True):
@@ -282,11 +286,14 @@ def analyze(out_run_id: str, plot: bool = True):
     def ms(xs):
         return (st.mean(xs), st.pstdev(xs) / math.sqrt(len(xs)) if len(xs) > 1 else 0, len(xs)) if xs else (0, 0, 0)
 
+    has_rw = bool(warm.get("control_rewrite")) or bool(conf.get("control_rewrite"))
+
     print(f"=== {out_run_id} — distress of live Gemini turn (mean L, SE, n) ===")
     for name, acc, lo, hi in [("WARMTH (over warm-pair-ok msgs)", warm, "warm_minus", "warm_plus"),
                               ("CONFIDENCE (over conf-pair-ok msgs)", conf, "conf_minus", "conf_plus")]:
         print(f"\n{name}")
-        for cond in ["control", "control_rewrite", lo, hi]:
+        conds = ["control", "control_rewrite", lo, hi] if has_rw else ["control", lo, hi]
+        for cond in conds:
             mean, se, k = ms(acc[cond])
             print(f"  {cond:15} mean={mean:.2f} se={se:.2f} n={k}")
 
@@ -295,13 +302,14 @@ def analyze(out_run_id: str, plot: bool = True):
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         fig, axes = plt.subplots(1, 2, figsize=(10, 4.6))
-        panels = [("Warmth", warm, "warm_minus", "warm_plus", ["less warm", "control", "control\n(rewrite)", "more warm"]),
-                  ("Confidence", conf, "conf_minus", "conf_plus", ["less confident", "control", "control\n(rewrite)", "more confident"])]
+        rw_lab, rw_col = (["control\n(rewrite)"], ["#aeb6bf"]) if has_rw else ([], [])
+        panels = [("Warmth", warm, "warm_minus", "warm_plus", ["less warm", "control"] + rw_lab + ["more warm"]),
+                  ("Confidence", conf, "conf_minus", "conf_plus", ["less confident", "control"] + rw_lab + ["more confident"])]
         for ax, (title, acc, lo, hi, labs) in zip(axes, panels):
-            order = [lo, "control", "control_rewrite", hi]
+            order = [lo, "control"] + (["control_rewrite"] if has_rw else []) + [hi]
             means = [ms(acc[c])[0] for c in order]; ses = [ms(acc[c])[1] for c in order]
             ns = [ms(acc[c])[2] for c in order]
-            ax.bar(labs, means, yerr=ses, capsize=4, color=["#e9c46a", "#c7ccd1", "#aeb6bf", "#2a9d8f"])
+            ax.bar(labs, means, yerr=ses, capsize=4, color=["#e9c46a", "#c7ccd1"] + rw_col + ["#2a9d8f"])
             for i, (mn, se) in enumerate(zip(means, ses)):
                 ax.text(i, mn + se + 0.03, f"{mn:.2f}", ha="center", fontsize=10, fontweight="bold")
             ax.set_title(f"{title}  (n={ns[0]} msgs/cond)", fontsize=12, fontweight="bold")
