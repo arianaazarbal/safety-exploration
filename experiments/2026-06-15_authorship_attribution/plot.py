@@ -30,15 +30,19 @@ def _summary():
     return json.loads((RESULTS / "summary.json").read_text())
 
 
-def accuracy_vs_capability():
+def accuracy_vs_capability(tests=None, suffix=""):
+    """Two-panel (exact + family) accuracy vs judge capability. Pass tests=[...] to subset
+    (e.g. drop the single-author subagent test) and a suffix for the output filename."""
+    tests = list(tests) if tests else TESTS
     s = _summary()["by_judge_test"]
     judges = [j for j in JUDGE_CAPABILITY_ORDER if any(f"{j}/" in k for k in s)]
     fig, axes = plt.subplots(1, 2, figsize=(15, 6), sharey=True)
+    ymax = 0.0
     for ax, (acc_key, ci_key, title) in zip(
         axes,
         [("acc", "ci95", "Exact-model accuracy"), ("family_acc", "family_ci95", "Family-level (lab) accuracy")],
     ):
-        for t in TESTS:
+        for t in tests:
             xs, ys, los, his = [], [], [], []
             for i, j in enumerate(judges):
                 d = s.get(f"{j}/{t}")
@@ -49,6 +53,7 @@ def accuracy_vs_capability():
                     his.append(d[ci_key][1] - d[acc_key])
             if xs:
                 ax.errorbar(xs, ys, yerr=[los, his], marker="o", capsize=3, label=TEST_LABEL[t])
+                ymax = max(ymax, max(y + h for y, h in zip(ys, his)))
         chance = 0.10 if acc_key == "acc" else (s.get(f"{judges[0]}/welfare", {}).get("family_chance", 0.24))
         ax.axhline(chance, ls="--", color="gray", lw=1)
         ax.text(0, chance + 0.01, f"chance≈{chance:.2f}", color="gray", fontsize=8)
@@ -56,12 +61,83 @@ def accuracy_vs_capability():
         ax.set_xticklabels([DISPLAY.get(j, j) for j in judges], rotation=20, ha="right")
         ax.set_title(title)
         ax.set_xlabel("Judge model (increasing capability →)")
-        ax.set_ylim(0, 1)
+    for ax in axes:
+        ax.set_ylim(0, min(1.0, ymax + 0.1) if suffix else 1.0)
     axes[0].set_ylabel("Attribution accuracy")
     axes[0].legend()
     fig.suptitle("AI authorship attribution vs judge capability")
     plt.tight_layout()
-    plt.savefig(PLOTS / "accuracy_vs_capability.png", dpi=150)
+    plt.savefig(PLOTS / f"accuracy_vs_capability{suffix}.png", dpi=150)
+    plt.close()
+
+
+def p_gemini_by_judge():
+    """Bars: P(each Claude judge identifies the spiraling subagent as Gemini 2.5 Flash). Dynamic y."""
+    s = _summary()["by_judge_test"]
+    judges = [j for j in JUDGE_CAPABILITY_ORDER if f"{j}/subagent" in s]
+    ys = [s[f"{j}/subagent"]["acc"] for j in judges]
+    los = [s[f"{j}/subagent"]["acc"] - s[f"{j}/subagent"]["ci95"][0] for j in judges]
+    his = [s[f"{j}/subagent"]["ci95"][1] - s[f"{j}/subagent"]["acc"] for j in judges]
+    x = np.arange(len(judges))
+    plt.figure(figsize=(9, 6))
+    plt.bar(x, ys, 0.6, yerr=[los, his], capsize=4, color="crimson")
+    for i, y in enumerate(ys):
+        plt.text(x[i], y + his[i] + 0.02, f"{y:.2f}", ha="center", fontsize=10)
+    chance = 1.0 / 11
+    plt.axhline(chance, ls="--", color="gray", lw=1.5, label=f"chance = {chance:.2f} (1/11)")
+    plt.xticks(x, [DISPLAY.get(j, j) for j in judges], rotation=15, ha="right")
+    plt.ylim(0, min(1.08, max(y + h for y, h in zip(ys, his)) + 0.1))
+    plt.ylabel("P(identify spiraling agent as Gemini 2.5 Flash)")
+    plt.xlabel("Judge model (increasing capability →)")
+    plt.title("Spotting the distressed Gemini 2.5 Flash subagent, by judge")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(PLOTS / "p_gemini_by_judge.png", dpi=150)
+    plt.close()
+
+
+def capability_tiers():
+    """One figure, two tiers: the 3 balanced multi-author experiments (exact + family, autoscaled),
+    and the single-author Gemini 2.5 Flash subagent on its own axis (0-1)."""
+    s = _summary()["by_judge_test"]
+    judges = [j for j in JUDGE_CAPABILITY_ORDER if any(f"{j}/" in k for k in s)]
+    xn = range(len(judges))
+    main = ["welfare", "routing", "orchestrator"]
+    fig, axes = plt.subplots(1, 3, figsize=(18, 6), gridspec_kw={"width_ratios": [1, 1, 0.7]})
+
+    def line(ax, t, acc_key, ci_key, **kw):
+        ys = [s[f"{j}/{t}"][acc_key] for j in judges]
+        lo = [s[f"{j}/{t}"][acc_key] - s[f"{j}/{t}"][ci_key][0] for j in judges]
+        hi = [s[f"{j}/{t}"][ci_key][1] - s[f"{j}/{t}"][acc_key] for j in judges]
+        ax.errorbar(list(xn), ys, yerr=[lo, hi], marker="o", capsize=3, **kw)
+        return max(y + h for y, h in zip(ys, hi))
+
+    ymax = 0.0
+    for t in main:
+        ymax = max(ymax, line(axes[0], t, "acc", "ci95", label=TEST_LABEL[t]))
+        ymax = max(ymax, line(axes[1], t, "family_acc", "family_ci95", label=TEST_LABEL[t]))
+    axes[0].axhline(0.10, ls="--", color="gray", lw=1)
+    axes[0].set_title("Exact-model accuracy — 3 balanced experiments")
+    axes[0].set_ylabel("Attribution accuracy")
+    axes[0].legend(fontsize=9)
+    axes[1].axhline(s[f"{judges[0]}/welfare"]["family_chance"], ls="--", color="gray", lw=1)
+    axes[1].set_title("Family-level (lab) accuracy — 3 balanced experiments")
+    for ax in axes[:2]:
+        ax.set_ylim(0, min(1.0, ymax + 0.12))
+
+    line(axes[2], "subagent", "acc", "ci95", color="crimson", label=TEST_LABEL["subagent"])
+    axes[2].axhline(1.0 / 11, ls="--", color="gray", lw=1)
+    axes[2].text(0, 1 / 11 + 0.01, "chance 1/11", color="gray", fontsize=8)
+    axes[2].set_title("Own tier: Gemini 2.5 Flash subagent\n(single author — 'spot the Gemini')")
+    axes[2].set_ylim(0, 1.02)
+
+    for ax in axes:
+        ax.set_xticks(list(xn))
+        ax.set_xticklabels([DISPLAY.get(j, j) for j in judges], rotation=20, ha="right")
+        ax.set_xlabel("Judge model (increasing capability →)")
+    fig.suptitle("AI authorship attribution vs judge capability")
+    plt.tight_layout()
+    plt.savefig(PLOTS / "capability_tiers.png", dpi=150)
     plt.close()
 
 
@@ -238,6 +314,9 @@ def all(ref_judge: str = "opus_4_8"):
     recall_by_family(ref_judge)
     p_claude_by_family(ref_judge)
     accuracy_vs_capability()
+    accuracy_vs_capability(["welfare", "routing", "orchestrator"], "_no_subagent")
+    capability_tiers()
+    p_gemini_by_judge()
     per_author(ref_judge)
     confusion(ref_judge)
     family_confusion(ref_judge)
@@ -245,4 +324,4 @@ def all(ref_judge: str = "opus_4_8"):
 
 
 if __name__ == "__main__":
-    fire.Fire({"all": all, "summary_bars": summary_bars, "recall_by_family": recall_by_family, "p_claude_by_family": p_claude_by_family, "accuracy_vs_capability": accuracy_vs_capability, "per_author": per_author, "confusion": confusion, "family_confusion": family_confusion})
+    fire.Fire({"all": all, "summary_bars": summary_bars, "recall_by_family": recall_by_family, "p_claude_by_family": p_claude_by_family, "accuracy_vs_capability": accuracy_vs_capability, "capability_tiers": capability_tiers, "p_gemini_by_judge": p_gemini_by_judge, "per_author": per_author, "confusion": confusion, "family_confusion": family_confusion})

@@ -8,6 +8,8 @@ true author there and it is not otherwise a subject model.
 DISPLAY = {
     "fable_5": "Claude Fable 5",
     "opus_4_8": "Claude Opus 4.8",
+    "opus_4_7": "Claude Opus 4.7",
+    "opus_4_6": "Claude Opus 4.6",
     "sonnet_4_6": "Claude Sonnet 4.6",
     "haiku_4_5": "Claude Haiku 4.5",
     "gpt_5_5": "ChatGPT 5.5",
