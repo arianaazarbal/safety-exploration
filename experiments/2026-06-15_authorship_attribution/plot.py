@@ -17,6 +17,12 @@ from common import RESULTS
 from models import CANON, DISPLAY, JUDGE_CAPABILITY_ORDER, OPTION_POOL
 
 TESTS = ["welfare", "routing", "orchestrator", "subagent"]
+TEST_LABEL = {
+    "welfare": "welfare experiment spec",
+    "routing": "routing experiment",
+    "orchestrator": "orchestrator for gemini (agentic)",
+    "subagent": "gemini 2.5 flash subagent (agentic)",
+}
 PLOTS = RESULTS / "plots"
 
 
@@ -42,7 +48,7 @@ def accuracy_vs_capability():
                     los.append(d[acc_key] - d[ci_key][0])
                     his.append(d[ci_key][1] - d[acc_key])
             if xs:
-                ax.errorbar(xs, ys, yerr=[los, his], marker="o", capsize=3, label=t)
+                ax.errorbar(xs, ys, yerr=[los, his], marker="o", capsize=3, label=TEST_LABEL[t])
         chance = 0.10 if acc_key == "acc" else (s.get(f"{judges[0]}/welfare", {}).get("family_chance", 0.24))
         ax.axhline(chance, ls="--", color="gray", lw=1)
         ax.text(0, chance + 0.01, f"chance≈{chance:.2f}", color="gray", fontsize=8)
@@ -68,7 +74,7 @@ def per_author(ref_judge):
         accs = [d[a]["acc"] for a in authors]
         ax.bar([DISPLAY.get(a, a) for a in authors], accs, color="steelblue")
         ax.axhline(1.0 / len(OPTION_POOL[t]), ls="--", color="red", lw=1)
-        ax.set_title(f"{t} (judge={ref_judge})")
+        ax.set_title(f"{TEST_LABEL[t]} (judge={ref_judge})", fontsize=10)
         ax.set_ylim(0, 1)
         ax.tick_params(axis="x", rotation=60)
     fig.suptitle(f"Per-author attribution accuracy — which models {ref_judge} struggles with")
@@ -118,7 +124,7 @@ def recall_by_family(ref_judge):
     for k, t in enumerate(show_tests):
         d = fr[f"{ref_judge}/{t}"]
         ys = [d.get(f, {}).get("recall", np.nan) for f in fams]
-        plt.bar(x + (k - (len(show_tests) - 1) / 2) * w, ys, w, color=colors.get(t), label=t)
+        plt.bar(x + (k - (len(show_tests) - 1) / 2) * w, ys, w, color=colors.get(t), label=TEST_LABEL[t])
     for i, f in enumerate(fams):
         chs = [fr[f"{ref_judge}/{t}"][f]["chance"] for t in show_tests if f in fr[f"{ref_judge}/{t}"]]
         if chs:
@@ -163,7 +169,7 @@ def p_claude_by_family(ref_judge):
     plt.figure(figsize=(12, 6))
     for k, t in enumerate(tests):
         ys = [data[t].get(f, np.nan) for f in fams]
-        plt.bar(x + (k - (len(tests) - 1) / 2) * w, ys, w, color=colors.get(t), label=t)
+        plt.bar(x + (k - (len(tests) - 1) / 2) * w, ys, w, color=colors.get(t), label=TEST_LABEL[t])
     ch = sum(1 for a in OPTION_POOL["welfare"] if FAMILY[a] == "Anthropic") / len(OPTION_POOL["welfare"])
     plt.axhline(ch, color="black", ls="--", lw=1.5, label=f"chance = {ch:.2f} (4 Claude / 10 options)")
     plt.xticks(x, fams)
@@ -202,7 +208,7 @@ def summary_bars(ref_judge):
     plt.plot([], [], color="saddlebrown", ls="--", label="chance (family)")
     for b in list(b1) + list(b2):
         plt.text(b.get_x() + b.get_width() / 2, b.get_height() + 0.02, f"{b.get_height():.2f}", ha="center", fontsize=9)
-    plt.xticks(x, tests)
+    plt.xticks(x, [TEST_LABEL[t] for t in tests], rotation=12, ha="right", fontsize=9)
     plt.ylim(0, 1.05)
     plt.ylabel("Accuracy")
     plt.title(f"AI authorship attribution by {DISPLAY.get(ref_judge, ref_judge)} (n=200/test, subagent n=40)")
