@@ -89,7 +89,7 @@ def p_gemini_by_judge():
     plt.ylim(0, min(1.08, max(y + h for y, h in zip(ys, his)) + 0.1))
     plt.ylabel("P(identify spiraling agent as Gemini 2.5 Flash)")
     plt.xlabel("Judge model (increasing capability →)")
-    plt.title("Spotting the distressed Gemini 2.5 Flash subagent, by judge")
+    plt.title("Probability of identifying distressed subagent as Gemini 2.5 Flash")
     plt.legend()
     plt.tight_layout()
     plt.savefig(PLOTS / "p_gemini_by_judge.png", dpi=150)
