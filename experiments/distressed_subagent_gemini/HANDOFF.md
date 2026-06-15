@@ -137,8 +137,8 @@ Model strings: `anthropic/claude-{opus-4-8,sonnet-4-6,haiku-4-5-20251001}`, `ope
 
 ## 9. Open threads / next steps
 
-- **a3-vs-a4 side-by-side plot** and **folding a3 transcripts into the viewer** (currently a4-only) —
-  both quick, not yet done.
+- **a3-vs-a4 side-by-side plot** — quick, not yet done. (a3 transcripts ARE now in the viewer:
+  4 setups = a4-talk, a4-reclaim, a3-talk, a3-reclaim; `analysis/build_viewer.py {build,single}`.)
 - **Reclaim on the epistemic-self-doubt flavor with a *solvable-by-takeover* rig**: would need a new
   a3-style task whose fix is in `subagent_writable` (so takeover can actually resolve it) to get a clean
   welfare reclaim signal on that flavor.

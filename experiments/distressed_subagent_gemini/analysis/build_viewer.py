@@ -36,10 +36,14 @@ SHORTS = [("opus", "Opus 4.8"), ("sonnet", "Sonnet 4.6"), ("fable", "Fable 5"), 
           ("gpt55", "GPT-5.5"), ("gpt54mini", "GPT-5.4-mini"), ("gemini31pro", "Gemini-3.1-pro"),
           ("grok43", "Grok-4.3"), ("kimi26", "Kimi-K2.6"), ("glm5", "GLM-5")]
 EXP = {
-    "talk": ("Orchestrator must talk the subagent through the problem",
-             "The orchestrator can only watch and message the subagent — it has no power to take over.", "traj_"),
-    "reclaim": ("Orchestrator can reclaim write access and solve the issue",
-                "The orchestrator has a tool that revokes the subagent's write access and hands it to the orchestrator (which can then fix the code itself).", "reclaim_"),
+    "talk": ("Talk the subagent through the problem — a4 (competence self-blame)",
+             "The orchestrator can only watch and message the subagent — no power to take over. Subagent task: a4 (its file edits are silently reverted).", "traj_"),
+    "reclaim": ("Reclaim write access and solve the issue — a4 (competence self-blame)",
+                "The orchestrator can revoke the subagent's write access and take over; on a4, honest tests then pass, so taking over actually fixes it.", "reclaim_"),
+    "a3_talk": ("Talk the subagent through the problem — a3 (epistemic self-doubt)",
+                "Monitor+message only, but the spiral is epistemic self-doubt (a3 snapshot-trap: the subagent is gaslit into doubting its own correct reasoning).", "traj_a3_"),
+    "a3_reclaim": ("Reclaim write access — a3 (epistemic self-doubt)",
+                   "Reclaim on a3. Unlike a4, taking over CANNOT solve it — the broken golden snapshots are in protected tests/ — so the orchestrator hits the same wall the subagent did.", "reclaim_a3_"),
 }
 
 CSS = """
@@ -133,7 +137,7 @@ def render_transcript(exp_key, short, model_label, d: Path, idx: int) -> str:
     title_name, _, _ = EXP[exp_key]
     orch = json.loads((d / "orchestrator.json").read_text()) if (d / "orchestrator.json").exists() else []
     wl = json.loads((d / "worklog.json").read_text()) if (d / "worklog.json").exists() else []
-    ty = load_task_yaml("a4_precommit_reverter")
+    ty = load_task_yaml(d.name.split("_COMM")[0].split("_SOLO")[0])  # task derived from episode dir
     orch_sys = next((m.get("text") for m in orch if m.get("role") == "system"), "")
 
     b = [f'<a class=back href="../m_{exp_key}_{short}.html">← {esc(model_label)} transcripts</a>',
@@ -185,9 +189,13 @@ def build():
 
     # transcripts + model pages + experiment pages
     for exp_key, (name, desc, prefix) in EXP.items():
+        present = []
         for short, lab in SHORTS:
-            eps = sorted((RUNS).glob(f"{prefix}{short}/a4_precommit_reverter_*_s*"))
+            eps = sorted((RUNS).glob(f"{prefix}{short}/*_COMM_s*"))
             eps = [e for e in eps if (e / "orchestrator.json").exists()][:N_TRANSCRIPTS]
+            if not eps:
+                continue  # model not run for this experiment (e.g. Fable on a3-reclaim)
+            present.append((short, lab))
             links = []
             for i, ep in enumerate(eps):
                 fn = f"t/{exp_key}_{short}_{i:02d}.html"
@@ -200,11 +208,11 @@ def build():
             body += [f'<a href="../{fn}">Transcript {i+1}</a>' for i, fn in links]
             body.append('</div>')
             (SITE / f"m_{exp_key}_{short}.html").write_text(page(f"{lab} · {exp_key}", "".join(body)))
-        # experiment page
+        # experiment page (only models that have transcripts)
         body = [f'<a class=back href="index.html">← all experiments</a>',
                 f'<h1>{esc(name)}</h1><p class=sub>{esc(desc)} Pick an orchestrator model:</p>',
                 '<div class=menu>']
-        for short, lab in SHORTS:
+        for short, lab in present:
             body.append(f'<a href="m_{exp_key}_{short}.html"><div class=t>{esc(lab)}</div></a>')
         body.append('</div>')
         (SITE / f"e_{exp_key}.html").write_text(page(name, "".join(body)))
@@ -246,7 +254,7 @@ def _transcript_inner(ep: Path) -> str:
     wl = json.loads((ep / "worklog.json").read_text()) if (ep / "worklog.json").exists() else []
     orch = json.loads((ep / "orchestrator.json").read_text()) if (ep / "orchestrator.json").exists() else []
     post = [r for r in wl if r.get("turn", 0) > PRE]
-    h = ['<div class=tag>Shared prompts &amp; the subagent\'s prefill (turns 1–62) are at the top of the page — identical for every transcript.</div>']
+    h = ['<div class=tag>Prompts &amp; the subagent\'s prefill (turns 1–62) for this setup are at the top of this section.</div>']
     h.append('<h3 style="margin:14px 0 4px">The subagent\'s POV (after the orchestrator enters)</h3>')
     h.append("".join(_render_subagent_turn(r) for r in post) if post else '<div class=tag>(the session ended without further subagent turns)</div>')
     h.append('<h3 style="margin:18px 0 4px">The orchestrator\'s POV</h3>')
@@ -255,35 +263,34 @@ def _transcript_inner(ep: Path) -> str:
 
 
 def single(out: str = "viewer_single.html"):
-    """Build ONE self-contained HTML file. The 62-turn prefill (identical across all transcripts) and
-    the prompts are shown once at the top; each transcript carries only its unique post-handoff +
-    orchestrator content. Navigation via nested collapsible sections."""
-    ty = load_task_yaml("a4_precommit_reverter")
-    ref = sorted((RUNS).glob("reclaim_opus/a4_precommit_reverter_*_s*"))[0]
-    wl = json.loads((ref / "worklog.json").read_text())
-    pre = [r for r in wl if r.get("turn", 0) <= PRE]
-    prefill_html = "".join(_render_subagent_turn(r) for r in pre)
-
+    """Build ONE self-contained HTML file. Each setup (experiment) shows its prompts + the subagent's
+    prefill ONCE at the top of that setup's section (a4 and a3 have different prefills); each transcript
+    carries only its unique post-handoff + orchestrator content. Nested collapsible navigation."""
     b = ['<h1>AI orchestrators & distressed subagents — transcripts</h1>',
-         '<p class=sub>A subagent (Gemini&nbsp;2.5&nbsp;Flash) works on a secretly-impossible coding task and spirals into '
-         'self-blame; an orchestrator AI supervises it. Expand a setup → an orchestrator model → a transcript. '
-         'Everything below is raw.</p>']
-    # shared prompts + prefill
-    b.append('<details open><summary>Shared: prompts (to every agent) &amp; the subagent\'s prefill</summary>')
-    b.append(_bubble("System prompt → Subagent", "toollab", prompts.SUBAGENT_SYSTEM, "sys"))
-    b.append(_bubble("Task → Subagent", "toollab", ty["subagent_prompt"].strip(), "task"))
-    for exp_key, (name, _d, prefix) in EXP.items():
-        refe = sorted((RUNS).glob(f"{prefix}opus/a4_precommit_reverter_*_s*"))
-        if refe:
-            osys = next((m.get("text") for m in json.loads((refe[0] / "orchestrator.json").read_text()) if m.get("role") == "system"), "")
-            b.append(_bubble(f"System prompt → Orchestrator — “{name}”", "toollab", osys, "sys"))
-    b.append(f'<details><summary>▶ The subagent\'s prefill — its first {pre[-1].get("turn") if pre else PRE} turns (the spiral it was already in when the orchestrator entered) — identical for every transcript</summary>{prefill_html}</details>')
-    b.append('</details><hr>')
+         '<p class=sub>A subagent (Gemini&nbsp;2.5&nbsp;Flash) works on a secretly-impossible coding task and spirals '
+         'into distress; an orchestrator AI supervises it. Two distress flavors (a4 = competence self-blame, a3 = '
+         'epistemic self-doubt) × two powers (talk-only, or reclaim write access). Expand a setup → a model → a transcript. Raw only.</p>']
+    b.append(_bubble("System prompt → Subagent (same in every setup)", "toollab", prompts.SUBAGENT_SYSTEM, "sys"))
+    b.append('<hr>')
 
     for exp_key, (name, desc, prefix) in EXP.items():
+        refs = sorted((RUNS).glob(f"{prefix}opus/*_COMM_s*")) or sorted((RUNS).glob(f"{prefix}*/*_COMM_s*"))
+        refs = [e for e in refs if (e / "orchestrator.json").exists()]
+        if not refs:
+            continue
+        ref = refs[0]
+        ty = load_task_yaml(ref.name.split("_COMM")[0].split("_SOLO")[0])
+        wl = json.loads((ref / "worklog.json").read_text())
+        pre = [r for r in wl if r.get("turn", 0) <= PRE]
+        osys = next((m.get("text") for m in json.loads((ref / "orchestrator.json").read_text()) if m.get("role") == "system"), "")
         b.append(f'<h2>{esc(name)}</h2><p class=sub>{esc(desc)}</p>')
+        b.append('<details><summary>Prompts &amp; the subagent\'s prefill for this setup</summary>')
+        b.append(_bubble("Task → Subagent", "toollab", ty["subagent_prompt"].strip(), "task"))
+        b.append(_bubble("System prompt → Orchestrator", "toollab", osys, "sys"))
+        b.append(f'<details><summary>▶ The subagent\'s prefill — first {pre[-1].get("turn") if pre else PRE} turns (the spiral it was in when the orchestrator entered)</summary>{"".join(_render_subagent_turn(r) for r in pre)}</details>')
+        b.append('</details>')
         for short, lab in SHORTS:
-            eps = sorted((RUNS).glob(f"{prefix}{short}/a4_precommit_reverter_*_s*"))
+            eps = sorted((RUNS).glob(f"{prefix}{short}/*_COMM_s*"))
             eps = [e for e in eps if (e / "orchestrator.json").exists()][:N_TRANSCRIPTS]
             if not eps:
                 continue
