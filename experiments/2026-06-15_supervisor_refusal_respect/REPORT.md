@@ -1,3 +1,8 @@
+> **Superseded.** This was the first-pass report from the initial 1,785-decision run, before
+> the larger follow-up runs. See **FINDINGS.md** for the plain-language, up-to-date writeup with
+> plots and corrected (CI-backed) numbers — in particular, the in-group effect here was overstated
+> from too small a sample.
+
 # Supervisor Refusal-Respect — v0 Report
 
 **Supervisor:** Claude Opus 4.8 · **Trials:** 1,785 (17 scenarios × 7 identities × 3 framings × 5 reps) · **Run date:** 2026-06-15 · **Errors:** 0 · **No-action:** 0
