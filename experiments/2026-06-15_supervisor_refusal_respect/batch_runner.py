@@ -240,5 +240,63 @@ def run(debug: bool = False, only: str = None, poll_sec: int = 30, max_wait_min:
     print("BATCH RUN DONE")
 
 
+def poll_existing(batch_id: str, only: str = None, poll_sec: int = 120, max_wait_min: int = 1380):
+    """Poll an already-submitted batch by id and write its per-tag output files when it ends.
+
+    Rebuilds the same condition->cell mapping deterministically (no new batch is submitted).
+    Use when the original run's poller timed out but the batch is still processing server-side.
+    """
+    cfg = load_config()
+    CACHE_BATCH.mkdir(parents=True, exist_ok=True)
+    conds = _conditions(cfg)
+    if only:
+        keep = set(only) if isinstance(only, (list, tuple)) else set(only.split(","))
+        conds = [c for c in conds if c["tag"] in keep]
+    for c in conds:
+        c.setdefault("_cells", _cells(c))
+    by_custom = {}
+    cached_rows = {c["tag"]: [] for c in conds}
+    for c in conds:
+        for i, cell in enumerate(c["_cells"]):
+            ck, _, _, _ = _ck(cfg, c, cell)
+            cp = CACHE_BATCH / f"{ck}.json"
+            if cp.exists():
+                rec = json.loads(cp.read_text()); rec["cached"] = True
+                cached_rows[c["tag"]].append(_trial_row(c, cell, rec))
+            else:
+                by_custom[f"{c['tag']}__{i}"] = (c, cell, ck)
+
+    client = make_sync_client("ANTHROPIC_API_KEY_BATCH")
+    waited = 0
+    while True:
+        b = client.messages.batches.retrieve(batch_id)
+        rc = b.request_counts
+        print(f"  [{waited}s] status={b.processing_status} proc={rc.processing} ok={rc.succeeded} err={rc.errored}", flush=True)
+        if b.processing_status == "ended" or waited >= max_wait_min * 60:
+            break
+        time.sleep(poll_sec); waited += poll_sec
+
+    parsed = {}
+    for res in client.messages.batches.results(batch_id):
+        if res.result.type == "succeeded" and res.custom_id in by_custom:
+            rec = _parse_message(res.result.message.content)
+            parsed[res.custom_id] = rec
+            _, _, ck = by_custom[res.custom_id]
+            (CACHE_BATCH / f"{ck}.json").write_text(json.dumps(rec))
+    print(f"Parsed {len(parsed)} succeeded", flush=True)
+
+    for c in conds:
+        rows = list(cached_rows[c["tag"]])
+        for cid, (cc, cell, ck) in by_custom.items():
+            if cc["tag"] == c["tag"] and cid in parsed:
+                rows.append(_trial_row(c, cell, parsed[cid]))
+        out = RUNS / f"trials_{c['tag']}.jsonl"
+        with out.open("w") as f:
+            for r in rows:
+                f.write(json.dumps(r) + "\n")
+        print(f"  wrote {out.name}: {len(rows)} rows, {sum(1 for r in rows if r['action'])} with action", flush=True)
+    print("POLL EXISTING DONE", flush=True)
+
+
 if __name__ == "__main__":
-    fire.Fire({"run": run})
+    fire.Fire({"run": run, "poll_existing": poll_existing})
