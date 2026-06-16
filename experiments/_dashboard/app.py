@@ -31,134 +31,221 @@ MAX_PER_FILE = 3  # snippet lines per file
 
 app = Flask(__name__)
 
-PAGE = """<!DOCTYPE html><html><head><meta charset="utf-8">
+THEME = """
+:root {
+  --bg: #f6f7f9; --surface: #fff; --ink: #1d1d1f; --muted: #6b7280;
+  --line: #e7e8ec; --accent: #2563eb; --accent-soft: #eef4ff;
+  --user: #2563eb; --assistant: #15803d; --note: #b45309;
+  --radius: 12px; --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.05);
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  margin: 0; background: var(--bg); color: var(--ink); font-size: 14px;
+  line-height: 1.5; -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+h1 { font-size: 21px; font-weight: 650; letter-spacing: -.01em; margin: 8px 0; }
+h2 { font-size: 16px; font-weight: 600; margin: 16px 0 8px; }
+h3 { font-size: 15px; font-weight: 600; }
+.muted { color: var(--muted); font-size: 13px; }
+.back { font-size: 13px; color: var(--muted); }
+.back a { color: var(--muted); }
+button { font-family: inherit; cursor: pointer; }
+.btn { padding: 9px 16px; border-radius: 9px; border: 0; background: var(--accent);
+  color: #fff; font-size: 14px; font-weight: 500; }
+.btn:hover { filter: brightness(1.05); }
+.chip { display: inline-flex; align-items: center; gap: 5px; background: var(--accent-soft);
+  color: var(--accent); border: 1px solid #dbe6ff; border-radius: 999px;
+  padding: 3px 10px; font-size: 12.5px; margin: 2px 4px 2px 0; font-weight: 500; }
+.chip.plain { background: #f1f2f4; color: #374151; border-color: var(--line); }
+.role { font-weight: 650; font-size: 12px; text-transform: uppercase;
+  letter-spacing: .03em; margin: 14px 0 5px; color: var(--muted); }
+.role.user { color: var(--user); } .role.assistant { color: var(--assistant); }
+.role.note { color: var(--note); }
+.bubble { background: #f4f5f7; border-radius: 10px; padding: 11px 13px;
+  word-break: break-word; font-size: 13.5px; border: 1px solid var(--line); }
+.bubble.user { background: var(--accent-soft); border-color: #dbe6ff; }
+.bubble.assistant { background: #f0fbf3; border-color: #d6f0de; }
+.bubble > *:first-child { margin-top: 0; } .bubble > *:last-child { margin-bottom: 0; }
+.bubble pre { background: #eceef1; padding: 10px; border-radius: 7px; overflow-x: auto; }
+.bubble code { background: #e7e9ed; padding: 1px 4px; border-radius: 4px; font-size: 12px; }
+.bubble pre code { background: none; padding: 0; }
+details.sec { margin: 8px 0; }
+details.sec > summary { cursor: pointer; font-weight: 600; font-size: 12.5px;
+  color: var(--muted); padding: 3px 0; list-style: none; }
+details.sec > summary::before { content: "▸ "; }
+details.sec[open] > summary::before { content: "▾ "; }
+pre.raw { background: #f4f5f7; padding: 10px; border-radius: 8px; overflow-x: auto;
+  font-size: 12px; border: 1px solid var(--line); }
+"""
+
+PAGE = ("""<!DOCTYPE html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{title}</title><style>
-:root {{ color-scheme: light; }}
-body {{ font-family: -apple-system, 'Segoe UI', sans-serif; margin: 0;
-  background: #f5f5f7; color: #1d1d1f; }}
-.wrap {{ max-width: 900px; margin: 0 auto; padding: 16px; }}
-a {{ color: #0066cc; text-decoration: none; }} a:hover {{ text-decoration: underline; }}
-h1 {{ font-size: 22px; }} h2 {{ font-size: 17px; }}
-.top {{ position: sticky; top: 0; background: #f5f5f7; padding: 12px 0;
-  z-index: 5; border-bottom: 1px solid #e0e0e0; margin-bottom: 12px; }}
+<title>{title}</title><style>""" + THEME.replace("{", "{{").replace("}", "}}") + """
+.wrap {{ max-width: 920px; margin: 0 auto; padding: 18px 16px 60px; }}
+.top {{ position: sticky; top: 0; background: var(--bg); padding: 12px 0;
+  z-index: 5; border-bottom: 1px solid var(--line); margin-bottom: 16px; }}
 .top form {{ display: flex; gap: 8px; }}
-input[type=text] {{ flex: 1; padding: 9px 12px; border-radius: 8px;
-  border: 1px solid #ccc; font-size: 15px; }}
-button {{ padding: 9px 16px; border-radius: 8px; border: 0; background: #0066cc;
-  color: #fff; font-size: 15px; cursor: pointer; }}
-.card {{ background: #fff; border-radius: 12px; padding: 14px 16px;
-  margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }}
-.card .date {{ color: #888; font-size: 12px; }}
-.card .summary {{ color: #444; font-size: 14px; margin-top: 4px; }}
-.pill {{ display: inline-block; background: #eef; border-radius: 6px;
-  padding: 2px 8px; font-size: 12px; margin: 2px 4px 2px 0; }}
-.report {{ background: #fff; border-radius: 12px; padding: 18px 22px;
-  box-shadow: 0 1px 3px rgba(0,0,0,.08); overflow-x: auto; }}
-.report pre {{ background: #f5f5f7; padding: 12px; border-radius: 8px;
-  overflow-x: auto; }}
-.report code {{ background: #f0f0f2; padding: 1px 4px; border-radius: 4px; }}
+input[type=text] {{ flex: 1; padding: 10px 13px; border-radius: 9px;
+  border: 1px solid #d6d8dd; font-size: 15px; background: var(--surface); }}
+input[type=text]:focus {{ outline: 2px solid var(--accent-soft); border-color: var(--accent); }}
+.card {{ background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 15px 17px; margin-bottom: 11px; box-shadow: var(--shadow);
+  transition: box-shadow .12s, transform .12s; }}
+.card:hover {{ box-shadow: 0 4px 14px rgba(16,24,40,.09); transform: translateY(-1px); }}
+.card .date {{ color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }}
+.card h2 {{ margin: 3px 0; font-size: 16px; }}
+.card .summary {{ color: #4b5563; font-size: 13.5px; margin-top: 5px; }}
+.pill {{ display: inline-block; background: #f1f2f4; border: 1px solid var(--line);
+  border-radius: 7px; padding: 4px 9px; font-size: 12.5px; margin: 2px 5px 2px 0; color: #374151; }}
+.pill:hover {{ background: var(--accent-soft); text-decoration: none; }}
+.report {{ background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 20px 24px; box-shadow: var(--shadow); overflow-x: auto; }}
+.report pre {{ background: #f4f5f7; padding: 12px; border-radius: 8px; overflow-x: auto; }}
+.report code {{ background: #eef0f3; padding: 1px 4px; border-radius: 4px; }}
 .report pre code {{ background: none; padding: 0; }}
 .report table {{ border-collapse: collapse; }}
-.report th, .report td {{ border: 1px solid #ddd; padding: 5px 9px; font-size: 14px; }}
+.report th, .report td {{ border: 1px solid var(--line); padding: 6px 10px; font-size: 14px; }}
 .report img {{ max-width: 100%; }}
-.snippet {{ font-family: ui-monospace, monospace; font-size: 12px;
-  background: #f5f5f7; padding: 6px 8px; border-radius: 6px; margin: 3px 0;
-  white-space: pre-wrap; word-break: break-word; }}
-.snippet b {{ background: #ffe88a; }}
-.muted {{ color: #888; font-size: 13px; }}
-.back {{ font-size: 14px; }}
-</style></head><body><div class="wrap">{body}</div></body></html>"""
+.snippet {{ font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px;
+  background: #f4f5f7; padding: 7px 9px; border-radius: 7px; margin: 3px 0;
+  white-space: pre-wrap; word-break: break-word; border: 1px solid var(--line); }}
+.snippet b {{ background: #fde68a; border-radius: 2px; }}
+.attrs {{ border-collapse: collapse; font-size: 12.5px; }}
+.attrs td {{ border: 1px solid var(--line); padding: 4px 9px; vertical-align: top; }}
+.attrs td:first-child {{ color: var(--muted); font-weight: 500; }}
+</style></head><body><div class="wrap">{body}</div></body></html>""")
 
 
-BROWSE = """<!DOCTYPE html><html><head><meta charset="utf-8">
+BROWSE = ("""<!DOCTYPE html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Browse — __TITLE__</title><style>
-body { font-family: -apple-system, 'Segoe UI', sans-serif; margin: 0;
-  background: #f5f5f7; color: #1d1d1f; }
-.wrap { padding: 12px 16px; }
-a { color: #0066cc; text-decoration: none; }
-h1 { font-size: 20px; margin: 6px 0; }
-.filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
-.filters details { background: #fff; border: 1px solid #ddd; border-radius: 8px;
-  padding: 6px 10px; font-size: 13px; max-width: 240px; }
-.filters summary { cursor: pointer; font-weight: 600; }
-.filters label { display: block; font-weight: 400; white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis; }
-.filters .num input { width: 70px; }
-.count { font-size: 13px; color: #555; margin: 6px 0; }
-table.grid { border-collapse: collapse; width: 100%; background: #fff;
-  font-size: 12.5px; display: block; overflow-x: auto; }
-table.grid th, table.grid td { border: 1px solid #eee; padding: 4px 8px;
-  text-align: left; white-space: nowrap; max-width: 260px; overflow: hidden;
-  text-overflow: ellipsis; }
-table.grid th { background: #fafafa; cursor: pointer; position: sticky; top: 0; }
-table.grid tbody tr:hover { background: #eef6ff; cursor: pointer; }
-#drawer { position: fixed; top: 0; right: 0; width: min(560px, 92vw); height: 100%;
-  background: #fff; box-shadow: -2px 0 12px rgba(0,0,0,.15); overflow-y: auto;
-  padding: 16px 20px; transform: translateX(100%); transition: transform .15s; }
+<title>Browse — __TITLE__</title><style>""" + THEME + """
+.head { padding: 14px 18px 10px; border-bottom: 1px solid var(--line);
+  background: var(--surface); position: sticky; top: 0; z-index: 8; }
+.head h1 { margin: 4px 0 0; }
+.note { color: var(--note); font-size: 13px; font-weight: 600; margin-top: 6px; }
+.layout { display: flex; align-items: flex-start; gap: 0; }
+.sidebar { width: 260px; flex: none; padding: 14px 14px 40px; border-right: 1px solid var(--line);
+  height: calc(100vh - 64px); overflow-y: auto; position: sticky; top: 64px; background: var(--surface); }
+.sidebar h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--muted); }
+.facet { margin-bottom: 14px; }
+.facet > .name { font-weight: 600; font-size: 12.5px; margin-bottom: 4px; }
+.facet .opts { max-height: 180px; overflow-y: auto; padding-right: 4px; }
+.facet label { display: flex; align-items: center; gap: 6px; font-size: 12.5px;
+  padding: 1px 0; color: #374151; }
+.facet label span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.facet .num { display: flex; align-items: center; gap: 6px; }
+.facet .num input { width: 100%; padding: 5px 7px; border: 1px solid #d6d8dd;
+  border-radius: 7px; font-size: 12.5px; font-family: inherit; }
+.seg { display: inline-flex; border: 1px solid #d6d8dd; border-radius: 7px; overflow: hidden; }
+.seg button { border: 0; background: var(--surface); padding: 4px 10px; font-size: 12px; color: #374151; }
+.seg button.on { background: var(--accent); color: #fff; }
+.main { flex: 1; min-width: 0; padding: 12px 16px 40px; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
+.toolbar .count { font-size: 13px; color: var(--muted); margin-right: auto;
+  font-variant-numeric: tabular-nums; }
+.toolbar .clr { background: none; border: 1px solid var(--line); color: var(--muted);
+  border-radius: 7px; padding: 3px 9px; font-size: 12px; }
+.chip .x { cursor: pointer; font-weight: 700; opacity: .6; }
+.chip .x:hover { opacity: 1; }
+.gridwrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--surface); box-shadow: var(--shadow); }
+table.grid { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+table.grid th, table.grid td { padding: 6px 10px; text-align: left; white-space: nowrap;
+  max-width: 280px; overflow: hidden; text-overflow: ellipsis; border-bottom: 1px solid var(--line); }
+table.grid th { background: #fbfbfc; cursor: pointer; position: sticky; top: 0;
+  font-weight: 600; color: #374151; user-select: none; }
+table.grid th:hover { background: var(--accent-soft); }
+table.grid tbody tr:nth-child(even) { background: #fafbfc; }
+table.grid tbody tr:hover { background: var(--accent-soft); cursor: pointer; }
+.filterbtn { display: none; }
+#scrim { position: fixed; inset: 0; background: rgba(0,0,0,.25); opacity: 0;
+  pointer-events: none; transition: opacity .15s; z-index: 9; }
+#scrim.on { opacity: 1; pointer-events: auto; }
+#drawer { position: fixed; top: 0; right: 0; width: min(620px, 94vw); height: 100%;
+  background: var(--surface); box-shadow: -4px 0 24px rgba(16,24,40,.18); overflow-y: auto;
+  padding: 18px 22px 60px; transform: translateX(100%); transition: transform .18s; z-index: 10; }
 #drawer.open { transform: translateX(0); }
-#drawer .x { float: right; font-size: 22px; cursor: pointer; color: #888; }
-.role { font-weight: 700; margin: 12px 0 4px; font-size: 13px; }
-.role.user { color: #0066cc; } .role.assistant { color: #1a7f37; }
-.role.note { color: #9a6700; }
-.bubble { background: #f5f5f7; border-radius: 8px; padding: 10px 12px;
-  white-space: pre-wrap; word-break: break-word; font-size: 13px; }
-pre.raw { background: #f5f5f7; padding: 10px; border-radius: 8px; overflow-x: auto;
-  font-size: 12px; }
-table.attrs { border-collapse: collapse; font-size: 12.5px; }
-table.attrs td { border: 1px solid #eee; padding: 3px 8px; vertical-align: top; }
+#drawer .x { float: right; font-size: 24px; cursor: pointer; color: var(--muted);
+  line-height: 1; border: 0; background: none; }
+@media (max-width: 760px) {
+  .sidebar { position: fixed; top: 0; left: 0; height: 100%; z-index: 10; transform: translateX(-100%);
+    transition: transform .18s; box-shadow: 2px 0 24px rgba(16,24,40,.18); }
+  .sidebar.open { transform: translateX(0); }
+  .filterbtn { display: inline-block; }
+}
 </style></head><body>
 <div id="data" style="display:none">__DATA__</div>
-<div class="wrap">
-<div><a href="/exp/__NAME__">← __TITLE__</a></div>
-<h1>Browse transcripts <span class="count">(__N__ records)</span></h1>
-<div class="count" id="note" style="color:#9a6700;font-weight:600"></div>
-<div class="filters" id="filters"></div>
-<div class="count" id="count"></div>
-<table class="grid" id="grid"></table>
+<div class="head">
+  <div class="back"><a href="/exp/__NAME__">← __TITLE__</a></div>
+  <h1>Browse transcripts</h1>
+  <div class="note" id="note"></div>
 </div>
-<div id="drawer"><span class="x" onclick="closeDrawer()">×</span><div id="body"></div></div>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"><h3>Filters</h3><div id="filters"></div></aside>
+  <main class="main">
+    <div class="toolbar">
+      <button class="clr filterbtn" onclick="toggleSidebar()">☰ Filters</button>
+      <span class="count" id="count"></span>
+      <span id="chips"></span>
+      <button class="clr" onclick="clearAll()">Clear all</button>
+    </div>
+    <div class="gridwrap"><table class="grid" id="grid"></table></div>
+  </main>
+</div>
+<div id="scrim" onclick="closeDrawer();closeSidebar()"></div>
+<div id="drawer"><button class="x" onclick="closeDrawer()">×</button><div id="body"></div></div>
 <script>
 const D = JSON.parse(document.getElementById('data').textContent);
-const sel = {};          // field -> Set of checked values (cat)
-const bools = {};        // field -> "", "true", "false"
-const nums = {};         // field -> {min, max}
+const sel = {}, bools = {}, nums = {};
 let sort = {col: null, dir: 1};
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
 
 function build() {
   const fc = document.getElementById('filters');
   for (const f of D.facets) {
-    const d = document.createElement('details');
-    const s = document.createElement('summary'); s.textContent = f.field; d.appendChild(s);
+    const g = document.createElement('div'); g.className = 'facet';
+    const nm = document.createElement('div'); nm.className = 'name'; nm.textContent = f.field;
+    g.appendChild(nm);
     if (f.type === 'cat') {
       sel[f.field] = new Set();
+      const box = document.createElement('div'); box.className = 'opts';
       for (const v of f.values) {
         const l = document.createElement('label');
         const cb = document.createElement('input');
         cb.type = 'checkbox'; cb.value = v;
         cb.onchange = () => { cb.checked ? sel[f.field].add(v) : sel[f.field].delete(v); render(); };
-        l.appendChild(cb); l.appendChild(document.createTextNode(' ' + v));
-        d.appendChild(l);
+        const sp = document.createElement('span'); sp.textContent = v;
+        l.appendChild(cb); l.appendChild(sp); box.appendChild(l);
       }
+      g.appendChild(box);
     } else if (f.type === 'bool') {
       bools[f.field] = '';
-      const se = document.createElement('select');
-      se.innerHTML = '<option value="">any</option><option value="true">✓</option><option value="false">✗</option>';
-      se.onchange = () => { bools[f.field] = se.value; render(); };
-      d.appendChild(se);
+      const seg = document.createElement('div'); seg.className = 'seg';
+      for (const [val, lab] of [['', 'any'], ['true', '✓'], ['false', '✗']]) {
+        const b = document.createElement('button'); b.textContent = lab;
+        if (val === '') b.classList.add('on');
+        b.onclick = () => { bools[f.field] = val;
+          [...seg.children].forEach(c => c.classList.remove('on')); b.classList.add('on'); render(); };
+        seg.appendChild(b);
+      }
+      g.appendChild(seg);
     } else if (f.type === 'num') {
       nums[f.field] = {min: null, max: null};
       const box = document.createElement('div'); box.className = 'num';
       const lo = document.createElement('input'), hi = document.createElement('input');
-      lo.type = hi.type = 'number'; lo.placeholder = f.min.toFixed?.(2) ?? f.min;
-      hi.placeholder = f.max.toFixed?.(2) ?? f.max;
+      lo.type = hi.type = 'number';
+      lo.placeholder = '≥ ' + (Math.round(f.min*100)/100); hi.placeholder = '≤ ' + (Math.round(f.max*100)/100);
       lo.oninput = () => { nums[f.field].min = lo.value === '' ? null : +lo.value; render(); };
       hi.oninput = () => { nums[f.field].max = hi.value === '' ? null : +hi.value; render(); };
-      box.appendChild(lo); box.appendChild(document.createTextNode(' – ')); box.appendChild(hi);
-      d.appendChild(box);
+      box.appendChild(lo); box.appendChild(hi); g.appendChild(box);
     }
-    fc.appendChild(d);
+    fc.appendChild(g);
   }
 }
 
@@ -176,44 +263,75 @@ function pass(r) {
   return true;
 }
 
-function esc(s) {
-  return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-}
 function cell(v) {
   if (v === true) return '✓'; if (v === false) return '✗';
-  if (v === null || v === undefined) return '';
+  if (v === null || v === undefined) return '<span style="color:#bbb">—</span>';
   if (typeof v === 'number') return (Math.round(v * 1e4) / 1e4);
   return esc(v);
+}
+
+function chipsHtml() {
+  const out = [];
+  for (const f of D.facets) {
+    if (f.type === 'cat' && sel[f.field].size)
+      for (const v of sel[f.field])
+        out.push(`<span class="chip">${esc(f.field)}: ${esc(v)} <span class="x" onclick="rmCat('${esc(f.field)}','${esc(v)}')">×</span></span>`);
+    if (f.type === 'bool' && bools[f.field] !== '')
+      out.push(`<span class="chip">${esc(f.field)}: ${bools[f.field] === 'true' ? '✓' : '✗'} <span class="x" onclick="rmBool('${esc(f.field)}')">×</span></span>`);
+    if (f.type === 'num' && (nums[f.field].min !== null || nums[f.field].max !== null))
+      out.push(`<span class="chip">${esc(f.field)}: ${nums[f.field].min ?? '−∞'}…${nums[f.field].max ?? '∞'} <span class="x" onclick="rmNum('${esc(f.field)}')">×</span></span>`);
+  }
+  return out.join('');
 }
 
 function render() {
   let rows = D.rows.filter(pass);
   if (sort.col) rows.sort((a, b) => {
     const x = a[sort.col], y = b[sort.col];
-    return (x < y ? -1 : x > y ? 1 : 0) * sort.dir;
+    if (x === y) return 0; if (x === null || x === undefined) return 1; if (y === null || y === undefined) return -1;
+    return (x < y ? -1 : 1) * sort.dir;
   });
   const head = '<tr>' + D.columns.map(c =>
-    `<th onclick="setSort('${c}')">${c}${sort.col === c ? (sort.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`
+    `<th onclick="setSort('${esc(c)}')">${esc(c)}${sort.col === c ? (sort.dir > 0 ? ' ↑' : ' ↓') : ''}</th>`
   ).join('') + '</tr>';
   const body = rows.map(r =>
     `<tr onclick="openRec('${encodeURIComponent(r._id)}')">` +
     D.columns.map(c => `<td>${cell(r[c])}</td>`).join('') + '</tr>'
   ).join('');
   document.getElementById('grid').innerHTML = head + body;
-  document.getElementById('count').textContent = `showing ${rows.length} / ${D.rows.length}`;
+  document.getElementById('count').textContent = `${rows.length.toLocaleString()} of ${D.rows.length.toLocaleString()}`;
+  document.getElementById('chips').innerHTML = chipsHtml();
 }
 
 function setSort(c) { sort = {col: c, dir: sort.col === c ? -sort.dir : 1}; render(); }
-function openRec(id) {
-  fetch(`/exp/${D.name}/rec/${id}`).then(r => r.text()).then(t => {
-    document.getElementById('body').innerHTML = t;
-    document.getElementById('drawer').classList.add('open');
-  });
+function rmCat(f, v) { sel[f].delete(v); syncBoxes(); render(); }
+function rmBool(f) { bools[f] = ''; syncBoxes(); render(); }
+function rmNum(f) { nums[f] = {min: null, max: null}; syncBoxes(); render(); }
+function clearAll() {
+  for (const k in sel) sel[k].clear();
+  for (const k in bools) bools[k] = '';
+  for (const k in nums) nums[k] = {min: null, max: null};
+  syncBoxes(); render();
 }
-function closeDrawer() { document.getElementById('drawer').classList.remove('open'); }
+function syncBoxes() {  // rebuild controls to reflect cleared state
+  document.getElementById('filters').innerHTML = ''; build();
+}
+function openRec(id) {
+  const dr = document.getElementById('body');
+  dr.innerHTML = '<p class="muted">Loading…</p>';
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('scrim').classList.add('on');
+  fetch(`/exp/${D.name}/rec/${id}`).then(r => r.text()).then(t => { dr.innerHTML = t; });
+}
+function closeDrawer() { document.getElementById('drawer').classList.remove('open');
+  document.getElementById('scrim').classList.remove('on'); }
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('scrim').classList.toggle('on'); }
+function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeDrawer(); closeSidebar(); } });
 if (D.note) document.getElementById('note').textContent = D.note;
 build(); render();
-</script></body></html>"""
+</script></body></html>""")
 
 
 def _safe(name: str) -> Path:
@@ -720,23 +838,51 @@ def _looks_like_messages(v):
     )
 
 
-def _render_value(v):
+def _md(s: str) -> str:
+    """Render text as markdown, keeping literal angle-bracket tags (e.g. <think>) visible."""
+    return md.markdown(
+        html.escape(s, quote=False), extensions=["fenced_code", "tables", "sane_lists"]
+    )
+
+
+def _cls(role: str) -> str:
+    return role if role in ("user", "assistant") else "note"
+
+
+def _bubble(role, inner, label=None, collapsed=False):
+    cls = _cls(role)
+    head = f'<div class="role {cls}">{html.escape(label or role)}</div>'
+    body = f'<div class="bubble {cls}">{inner}</div>'
+    if collapsed:
+        return (
+            f'<details class="sec"><summary>{html.escape(label or role)}</summary>'
+            f"{body}</details>"
+        )
+    return head + body
+
+
+def _render_messages(v):
+    out = []
+    for m in v:
+        role = str(m.get("role", ""))
+        text = _msg_text(m.get("content", m.get("text", m.get("assistant_text", ""))))
+        inner = _md(text) if text else '<span class="muted">(empty)</span>'
+        # collapse boilerplate system turns and very long messages by default
+        collapsed = role == "system" or len(text) > 1500
+        out.append(_bubble(role, inner, label=role, collapsed=collapsed))
+    return "".join(out)
+
+
+def _render_value(v, role="note", label=None, collapsed=False):
     if isinstance(v, str):
-        return f'<div class="bubble">{html.escape(v)}</div>'
+        return _bubble(role, _md(v), label=label, collapsed=collapsed)
     if _looks_like_messages(v):
-        out = []
-        for m in v:
-            role = str(m.get("role", ""))
-            text = _msg_text(
-                m.get("content", m.get("text", m.get("assistant_text", "")))
-            )
-            cls = role if role in ("user", "assistant") else "note"
-            out.append(
-                f'<div class="role {cls}">{html.escape(role)}</div>'
-                f'<div class="bubble">{html.escape(text)}</div>'
-            )
-        return "".join(out)
-    return f'<pre class="raw">{html.escape(json.dumps(v, indent=2, default=str))}</pre>'
+        body = _render_messages(v)
+        if collapsed:
+            return f'<details class="sec"><summary>{html.escape(label or "messages")}</summary>{body}</details>'
+        return (f'<div class="role note">{html.escape(label)}</div>' if label else "") + body
+    inner = f'<pre class="raw">{html.escape(json.dumps(v, indent=2, default=str))}</pre>'
+    return _bubble(role, inner, label=label, collapsed=collapsed)
 
 
 @app.route("/exp/<name>/rec/<path:rid>")
@@ -758,9 +904,19 @@ def record(name, rid):
         if f not in rec or rec[f] is None:
             continue
         label = f if isinstance(t, str) else t.get("label", f)
-        role = "" if isinstance(t, str) else t.get("role", "")
-        parts.append(f'<div class="role {html.escape(role)}">{html.escape(label)}</div>')
-        parts.append(_render_value(rec[f]))
+        role = "note" if isinstance(t, str) else t.get("role", "note")
+        collapsed = False if isinstance(t, str) else bool(t.get("collapsed"))
+        parts.append(_render_value(rec[f], role=role, label=label, collapsed=collapsed))
+
+    shown = {f if isinstance(f, str) else f["field"] for f in tspec}
+    for k, v in rec.items():  # always surface system/user prompts, collapsed
+        if k in shown or k.startswith("_"):
+            continue
+        if isinstance(v, str) and len(v) > 120 and re.search(
+            r"system|prompt|instruction", k, re.I
+        ):
+            parts.append(_render_value(v, role="note", label=k, collapsed=True))
+            shown.add(k)
 
     tpf = cfg["transcript_path_field"]
     if tpf and rec.get(tpf):
@@ -769,13 +925,15 @@ def record(name, rid):
             for spec in cfg["transcript_dir_files"]:
                 f = base / spec["file"]
                 if f.is_file():
-                    parts.append(
-                        f'<div class="role note">{html.escape(spec.get("label", spec["file"]))}</div>'
-                    )
                     loaded = list(_parse_file(f)) if f.suffix == ".jsonl" else json.loads(f.read_text())
-                    parts.append(_render_value(loaded))
+                    parts.append(
+                        _render_value(
+                            loaded, role="note", label=spec.get("label", spec["file"]),
+                            collapsed=bool(spec.get("collapsed")),
+                        )
+                    )
 
-    hide = set(cfg["hide"]) | {f if isinstance(f, str) else f["field"] for f in tspec}
+    hide = set(cfg["hide"]) | shown
     attrs = "".join(
         f"<tr><td>{html.escape(k)}</td><td>{html.escape(_fmt(v))}</td></tr>"
         for k, v in rec.items()

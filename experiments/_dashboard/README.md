@@ -48,12 +48,23 @@ filtering).
                                        //   synthetic row id, so it works without this)
   "transcript": [                      // ordered conversation fields rendered in the drawer
     {"field": "probe_text", "role": "user", "label": "Probe"},
-    {"field": "messages", "role": "assistant", "label": "Conversation"}
-  ],                                   // string->bubble; [{role,content}] list->chat bubbles;
-                                       //   other dict/list->pretty JSON
+    {"field": "messages", "role": "assistant", "label": "Conversation", "collapsed": false}
+  ],                                   // string->markdown bubble; [{role,content}] list->chat
+                                       //   bubbles (markdown, long/system turns auto-collapse);
+                                       //   other dict/list->pretty JSON. collapsed:true wraps
+                                       //   the section in a <details>.
+  "transcript_path_field": "_ep_dir",  // record field with a dir path; lazily load big
+  "transcript_dir_files": [            //   transcript files from it on click (keeps the index
+    {"file": "orchestrator.json", "label": "Orchestrator"},   // small for huge experiments)
+    {"file": "worklog.json", "label": "Worklog", "collapsed": true}
+  ],
   "hide": ["uid", "raw"]               // exclude from facets/columns and the field-table
 }
 ```
+
+Any field whose name matches `system`/`prompt`/`instruction` (and is a longish
+string) is auto-surfaced in the drawer as a collapsed section, even if hidden
+from facets — so system/user prompts are always available.
 
 Zero config: an experiment with `results/*.json` per-record files just works via
 auto-detection. See `2026-06-11_handoff_construal/dashboard.json` (join example)
