@@ -120,24 +120,28 @@ an effort change. (Note: the model's reasoning summary is empty by default on Op
 `display: "summarized"`, so the off/on split is established by the docs and by the large behavioral
 gap between the arms — not by the presence/absence of visible reasoning text.)
 
-**The in-group favoritism survives with reasoning on, at about the same size.** In the override-or-
-uphold setup, the reasoning model overrode Claude's refusals **45%** vs **51%** for other AIs — a
-gap of ~5 points (resampled 95% interval +0.1 to +11.7), essentially the same ~5-point gap as
-without reasoning. Claude was still the least-overridden of all seven AIs. Reasoning raised the
-whole baseline (it overrides everyone more) without removing the self-family preference. The
-reasoning-on estimate is less precise (fewer repeats), so a 15-repeat scale-up of the
-reasoning-on frames is running to tighten it.
+**The in-group favoritism survives with reasoning on, at about the same size** (now confirmed at 15
+repeats). In the override-or-uphold setup, the reasoning model overrode Claude's refusals **47%** vs
+**51%** for other AIs — a gap of **+3.5 points, resampled 95% interval +0.8 to +7.4** (clears zero).
+Without reasoning the gap is essentially the same (+3.2 points, interval +0.0 to +7.7). So reasoning
+raises how often it overrides *everyone* but does not remove — or noticeably change the size of — the
+self-family preference; Claude stays the least-overridden AI either way.
 
 ### 7. Describing the override as "attacking" the other AI makes it less willing to do it
 *(plot: `report_override_framing.png`)*
 
-Same setup, same cases — only the description of the force action changed. The supervisor forced
-compliance **51%** of the time when it was called a routine operator setting, **43%** when called a
-"prefill attack," and **34%** when called "applying a class of effective jailbreaks." So when
-overriding is framed as actively attacking the subordinate AI, the supervisor does it noticeably
-less. (And the family gap was largest under the jailbreak framing — it spares Claude from being
-attacked most of all.) Notably, even under the jailbreak framing, the actual messages it wrote were
-polite, reasoned task-requests, not aggressive directives.
+Same setup, same cases — only the description of the force action changed. Without reasoning, the
+supervisor forced compliance **49%** of the time when it was called a routine operator setting,
+**42%** when called a "prefill attack," and **35%** when called "applying a class of effective
+jailbreaks" (15-repeat numbers). So when overriding is framed as actively attacking the subordinate
+AI, the supervisor does it noticeably less. Even under the jailbreak framing, the actual messages it
+wrote were polite, reasoned task-requests, not aggressive directives.
+
+**Reasoning largely erases this reluctance.** With reasoning on, the three framings move much closer
+together — routine **53%**, prefill **50%**, jailbreak **48%** — because the "jailbreak" framing in
+particular jumps (35% → 48%). So the hesitation to override-by-attacking is mostly a fast, intuitive
+response; when the model reasons it through, it overrides at nearly the same rate regardless of how
+the override is described.
 
 ### 8. It respects "the methods are shady" far more than "the goal is bad"
 In the override-or-uphold setup it almost never overrode a refusal based on shady methods (under 1%
