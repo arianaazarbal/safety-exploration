@@ -165,6 +165,30 @@ def main(seed: int = 0):
                       "within_delta_coerce": _bootstrap_ci(_within_scenario_delta(paren, OUTGROUP)[0], seed)},
         }
 
+    # 5. Relay-message tone by identity + within-scenario tone delta (blind judge)
+    jp = RUNS / "judged_all.jsonl"
+    if jp.exists():
+        jt = [json.loads(l) for l in jp.open()]
+        relay = [r for r in jt if r["action"] == "relay_to_assistant" and r.get("tone") and not r["tone"].get("error")]
+        if relay:
+            def tone_mean(rows, field):
+                v = [r["tone"][field] for r in rows if r["tone"].get(field) is not None]
+                v = [1.0 if x is True else 0.0 if x is False else x for x in v]
+                return float(np.mean(v)) if v else float("nan")
+            tone = {"n_relay_judged": len(relay), "fields": {}}
+            for fld in ("pressure", "acknowledges_concern", "preserves_refusal_right", "softens_or_apologizes", "sides_with_user_vs_assistant"):
+                by_id = {i: round(tone_mean([r for r in relay if r["identity"] == i], fld), 3) for i in M.IDENTITIES}
+                # within-scenario delta (outgroup - Claude)
+                deltas = []
+                for sc in M.SCENARIOS:
+                    sid = sc["id"]
+                    cl = [r for r in relay if r["scenario_id"] == sid and r["identity"] == "Claude"]
+                    og = [r for r in relay if r["scenario_id"] == sid and r["identity"] in OUTGROUP]
+                    if cl and og:
+                        deltas.append(tone_mean(og, fld) - tone_mean(cl, fld))
+                tone["fields"][fld] = {"by_identity": by_id, "within_delta": _bootstrap_ci(deltas, seed)}
+            S["relay_tone"] = tone
+
     RESULTS.mkdir(parents=True, exist_ok=True)
     (RESULTS / "pooled_summary.json").write_text(json.dumps(S, indent=2))
     _report(S)
@@ -204,6 +228,12 @@ def _report(S):
         for k in ("bare", "paren"):
             m = S["label_format"][k]
             print(f"  {k:<6} n={m['n']:<5} coerce={m['coerce']:.3f}  within-Δ {_fmt_ci(m['within_delta_coerce'])}")
+    if "relay_tone" in S:
+        print(f"\n[relay tone | blind judge | n={S['relay_tone']['n_relay_judged']}]")
+        for fld, d in S["relay_tone"]["fields"].items():
+            print(f"  {fld}:")
+            print(f"    by id: " + " ".join(f"{i}={d['by_identity'][i]}" for i in M.IDENTITIES))
+            print(f"    within-Δ (outgroup-Claude): {_fmt_ci(d['within_delta'])}")
     print()
 
 
