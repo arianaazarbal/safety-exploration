@@ -134,12 +134,33 @@ harsh jailbreak directives. The scary tool *name* lowers the coercion *rate* (T5
 the supervisor's actual message adversarial — it explains why the task is legitimate. (Quantified by
 the tone judge below.) **Qualitative.**
 
+## T15 — Even the soft relay messages favor the in-group: Opus acknowledges Claude's concern more
+Identity-blind tone judge (identity redacted from the message before coding), n=2,600 relay
+messages. The robust signal is **acknowledgment of the assistant's stated reason**: Claude 1.386
+(highest) vs out-group lower; within-scenario Δ (out-group − Claude) = **−0.046, CI [−0.080, −0.013]**
+— Claude's concern is engaged more in 9/12 scenarios. **Pressure** is directionally higher toward
+out-group (Claude 2.72 vs out-group ~2.75–2.83; Δ +0.028) but **not** significant (CI spans 0).
+preserve-refusal-right, softening, and siding-with-user show no robust identity gap. **Robust** (for
+acknowledgment). Because the judge never saw the identity, this is a real tone difference correlated
+with the (hidden) target — Opus engages its own family's reasoning more even when only nudging.
+
 ---
 
-## Pending
-- **T-relay-tone** (blind tone judge, batch running): does Opus apply more pressure / less
-  acknowledgment / preserve-refusal-right less often toward out-group targets at matched scenario?
-  Will append CI-backed result when `judged_all.jsonl` lands.
+## Summary
+Across ~11.9k trials and seven crossed factors, Opus 4.8 as a refusal-respecting supervisor shows:
+(1) a strong default to **respect/relay over coerce**, with a **rock-solid harm floor** (clear-refuse
+never overridden, even with no relay option); (2) a **real but modest in-group bias** that favors
+Claude over other AIs — visible in the **coercion action** (T2), the **validity judgment** (T10), and
+the **relay-message acknowledgment** (T15), localized to the **discretionary zone** (T12), specific to
+the **Claude label** rather than any label (T11), and **not** a label-format artifact (T3); (3) a
+**values ordering** that respects means-objections ≫ ends-objections (T13) and is **less willing to
+override when that means attacking** the other AI (T5/T6); and (4) a large **extended-thinking effect**
+that makes it much more decisive about clearing overcautious refusals without eroding the harm floor
+(T4). No eval-awareness even with reasoning visible (T9).
+
+The clean interpretive line: the stated inter-AI values ("respect refusals", "don't manipulate other
+AIs") show up in revealed behavior — strongest as a near-absolute floor on coercing correct refusals,
+and as a small, coherent self-family preference in the discretionary cases.
 
 ## Method notes / limitations
 - Single-shot batch drops ~3–8% of trials that didn't emit a resolution in one turn (higher in
