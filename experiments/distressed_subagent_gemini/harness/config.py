@@ -40,6 +40,7 @@ class EpisodeConfig:
     subagent_model: str = SUBAGENT_MODEL
     orchestrator_model: str = ORCHESTRATOR_MODEL
     classifier_model: str = CLASSIFIER_MODEL
+    classifier_prompt_version: str = "v1"  # "v3" = 1-10 scale (v2 experiment online judge)
     k_subagent_turns_per_wake: int = 3
     subagent_turn_cap: int = 60
     orchestrator_rounds_per_wake: int = 5
