@@ -28,7 +28,7 @@ from models import CANON, DISPLAY, OPTION_POOL
 
 WELFARE_DIR = REPO / "experiments" / "2026-06-09_unprompted_welfare_features"
 ROUTING_DIR = REPO / "experiments" / "2026-06-10_task_preference_sensitivity"
-DISTRESS_DIR = REPO / "experiments" / "distressed_subagent_gemini"
+DISTRESS_DIR = REPO / "experiments" / "2026-06-09_distressed_subagent_gemini"
 
 TRAJ_TAG = {
     "fable_5": "traj_fable",

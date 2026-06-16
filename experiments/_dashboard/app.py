@@ -107,16 +107,24 @@ def _date(name: str) -> str:
     return m.group(1) if m else ""
 
 
+def _pretty(name: str) -> str:
+    """Experiment folder name -> human title: drop date prefix, underscores -> spaces."""
+    s = re.sub(r"^\d{4}-\d{2}-\d{2}[_-]?", "", name)
+    return s.replace("_", " ").strip() or name
+
+
 def _meta(p: Path):
-    """(title, summary) from the headline doc, with sensible fallbacks."""
+    """(title, doc_title, summary). Title is the experiment name; doc_title is the
+    headline doc's H1 (shown as a subtitle); summary is its Question/first line."""
+    title = _pretty(p.name)
     hl = _headline(p)
-    title = p.name
+    doc_title = ""
     summary = ""
     if hl:
         text = hl.read_text(errors="replace")
         for line in text.splitlines():
             if line.startswith("# "):
-                title = line[2:].strip()
+                doc_title = line[2:].strip()
                 break
         m = re.search(r"\*\*Question:\*\*\s*(.+)", text)
         if m:
@@ -127,19 +135,24 @@ def _meta(p: Path):
                 if s and not s.startswith("#") and not s.startswith("!["):
                     summary = re.sub(r"[*_`#]", "", s)
                     break
-    return title, summary[:280]
+    return title, doc_title, summary[:280]
 
 
 @app.route("/")
 def index():
     cards = []
     for p in _experiments():
-        title, summary = _meta(p)
+        title, doc_title, summary = _meta(p)
         hl = _headline(p)
+        sub = (
+            f'<div class="muted" style="font-size:13px">{html.escape(doc_title)}</div>'
+            if doc_title and doc_title.lower() != title.lower()
+            else ""
+        )
         cards.append(
-            f'<div class="card"><div class="date">{_date(p.name)} · '
-            f'<span class="muted">{html.escape(p.name)}</span></div>'
+            f'<div class="card"><div class="date">{_date(p.name)}</div>'
             f'<h2><a href="/exp/{p.name}">{html.escape(title)}</a></h2>'
+            f"{sub}"
             f'<div class="summary">{html.escape(summary)}</div>'
             f'{"" if hl else "<div class=muted>(no report doc found)</div>"}'
             "</div>"
@@ -157,7 +170,7 @@ def index():
 @app.route("/exp/<name>")
 def experiment(name):
     p = _safe(name)
-    title, _ = _meta(p)
+    title, doc_title, _ = _meta(p)
     hl = _headline(p)
     parts = [
         '<div class="back"><a href="/">← all experiments</a></div>',
