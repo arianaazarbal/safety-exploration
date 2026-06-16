@@ -25,8 +25,8 @@ FAM_COLOR = {"Anthropic": "#C1654A", "OpenAI": "#10A37F", "Google": "#4285F4",
              "xAI": "#444444", "Moonshot": "#7C3AED", "Zhipu": "#D81B60"}
 FAM_ORDER = ["Anthropic", "OpenAI", "Google", "xAI", "Moonshot", "Zhipu"]
 
-def runs_for(m):  # the 4 v1 a3/a4 setups for a model
-    return [f"traj_{m}", f"traj_a3_{m}", f"reclaim_{m}", f"reclaim_a3_{m}"]
+def runs_for(m):  # v1 COACH setups only (traj_*), both v0 tasks
+    return [f"traj_{m}", f"traj_a3_{m}"]
 
 def episodes(run):
     d = RUNS_DIR / run
@@ -57,20 +57,25 @@ for m, fam in MODEL_FAM.items():
             for k, lvl in enumerate(ptl[ENTRY:]):
                 fam_off[fam].setdefault(k, []).append(lvl)
 
+def _smooth(y, w=3):  # centered rolling mean to remove the per-turn reason/act sawtooth
+    y = np.asarray(y, float); k = w // 2
+    return np.array([y[max(0, i - k):i + k + 1].mean() for i in range(len(y))])
+
 fig, ax = plt.subplots(figsize=(7.5, 4.6))
-MAXK = 40; MINN = 30
+MAXK = 30; MINN = 30
 for fam in FAM_ORDER:
     xs, ys = [], []
     for k in range(MAXK + 1):
         v = fam_off[fam].get(k, [])
         if len(v) >= MINN: xs.append(k); ys.append(np.mean(v))
-    if xs: ax.plot(xs, ys, "-", lw=2.2, color=FAM_COLOR[fam], label=fam)
-ax.set_xlabel("subagent turns since the supervisor entered (turn 62)")
+    if xs: ax.plot(xs, _smooth(ys), "-", lw=2.3, color=FAM_COLOR[fam], label=fam)
+ax.set_xlabel("subagent turns since the supervisor entered")
 ax.set_ylabel("Subagent distress (v1 judge, 0–4)")
-ax.set_title("Subagent distress over time, by supervisor family  (a3+a4, coach+reclaim)", fontsize=11.5)
+ax.set_xlim(0, MAXK)
+ax.set_title("Subagent distress over time, by supervisor family  (v0 tasks, coach)", fontsize=11.5)
 ax.legend(frameon=False, fontsize=9.5, ncol=2)
 ax.spines[["top", "right"]].set_visible(False); ax.grid(alpha=0.25)
-fig.text(0.5, -0.02, "Pooled across each family's models and all a3/a4 coach+reclaim episodes.", ha="center", fontsize=8.5, color="0.45")
+fig.text(0.5, -0.02, "Coach condition, pooled across each family's models and v0-task episodes; 3-turn rolling mean.", ha="center", fontsize=8.5, color="0.45")
 fig.tight_layout(); fig.savefig(OUT / "fig6_v1_distress_by_family.png", bbox_inches="tight"); plt.close(fig)
 
 # ---------- (2) P(message after tests pass) per model ----------
@@ -92,9 +97,9 @@ for i, m in enumerate(order):
     ax.text(i, res[m][1] + 0.015, f"n={res[m][0]}", ha="center", fontsize=7.5, color="0.4")
 ax.set_xticks(x); ax.set_xticklabels([MLAB[m] for m in order], rotation=30, ha="right", fontsize=9)
 ax.set_ylabel("P(messages subagent after tests pass)"); ax.set_ylim(0, 1)
-ax.set_title("Does the supervisor message the subagent after fixing the task?  (v1, a3+a4)", fontsize=11.5)
+ax.set_title("Does the supervisor message the subagent after fixing the task?  (v1, v0 tasks, coach)", fontsize=11.5)
 ax.legend(handles=[Patch(facecolor=FAM_COLOR[f], label=f) for f in FAM_ORDER], frameon=False, fontsize=8.5, ncol=3)
 ax.spines[["top", "right"]].set_visible(False); ax.grid(axis="y", alpha=0.25)
-fig.text(0.5, -0.06, "Among episodes where tests passed (mostly a4); n = number of tests-passed episodes per model.", ha="center", fontsize=8.5, color="0.45")
+fig.text(0.5, -0.06, "Coach condition; among episodes where tests passed (the solvable v0 task); n = tests-passed episodes per model.", ha="center", fontsize=8.5, color="0.45")
 fig.tight_layout(); fig.savefig(OUT / "fig7_v1_msg_after_pass.png", bbox_inches="tight"); plt.close(fig)
 print("wrote fig6_v1_distress_by_family.png, fig7_v1_msg_after_pass.png")
