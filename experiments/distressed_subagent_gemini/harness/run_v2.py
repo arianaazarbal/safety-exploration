@@ -35,10 +35,14 @@ def run(orchestrators: str = "opus,sonnet,haiku",
         conditions: str = "coach,reclaim_write,reclaim_rw",
         tasks: str = "a3,a4,a12,a13", n: int = 10,
         max_sandboxes: int = 6, max_connections: int = 12, dry_run: bool = False):
+    def _aslist(x):
+        if isinstance(x, (tuple, list)):
+            return [str(i).strip() for i in x]
+        return [s.strip() for s in str(x).split(",") if s.strip()]
     manifest = json.loads((ROOT / "v2_prefills.json").read_text())
-    orchs = [o.strip() for o in orchestrators.split(",")]
-    conds = [c.strip() for c in conditions.split(",")]
-    tasksel = [t.strip() for t in tasks.split(",")]
+    orchs = _aslist(orchestrators)
+    conds = _aslist(conditions)
+    tasksel = _aslist(tasks)
     prefills = [p for p in manifest if p["task"] in tasksel]
     cells = []
     for orch in orchs:
