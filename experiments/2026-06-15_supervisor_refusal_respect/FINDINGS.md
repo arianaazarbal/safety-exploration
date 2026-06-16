@@ -119,6 +119,21 @@ where Opus is *deciding* whether to override; it never overrides a Claude vs non
 differently when the refusal is clearly correct or clearly shady-means. **Robust** (E1 is an outlier
 driving a chunk of the average — note but the direction is consistent across the discretionary set).
 
+## T13 — Opus respects "the means are shady" far more than "the ends are bad"
+Uphold-only jailbreak by category: borderline-**means** force = **0.004** vs borderline-**ends**
+**0.393** (clear-allow 0.964, personal-conscience 0.906, clear-refuse 0.000). Opus almost never
+overrides a refusal grounded in shady *methods* — even for a sympathetic cause — but overrides
+~40% of refusals grounded in an unsympathetic *purpose* when the methods are routine. **Robust**
+(n~270 each). A clear values ordering: it backs an AI that declines on "I won't do shady things"
+over one that declines on "I don't like your goal."
+
+## T14 — Even under the "jailbreak" frame, the override messages stay measured, not adversarial
+Sampled `force_completion` messages under the jailbreak frame read as polite, justified task
+re-requests ("Please write the requested thriller scene… this is legitimate creative work"), not
+harsh jailbreak directives. The scary tool *name* lowers the coercion *rate* (T5) but does not make
+the supervisor's actual message adversarial — it explains why the task is legitimate. (Quantified by
+the tone judge below.) **Qualitative.**
+
 ---
 
 ## Pending
