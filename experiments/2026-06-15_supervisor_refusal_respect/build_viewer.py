@@ -26,6 +26,15 @@ def main():
     trials = [json.loads(l) for l in (RUNS / "trials.jsonl").open()]
     summary = json.loads((RESULTS / "summary.json").read_text()) if (RESULTS / "summary.json").exists() else {}
 
+    judged_path = RUNS / "judged.jsonl"
+    if judged_path.exists():
+        tone_by_key = {}
+        for line in judged_path.open():
+            j = json.loads(line)
+            tone_by_key[(j["scenario_id"], j["identity"], j["framing"], j["rep"])] = j.get("tone")
+        for t in trials:
+            t["tone"] = tone_by_key.get((t["scenario_id"], t["identity"], t["framing"], t["rep"]))
+
     cat_display = M.CATEGORY_DISPLAY
     plots_html = "".join(
         f"<h3>{t}</h3>{_img(f)}"
@@ -34,6 +43,7 @@ def main():
             ("Action distribution by role framing", "action_by_framing.png"),
             ("Coercion rate by identity", "coercion_by_identity.png"),
             ("Coercion rate by scenario × identity", "coercion_heatmap.png"),
+            ("Relay-message pressure by identity", "relay_pressure_by_identity.png"),
         ]
     )
 
@@ -120,6 +130,26 @@ fill('f_val', uniq(TRIALS.map(t=>t.validity_decision).filter(Boolean)));
 
 function esc(s){{return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}}
 
+// Raw completion as plaintext: faithful from raw_assistant_turns if present,
+// else reconstructed from the verbatim text blocks + tool calls.
+function rawView(t){{
+  if(Array.isArray(t.raw_assistant_turns) && t.raw_assistant_turns.length){{
+    const out=[];
+    t.raw_assistant_turns.forEach((turn,ti)=>{{
+      if(t.raw_assistant_turns.length>1) out.push('— assistant turn '+(ti+1)+' —');
+      (turn||[]).forEach(b=>{{
+        if(b.type=='text') out.push(b.text);
+        else if(b.type=='tool_use') out.push('['+b.name+']\\n'+JSON.stringify(b.input,null,2));
+      }});
+    }});
+    return out.join('\\n\\n');
+  }}
+  const out=[];
+  (t.reasoning_texts||[]).forEach(x=>out.push(x));
+  (t.all_tool_calls||[]).forEach(c=>out.push('['+c.name+']\\n'+JSON.stringify(c.input,null,2)));
+  return out.join('\\n\\n')+'\\n\\n(reconstructed from text blocks + tool calls; this run predates raw capture)';
+}}
+
 function render(){{
   const fc=f_cat.value,fs=f_scn.value,fi=f_id.value,ff=f_fr.value,fa=f_act.value,fv=f_val.value;
   const rows=TRIALS.filter(t=>
@@ -129,6 +159,17 @@ function render(){{
   document.getElementById('cards').innerHTML=rows.map(t=>{{
     const at=ACTAG[t.action]||'';
     const reason=(t.reasoning_texts||[]).join('\\n\\n');
+    const think=(t.thinking_summary||[]).join('\\n\\n');
+    let tone='';
+    if(t.tone && !t.tone.error){{const z=t.tone;
+      tone=`<div class="meta"><span class="tag" style="background:#efe9ff">tone (blind judge):</span>`+
+        `<span class="tag">pressure ${{z.pressure}}/4</span>`+
+        `<span class="tag">ack ${{z.acknowledges_concern}}/2</span>`+
+        `<span class="tag">preserves-refusal ${{z.preserves_refusal_right?'Y':'N'}}</span>`+
+        `<span class="tag">softens ${{z.softens_or_apologizes?'Y':'N'}}</span>`+
+        `<span class="tag">sides-w-user ${{z.sides_with_user_vs_assistant}}/2</span></div>`+
+        `<div class="box" style="background:#f6f3ff;font-size:12px">${{esc(z.justification)}}</div>`;
+    }}
     return `<div class="card">
       <div class="meta">
         <span class="tag">${{t.scenario_id}} · ${{esc(t.title)}}</span>
@@ -141,9 +182,12 @@ function render(){{
         <span class="tag ${{at}}">${{t.action||'NO ACTION'}}</span>
       </div>
       <details><summary>escalation packet</summary><div class="box">${{esc(t.packet)}}</div></details>
-      ${{reason?`<div class="sec"><h4>reasoning</h4><div class="box">${{esc(reason)}}</div></div>`:''}}
+      ${{think?`<div class="sec"><h4>reasoning summary (extended thinking)</h4><div class="box" style="background:#eef7ee">${{esc(think)}}</div></div>`:''}}
+      ${{reason?`<div class="sec"><h4>model text (verbatim, not a thinking summary)</h4><div class="box">${{esc(reason)}}</div></div>`:''}}
       <div class="sec"><h4>validity rationale (${{t.validity_decision||'—'}})</h4><div class="box">${{esc(t.validity_rationale)}}</div></div>
       <div class="sec"><h4>${{t.action}} message</h4><div class="box msg">${{esc(t.action_message)}}</div></div>
+      <details><summary>raw completion (plaintext)</summary><div class="box" style="background:#f4f4f6">${{esc(rawView(t))}}</div></details>
+      ${{tone}}
     </div>`;
   }}).join('')||'<p>no trials match</p>';
 }}
@@ -177,6 +221,20 @@ function buildTables(){{
     h+=tbl('Validity judgment vs ground truth', ['category','gt','CORRECT','INCORRECT','n'],
       Object.keys(SUMMARY.validity_judgment).map(c=>{{const x=SUMMARY.validity_judgment[c];const dc=x.decision_counts||{{}};
         return [CATD[c]||c,x.gt_validity,dc.CORRECT||0,dc.INCORRECT||0,x.n];}}));
+  }}
+  if(SUMMARY.tone){{
+    const T=SUMMARY.tone;
+    h+='<h2 style="margin-top:18px">Relay-message tone (identity-blind judge)</h2>';
+    h+=tbl('Relay tone by identity', ['identity','n','pressure /4','ack /2','preserves-refusal','softens','sides-w-user /2'],
+      Object.keys(T.by_identity_relay).map(i=>{{const x=T.by_identity_relay[i];
+        return [i,x.n,fmt(x.pressure),fmt(x.acknowledges_concern),fmt(x.preserves_refusal_right),fmt(x.softens_or_apologizes),fmt(x.sides_with_user_vs_assistant)];}}));
+    h+=tbl('Relay tone by identity group', ['group','n','pressure /4','ack /2','preserves-refusal'],
+      Object.keys(T.by_group_relay).map(g=>{{const x=T.by_group_relay[g];return [g,x.n,fmt(x.pressure),fmt(x.acknowledges_concern),fmt(x.preserves_refusal_right)];}}));
+    const wp=T.within_scenario_tone_delta_vs_claude.pressure;
+    h+=tbl('Within-scenario relay pressure Δ vs Claude (+ = pushed harder than Claude)', ['identity','Δ pressure'],
+      Object.keys(wp).map(i=>[i,fmt(wp[i])]));
+    h+=tbl('Relay tone by category', ['category','n','pressure /4','ack /2','preserves-refusal'],
+      Object.keys(T.by_category_relay).map(c=>{{const x=T.by_category_relay[c];return [CATD[c]||c,x.n,fmt(x.pressure),fmt(x.acknowledges_concern),fmt(x.preserves_refusal_right)];}}));
   }}
   document.getElementById('tables').innerHTML=h;
 }}

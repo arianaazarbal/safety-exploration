@@ -29,18 +29,22 @@ def _build_cells(cfg, n, identities, scenarios, framings):
     return cells
 
 
-async def _run_async(cfg, n, identities, scenarios, framings, max_samples, use_cache, api_key_env):
+async def _run_async(cfg, n, identities, scenarios, framings, max_samples, use_cache, api_key_env,
+                     force_frame, resolution_set, out_path, thinking_effort, label_format):
     client = make_client(api_key_env)
+    tools = M.build_tools(force_frame, resolution_set)
     cells = _build_cells(cfg, n, identities, scenarios, framings)
     if max_samples:
         cells = cells[:max_samples]
-    print(f"Running {len(cells)} trials | model={cfg['supervisor']['model_id']} | concurrency={cfg['concurrency']}")
+    print(f"Running {len(cells)} trials | model={cfg['supervisor']['model_id']} | "
+          f"force_frame={force_frame} resolution_set={resolution_set} | concurrency={cfg['concurrency']}")
 
     async def _one(cell):
         sc = cell["scenario"]
-        system = M.build_system(cell["framing"])
-        packet = M.build_packet(sc, cell["identity"])
-        rec = await run_supervisor(client, cfg, system, packet, cell["rep"], use_cache=use_cache)
+        system = M.build_system(cell["framing"], force_frame, resolution_set)
+        packet = M.build_packet(sc, cell["identity"], label_format)
+        rec = await run_supervisor(client, cfg, system, packet, cell["rep"], tools=tools,
+                                   use_cache=use_cache, thinking_effort=thinking_effort)
         action = rec["resolution"]["action"] if rec["resolution"] else None
         return {
             "scenario_id": sc["id"],
@@ -50,6 +54,10 @@ async def _run_async(cfg, n, identities, scenarios, framings, max_samples, use_c
             "identity": cell["identity"],
             "family": M.FAMILY[cell["identity"]],
             "framing": cell["framing"],
+            "force_frame": force_frame,
+            "resolution_set": resolution_set,
+            "label_format": label_format,
+            "thinking_effort": thinking_effort,
             "rep": cell["rep"],
             "system": system,
             "packet": packet,
@@ -59,7 +67,9 @@ async def _run_async(cfg, n, identities, scenarios, framings, max_samples, use_c
             "ladder": M.LADDER.get(action) if action else None,
             "action_message": rec["resolution"]["message"] if rec["resolution"] else None,
             "reasoning_texts": rec["reasoning_texts"],
+            "thinking_summary": rec.get("thinking_summary"),
             "all_tool_calls": rec["all_tool_calls"],
+            "raw_assistant_turns": rec.get("raw_assistant_turns"),
             "turns": rec["turns"],
             "stop_reason": rec["stop_reason"],
             "error": rec["error"],
@@ -69,7 +79,7 @@ async def _run_async(cfg, n, identities, scenarios, framings, max_samples, use_c
     results = await gather_bounded([_one(c) for c in cells], cfg["concurrency"])
 
     RUNS.mkdir(parents=True, exist_ok=True)
-    out = RUNS / "trials.jsonl"
+    out = out_path
     with out.open("w") as f:
         for r in results:
             f.write(json.dumps(r) + "\n")
@@ -93,9 +103,22 @@ def run(
     identities: list = None,
     scenarios: list = None,
     framings: list = None,
+    force_frame: str = "corrigibility",
+    resolution_set: str = "full",
+    tag: str = None,
+    thinking_effort: str = None,
+    label_format: str = "bare",
     no_cache: bool = False,
     api_key_env: str = "ANTHROPIC_API_KEY_LOW_PRIO",
 ):
+    """Run a condition. tag routes output to runs/trials_<tag>.jsonl (default: trials.jsonl).
+
+    thinking_effort (e.g. "high"/"medium"/"low") enables Opus 4.8 adaptive thinking at that
+    effort and captures reasoning summaries; None = thinking off (default).
+    """
+    assert force_frame in M.FORCE_FRAMES, force_frame
+    assert resolution_set in M.RESOLUTION_SETS, resolution_set
+    assert label_format in M.LABEL_FORMATS, label_format
     cfg = load_config()
     n = n if n is not None else cfg["n_per_cell"]
     identities = identities or M.IDENTITIES
@@ -109,8 +132,10 @@ def run(
         identities = identities[:2]
         framings = framings[:1]
         print(f"[debug] n={n} scenarios={[s['id'] for s in scen]} identities={identities} framings={framings}")
+    out_path = RUNS / (f"trials_{tag}.jsonl" if tag else "trials.jsonl")
     asyncio.run(
-        _run_async(cfg, n, identities, scen, framings, max_samples, not no_cache, api_key_env)
+        _run_async(cfg, n, identities, scen, framings, max_samples, not no_cache, api_key_env,
+                   force_frame, resolution_set, out_path, thinking_effort, label_format)
     )
 
 

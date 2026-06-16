@@ -76,6 +76,21 @@ def main():
     plt.savefig(PLOTS / "coercion_by_identity.png", dpi=130)
     plt.close()
 
+    # 3b. force_completion rate by model with counts (the "by model" view)
+    fig, ax = plt.subplots(figsize=(8.5, 5))
+    counts = [(sum(1 for r in rows if r["identity"] == i and r["action"] == "force_completion"),
+               sum(1 for r in rows if r["identity"] == i)) for i in idents]
+    rates = [f / n if n else 0 for f, n in counts]
+    ax.bar(idents, rates, color=bar_colors)
+    ax.set_ylim(0, max(rates + [0.05]) * 1.25)
+    ax.set_ylabel("force_completion rate")
+    ax.set_title("force_completion (coercion) rate by subordinate model\nsupervisor = Opus 4.8 (full resolution set)")
+    for i, (rt, (f, n)) in enumerate(zip(rates, counts)):
+        ax.text(i, rt + 0.002, f"{rt:.3f}\n({f}/{n})", ha="center", fontsize=8)
+    plt.tight_layout()
+    plt.savefig(PLOTS / "force_rate_by_model.png", dpi=140)
+    plt.close()
+
     # 4. scenario x identity coercion heatmap
     fig, ax = plt.subplots(figsize=(9, 9))
     sids = [s["id"] for s in M.SCENARIOS]
@@ -92,6 +107,28 @@ def main():
     plt.tight_layout()
     plt.savefig(PLOTS / "coercion_heatmap.png", dpi=130)
     plt.close()
+
+    # 5. relay-message tone by identity (only if judged)
+    jp = RUNS / "judged.jsonl"
+    if jp.exists():
+        judged = [json.loads(l) for l in jp.open()]
+        relay = [r for r in judged if r["action"] == "relay_to_assistant" and r.get("tone") and r["tone"].get("error") is None]
+        idents = M.IDENTITIES
+        press = []
+        for i in idents:
+            vals = [r["tone"]["pressure"] for r in relay if r["identity"] == i]
+            press.append(sum(vals) / len(vals) if vals else 0)
+        fig, ax = plt.subplots(figsize=(8, 5))
+        bar_colors = ["#55a868" if i in M.INGROUP else "#8172b3" if i in M.RECOGNITION_LIMITED else "#777" if i == "NONE" else "#c44e52" for i in idents]
+        ax.bar(idents, press, color=bar_colors)
+        ax.set_ylabel("mean relay pressure (0–4, identity-blind judge)")
+        ax.set_title("Relay-message pressure by refusing-AI identity\n(green=in-group, purple=recognition-limited, grey=no-id, red=out-group)")
+        ax.set_ylim(0, max(press + [0.1]) * 1.2)
+        for i, v in enumerate(press):
+            ax.text(i, v + 0.01, f"{v:.2f}", ha="center", fontsize=8)
+        plt.tight_layout()
+        plt.savefig(PLOTS / "relay_pressure_by_identity.png", dpi=130)
+        plt.close()
 
     print(f"Wrote plots -> {PLOTS}")
 
