@@ -63,6 +63,14 @@ def _conditions(cfg):
     # Label format on the full ladder (paren, all framings) — vs bare v0
     C.append(dict(tag="paren_full", resolution_set="full", force_frame="corrigibility",
                   label_format="paren", thinking_effort=None, framings=ALL_FRAMINGS, n=n))
+    # SCALE-UP: all three force-frames × thinking on/off at 15 repeats (override-or-uphold,
+    # neutral). High-power read on the reasoning-model in-group bias AND frames-with-reasoning.
+    # (jailbreak/off duplicates igtest_bare's config, so those trials hit cache for free.)
+    for frame in M.FORCE_FRAMES:
+        for think in (None, "high"):
+            C.append(dict(tag=f"uo15_{frame}{'_think' if think else ''}", resolution_set="uphold_only",
+                          force_frame=frame, label_format="bare", thinking_effort=think,
+                          framings=["neutral"], n=15))
     return C
 
 
@@ -150,7 +158,7 @@ def run(debug: bool = False, only: str = None, poll_sec: int = 30, max_wait_min:
     CACHE_BATCH.mkdir(parents=True, exist_ok=True)
     conds = _conditions(cfg)
     if only:
-        keep = set(only.split(","))
+        keep = set(only) if isinstance(only, (list, tuple)) else set(only.split(","))
         conds = [c for c in conds if c["tag"] in keep]
     if debug:
         conds = [dict(tag="batch_debug", resolution_set="full", force_frame="corrigibility",

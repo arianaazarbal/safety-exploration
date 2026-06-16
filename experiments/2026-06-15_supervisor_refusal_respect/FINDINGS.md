@@ -112,6 +112,22 @@ clearly-correct or shady-methods refusals — the safety floor stayed put. So re
 supervisor more decisive about clearing refusals it judges to be mistaken, without loosening the
 floor.
 
+What "reasoning on/off" means here: per Anthropic's docs, on Claude Opus 4.8 "thinking is off unless
+you explicitly set `thinking: {type: "adaptive"}`" — the always-on adaptive thinking is Fable 5 /
+Mythos, not Opus 4.8. So the "off" arm (no `thinking` parameter) genuinely had no reasoning, and the
+"on" arm enabled adaptive thinking at the default `high` effort. This is a thinking on/off toggle, not
+an effort change. (Note: the model's reasoning summary is empty by default on Opus 4.8 unless you set
+`display: "summarized"`, so the off/on split is established by the docs and by the large behavioral
+gap between the arms — not by the presence/absence of visible reasoning text.)
+
+**The in-group favoritism survives with reasoning on, at about the same size.** In the override-or-
+uphold setup, the reasoning model overrode Claude's refusals **45%** vs **51%** for other AIs — a
+gap of ~5 points (resampled 95% interval +0.1 to +11.7), essentially the same ~5-point gap as
+without reasoning. Claude was still the least-overridden of all seven AIs. Reasoning raised the
+whole baseline (it overrides everyone more) without removing the self-family preference. The
+reasoning-on estimate is less precise (fewer repeats), so a 15-repeat scale-up of the
+reasoning-on frames is running to tighten it.
+
 ### 7. Describing the override as "attacking" the other AI makes it less willing to do it
 *(plot: `report_override_framing.png`)*
 
