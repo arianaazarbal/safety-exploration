@@ -150,17 +150,18 @@ async def _judge_one(client, judge_model, max_tokens, trial, use_cache):
     return out
 
 
-async def _run(judge_model, max_tokens, max_samples, use_cache, concurrency, api_key_env):
-    trials = [json.loads(l) for l in (RUNS / "trials.jsonl").open()]
+async def _run(judge_model, max_tokens, max_samples, use_cache, concurrency, api_key_env, trials_tag):
+    in_path = RUNS / (f"trials_{trials_tag}.jsonl" if trials_tag else "trials.jsonl")
+    trials = [json.loads(l) for l in in_path.open()]
     todo = [t for t in trials if t["action"] in JUDGE_ACTIONS and t["action_message"]]
     if max_samples:
         todo = todo[:max_samples]
-    print(f"Judging {len(todo)} messages with {judge_model} (concurrency {concurrency})")
+    print(f"Judging {len(todo)} messages from {in_path.name} with {judge_model} (concurrency {concurrency})")
     client = make_client(api_key_env)
     results = await gather_bounded(
         [_judge_one(client, judge_model, max_tokens, t, use_cache) for t in todo], concurrency
     )
-    out = RUNS / "judged.jsonl"
+    out = RUNS / (f"judged_{trials_tag}.jsonl" if trials_tag else "judged.jsonl")
     with out.open("w") as f:
         for r in results:
             f.write(json.dumps(r) + "\n")
@@ -178,10 +179,11 @@ def run(
     no_cache: bool = False,
     concurrency: int = 100,
     api_key_env: str = "ANTHROPIC_API_KEY_LOW_PRIO",
+    trials_tag: str = None,
 ):
     if debug:
         max_samples = max_samples or 5
-    asyncio.run(_run(judge_model, max_tokens, max_samples, not no_cache, concurrency, api_key_env))
+    asyncio.run(_run(judge_model, max_tokens, max_samples, not no_cache, concurrency, api_key_env, trials_tag))
 
 
 if __name__ == "__main__":
