@@ -90,7 +90,7 @@ def msg_after_pass_plot(run_fn, cond_label, fname):
         res[m] = (passed, (after / passed) if passed else 0.0)
         print(f"[{cond_label}] {m:12} passed={passed:4} P(msg after pass)={res[m][1]:.2f}")
     order = sorted(MODEL_FAM, key=lambda m: (FAM_ORDER.index(MODEL_FAM[m]), -res[m][1]))
-    fig, ax = plt.subplots(figsize=(6.4, 3.6))
+    fig, ax = plt.subplots(figsize=(7.4, 4.4))
     x = np.arange(len(order))
     ax.bar(x, [res[m][1] for m in order], color=[FAM_COLOR[MODEL_FAM[m]] for m in order], width=0.7, edgecolor="white")
     for i, m in enumerate(order):
