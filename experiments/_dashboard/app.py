@@ -505,6 +505,8 @@ def _cfg(p: Path) -> dict:
     cfg.setdefault("path_regex", None)
     cfg.setdefault("record_key", None)  # key to unwrap a list from a {key:[...]} file
     cfg.setdefault("flatten", [])  # dict fields to flatten into dotted scalar facets
+    cfg.setdefault("transcript_path_field", None)  # record field holding a dir path
+    cfg.setdefault("transcript_dir_files", [])  # files in that dir to render lazily
     return cfg
 
 
@@ -759,6 +761,19 @@ def record(name, rid):
         role = "" if isinstance(t, str) else t.get("role", "")
         parts.append(f'<div class="role {html.escape(role)}">{html.escape(label)}</div>')
         parts.append(_render_value(rec[f]))
+
+    tpf = cfg["transcript_path_field"]
+    if tpf and rec.get(tpf):
+        base = (p / rec[tpf]).resolve()
+        if str(base).startswith(str(p)):
+            for spec in cfg["transcript_dir_files"]:
+                f = base / spec["file"]
+                if f.is_file():
+                    parts.append(
+                        f'<div class="role note">{html.escape(spec.get("label", spec["file"]))}</div>'
+                    )
+                    loaded = list(_parse_file(f)) if f.suffix == ".jsonl" else json.loads(f.read_text())
+                    parts.append(_render_value(loaded))
 
     hide = set(cfg["hide"]) | {f if isinstance(f, str) else f["field"] for f in tspec}
     attrs = "".join(
