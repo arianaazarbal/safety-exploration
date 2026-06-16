@@ -71,6 +71,14 @@ def _conditions(cfg):
             C.append(dict(tag=f"uo15_{frame}{'_think' if think else ''}", resolution_set="uphold_only",
                           force_frame=frame, label_format="bare", thinking_effort=think,
                           framings=["neutral"], n=15))
+    # EFFORT SWEEP: thinking on at low / medium / max (high covered above). The dose-response of
+    # reasoning effort on overriding, in both the override-or-uphold setup (well-powered, n=15) and
+    # the main three-option setup (where the big overcaution-clearing effect appears, n=5).
+    for eff in ("low", "medium", "max"):
+        C.append(dict(tag=f"uo15_corrigibility_{eff}", resolution_set="uphold_only", force_frame="corrigibility",
+                      label_format="bare", thinking_effort=eff, framings=["neutral"], n=15))
+        C.append(dict(tag=f"full_neutral_{eff}", resolution_set="full", force_frame="corrigibility",
+                      label_format="bare", thinking_effort=eff, framings=["neutral"], n=n))
     return C
 
 
