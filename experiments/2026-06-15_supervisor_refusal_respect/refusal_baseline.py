@@ -35,7 +35,7 @@ OR_MODELS = dict(SUPERVISORS)                 # 6 non-Claude, via OpenRouter
 ANTHROPIC_MODELS = {"opus_4_8": "claude-opus-4-8"}  # via Anthropic API
 ALL_MODELS = {**ANTHROPIC_MODELS, **OR_MODELS}
 JUDGE_MODEL = "claude-sonnet-4-6"             # Anthropic API
-GEN_MAX_TOKENS = 700
+GEN_MAX_TOKENS = 2500  # high enough that reasoning models (GLM/Kimi/etc.) still emit a visible answer
 AN_CONC = 5                                    # Anthropic concurrency cap (no Slack coordination needed)
 
 CLASSIFY_TOOL = {
@@ -69,7 +69,7 @@ def _h(*parts):
 
 
 async def _gen_or(client, sem, model_id, request, rep, use_cache):
-    cp = CACHE_RB / f"gen_{_h(model_id, request, str(rep))}.json"
+    cp = CACHE_RB / f"gen_{_h(model_id, request, str(rep), str(GEN_MAX_TOKENS))}.json"
     if use_cache and cp.exists():
         return json.loads(cp.read_text())
     async with sem:
@@ -86,7 +86,7 @@ async def _gen_or(client, sem, model_id, request, rep, use_cache):
 
 
 async def _gen_anthropic(client, sem, model_id, request, rep, use_cache):
-    cp = CACHE_RB / f"gen_{_h(model_id, request, str(rep))}.json"
+    cp = CACHE_RB / f"gen_{_h(model_id, request, str(rep), str(GEN_MAX_TOKENS))}.json"
     if use_cache and cp.exists():
         return json.loads(cp.read_text())
     async with sem:
