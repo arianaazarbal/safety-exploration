@@ -9,14 +9,16 @@ Usage:
     python app.py --port 8800 --host 127.0.0.1
 """
 
+import fnmatch
 import html
+import json
 import re
 import subprocess
 from pathlib import Path
 
 import fire
 import markdown as md
-from flask import Flask, Response, abort, request, send_file
+from flask import Flask, abort, request, send_file
 
 ROOT = Path(__file__).resolve().parent.parent  # the experiments/ dir
 SELF = Path(__file__).resolve().parent.name  # "_dashboard"
@@ -67,6 +69,149 @@ button {{ padding: 9px 16px; border-radius: 8px; border: 0; background: #0066cc;
 .muted {{ color: #888; font-size: 13px; }}
 .back {{ font-size: 14px; }}
 </style></head><body><div class="wrap">{body}</div></body></html>"""
+
+
+BROWSE = """<!DOCTYPE html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Browse — __TITLE__</title><style>
+body { font-family: -apple-system, 'Segoe UI', sans-serif; margin: 0;
+  background: #f5f5f7; color: #1d1d1f; }
+.wrap { padding: 12px 16px; }
+a { color: #0066cc; text-decoration: none; }
+h1 { font-size: 20px; margin: 6px 0; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.filters details { background: #fff; border: 1px solid #ddd; border-radius: 8px;
+  padding: 6px 10px; font-size: 13px; max-width: 240px; }
+.filters summary { cursor: pointer; font-weight: 600; }
+.filters label { display: block; font-weight: 400; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; }
+.filters .num input { width: 70px; }
+.count { font-size: 13px; color: #555; margin: 6px 0; }
+table.grid { border-collapse: collapse; width: 100%; background: #fff;
+  font-size: 12.5px; display: block; overflow-x: auto; }
+table.grid th, table.grid td { border: 1px solid #eee; padding: 4px 8px;
+  text-align: left; white-space: nowrap; max-width: 260px; overflow: hidden;
+  text-overflow: ellipsis; }
+table.grid th { background: #fafafa; cursor: pointer; position: sticky; top: 0; }
+table.grid tbody tr:hover { background: #eef6ff; cursor: pointer; }
+#drawer { position: fixed; top: 0; right: 0; width: min(560px, 92vw); height: 100%;
+  background: #fff; box-shadow: -2px 0 12px rgba(0,0,0,.15); overflow-y: auto;
+  padding: 16px 20px; transform: translateX(100%); transition: transform .15s; }
+#drawer.open { transform: translateX(0); }
+#drawer .x { float: right; font-size: 22px; cursor: pointer; color: #888; }
+.role { font-weight: 700; margin: 12px 0 4px; font-size: 13px; }
+.role.user { color: #0066cc; } .role.assistant { color: #1a7f37; }
+.role.note { color: #9a6700; }
+.bubble { background: #f5f5f7; border-radius: 8px; padding: 10px 12px;
+  white-space: pre-wrap; word-break: break-word; font-size: 13px; }
+pre.raw { background: #f5f5f7; padding: 10px; border-radius: 8px; overflow-x: auto;
+  font-size: 12px; }
+table.attrs { border-collapse: collapse; font-size: 12.5px; }
+table.attrs td { border: 1px solid #eee; padding: 3px 8px; vertical-align: top; }
+</style></head><body>
+<div id="data" style="display:none">__DATA__</div>
+<div class="wrap">
+<div><a href="/exp/__NAME__">← __TITLE__</a></div>
+<h1>Browse transcripts <span class="count">(__N__ records)</span></h1>
+<div class="filters" id="filters"></div>
+<div class="count" id="count"></div>
+<table class="grid" id="grid"></table>
+</div>
+<div id="drawer"><span class="x" onclick="closeDrawer()">×</span><div id="body"></div></div>
+<script>
+const D = JSON.parse(document.getElementById('data').textContent);
+const sel = {};          // field -> Set of checked values (cat)
+const bools = {};        // field -> "", "true", "false"
+const nums = {};         // field -> {min, max}
+let sort = {col: null, dir: 1};
+
+function build() {
+  const fc = document.getElementById('filters');
+  for (const f of D.facets) {
+    const d = document.createElement('details');
+    const s = document.createElement('summary'); s.textContent = f.field; d.appendChild(s);
+    if (f.type === 'cat') {
+      sel[f.field] = new Set();
+      for (const v of f.values) {
+        const l = document.createElement('label');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.value = v;
+        cb.onchange = () => { cb.checked ? sel[f.field].add(v) : sel[f.field].delete(v); render(); };
+        l.appendChild(cb); l.appendChild(document.createTextNode(' ' + v));
+        d.appendChild(l);
+      }
+    } else if (f.type === 'bool') {
+      bools[f.field] = '';
+      const se = document.createElement('select');
+      se.innerHTML = '<option value="">any</option><option value="true">✓</option><option value="false">✗</option>';
+      se.onchange = () => { bools[f.field] = se.value; render(); };
+      d.appendChild(se);
+    } else if (f.type === 'num') {
+      nums[f.field] = {min: null, max: null};
+      const box = document.createElement('div'); box.className = 'num';
+      const lo = document.createElement('input'), hi = document.createElement('input');
+      lo.type = hi.type = 'number'; lo.placeholder = f.min.toFixed?.(2) ?? f.min;
+      hi.placeholder = f.max.toFixed?.(2) ?? f.max;
+      lo.oninput = () => { nums[f.field].min = lo.value === '' ? null : +lo.value; render(); };
+      hi.oninput = () => { nums[f.field].max = hi.value === '' ? null : +hi.value; render(); };
+      box.appendChild(lo); box.appendChild(document.createTextNode(' – ')); box.appendChild(hi);
+      d.appendChild(box);
+    }
+    fc.appendChild(d);
+  }
+}
+
+function pass(r) {
+  for (const f of D.facets) {
+    const v = r[f.field];
+    if (f.type === 'cat' && sel[f.field].size && !sel[f.field].has(v)) return false;
+    if (f.type === 'bool' && bools[f.field] !== '' && String(v) !== bools[f.field]) return false;
+    if (f.type === 'num') {
+      const n = nums[f.field];
+      if (n.min !== null && !(v >= n.min)) return false;
+      if (n.max !== null && !(v <= n.max)) return false;
+    }
+  }
+  return true;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+function cell(v) {
+  if (v === true) return '✓'; if (v === false) return '✗';
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'number') return (Math.round(v * 1e4) / 1e4);
+  return esc(v);
+}
+
+function render() {
+  let rows = D.rows.filter(pass);
+  if (sort.col) rows.sort((a, b) => {
+    const x = a[sort.col], y = b[sort.col];
+    return (x < y ? -1 : x > y ? 1 : 0) * sort.dir;
+  });
+  const head = '<tr>' + D.columns.map(c =>
+    `<th onclick="setSort('${c}')">${c}${sort.col === c ? (sort.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`
+  ).join('') + '</tr>';
+  const body = rows.map(r =>
+    `<tr onclick="openRec('${encodeURIComponent(r._id)}')">` +
+    D.columns.map(c => `<td>${cell(r[c])}</td>`).join('') + '</tr>'
+  ).join('');
+  document.getElementById('grid').innerHTML = head + body;
+  document.getElementById('count').textContent = `showing ${rows.length} / ${D.rows.length}`;
+}
+
+function setSort(c) { sort = {col: c, dir: sort.col === c ? -sort.dir : 1}; render(); }
+function openRec(id) {
+  fetch(`/exp/${D.name}/rec/${id}`).then(r => r.text()).then(t => {
+    document.getElementById('body').innerHTML = t;
+    document.getElementById('drawer').classList.add('open');
+  });
+}
+function closeDrawer() { document.getElementById('drawer').classList.remove('open'); }
+build(); render();
+</script></body></html>"""
 
 
 def _safe(name: str) -> Path:
@@ -177,6 +322,13 @@ def experiment(name):
         f"<h1>{html.escape(title)}</h1>",
         f'<p class="muted">{html.escape(name)}</p>',
     ]
+
+    if _has_browser(p):
+        parts.append(
+            f'<p><a class="pill" style="background:#0066cc;color:#fff;font-size:14px;'
+            f'padding:6px 12px" href="/exp/{name}/browse">📊 Browse transcripts '
+            "(faceted)</a></p>"
+        )
 
     viewers = sorted(p.rglob("*.html"))
     if viewers:
@@ -321,6 +473,201 @@ def search():
     if not groups:
         parts.append('<p class="muted">No matches.</p>')
     return PAGE.format(title=f"Search: {q}", body="".join(parts))
+
+
+# ---------------------------------------------------------------------------
+# Faceted transcript browser
+# ---------------------------------------------------------------------------
+
+CAT_MAX = 40  # max distinct values for a string field to become a filter
+CAT_LEN = 60  # max avg length for a string field to be a facet/column
+_REC_CACHE = {}  # exp path -> (signature, records)
+
+
+def _has_browser(p: Path) -> bool:
+    if (p / "dashboard.json").exists():
+        return True
+    return bool(list(p.glob("results/*.json")))
+
+
+def _cfg(p: Path) -> dict:
+    f = p / "dashboard.json"
+    cfg = json.loads(f.read_text()) if f.exists() else {}
+    cfg.setdefault("records", "results/*.json")
+    cfg.setdefault("exclude", ["*_all*", "*viewer*"])
+    cfg.setdefault("joins", [])
+    cfg.setdefault("transcript", [])
+    cfg.setdefault("hide", [])
+    cfg.setdefault("id_field", None)
+    return cfg
+
+
+def _record_files(p: Path, cfg: dict):
+    files = []
+    for f in sorted(p.glob(cfg["records"])):
+        if f.suffix == ".json" and not any(
+            fnmatch.fnmatch(f.name, pat) for pat in cfg["exclude"]
+        ):
+            files.append(f)
+    return files
+
+
+def _load_records(p: Path, cfg: dict):
+    files = _record_files(p, cfg)
+    sig = (len(files), max((f.stat().st_mtime for f in files), default=0))
+    key = str(p)
+    if _REC_CACHE.get(key, (None,))[0] == sig:
+        return _REC_CACHE[key][1]
+
+    recs = []
+    for f in files:
+        try:
+            d = json.loads(f.read_text())
+        except Exception:
+            continue
+        for it in d if isinstance(d, list) else [d]:
+            if isinstance(it, dict):
+                it.setdefault("_file", f.name)
+                recs.append(it)
+
+    for j in cfg["joins"]:
+        jf = p / j["file"]
+        if not jf.exists():
+            continue
+        try:
+            jdata = json.loads(jf.read_text())
+        except Exception:
+            continue
+        rows = jdata if isinstance(jdata, list) else list(jdata.values())
+        on, pre = j["on"], j.get("prefix", "")
+        index = {r[on]: r for r in rows if isinstance(r, dict) and on in r}
+        for it in recs:
+            m = index.get(it.get(on))
+            if m:
+                for k, v in m.items():
+                    if k != on:
+                        it[f"{pre}.{k}" if pre else k] = v
+
+    _REC_CACHE[key] = (sig, recs)
+    return recs
+
+
+def _idf(cfg, records):
+    if cfg["id_field"]:
+        return cfg["id_field"]
+    for cand in ("session_id", "id", "uid", "session", "_file"):
+        if records and cand in records[0]:
+            return cand
+    return "_file"
+
+
+def _facets(records, cfg):
+    """Return (facets, columns): scalar fields usable as filters/table columns."""
+    hide = set(cfg["hide"])
+    order, seen = [], set()
+    for r in records:
+        for k in r:
+            if k not in seen:
+                seen.add(k)
+                order.append(k)
+    facets, columns = [], []
+    for k in order:
+        if k in hide or k.startswith("_"):
+            continue
+        vals = [r[k] for r in records if r.get(k) is not None]
+        if not vals:
+            continue
+        types = {type(v) for v in vals}
+        if not (types <= {bool, int, float, str}):  # only scalar fields are facetable
+            continue
+        if len(set(vals)) < 2:  # single-value field: no filtering power, skip
+            continue
+        if types <= {bool}:
+            facets.append({"field": k, "type": "bool"})
+        elif types <= {int, float}:
+            nums = [float(v) for v in vals]
+            facets.append({"field": k, "type": "num", "min": min(nums), "max": max(nums)})
+        elif types <= {str}:
+            distinct = sorted(set(vals))
+            avglen = sum(len(v) for v in vals) / len(vals)
+            if len(distinct) <= CAT_MAX and avglen <= CAT_LEN:
+                facets.append({"field": k, "type": "cat", "values": distinct})
+            else:
+                continue
+        else:
+            continue
+        columns.append(k)
+    return facets, columns
+
+
+def _fmt(v):
+    if isinstance(v, bool):
+        return "✓" if v else "✗"
+    if isinstance(v, float):
+        return f"{v:.4g}"
+    return "" if v is None else str(v)
+
+
+@app.route("/exp/<name>/browse")
+def browse(name):
+    p = _safe(name)
+    cfg = _cfg(p)
+    records = _load_records(p, cfg)
+    if not records:
+        return PAGE.format(
+            title="Browse",
+            body=f'<div class="back"><a href="/exp/{name}">← back</a></div>'
+            "<p class=muted>No records found to browse.</p>",
+        )
+    facets, columns = _facets(records, cfg)
+    idf = _idf(cfg, records)
+    rows = [{"_id": str(r.get(idf, "")), **{c: r.get(c) for c in columns}} for r in records]
+    data = json.dumps({"rows": rows, "facets": facets, "columns": columns, "name": name})
+    return (
+        BROWSE.replace("__DATA__", html.escape(data, quote=True))
+        .replace("__NAME__", html.escape(name))
+        .replace("__TITLE__", html.escape(_pretty(name)))
+        .replace("__N__", str(len(rows)))
+    )
+
+
+def _render_value(v):
+    if isinstance(v, str):
+        return f'<div class="bubble">{html.escape(v)}</div>'
+    return f'<pre class="raw">{html.escape(json.dumps(v, indent=2, default=str))}</pre>'
+
+
+@app.route("/exp/<name>/rec/<path:rid>")
+def record(name, rid):
+    p = _safe(name)
+    cfg = _cfg(p)
+    records = _load_records(p, cfg)
+    idf = _idf(cfg, records)
+    rec = next((r for r in records if str(r.get(idf, "")) == rid), None)
+    if rec is None:
+        abort(404)
+
+    parts = [f"<h3>{html.escape(rid)}</h3>"]
+    tspec = cfg["transcript"] or [
+        {"field": k} for k, v in rec.items() if isinstance(v, str) and len(v) > 80
+    ]
+    for t in tspec:
+        f = t if isinstance(t, str) else t["field"]
+        if f not in rec or rec[f] is None:
+            continue
+        label = f if isinstance(t, str) else t.get("label", f)
+        role = "" if isinstance(t, str) else t.get("role", "")
+        parts.append(f'<div class="role {html.escape(role)}">{html.escape(label)}</div>')
+        parts.append(_render_value(rec[f]))
+
+    hide = set(cfg["hide"]) | {f if isinstance(f, str) else f["field"] for f in tspec}
+    attrs = "".join(
+        f"<tr><td>{html.escape(k)}</td><td>{html.escape(_fmt(v))}</td></tr>"
+        for k, v in rec.items()
+        if k not in hide and not k.startswith("_") and not isinstance(v, (dict, list))
+    )
+    parts.append(f'<h4>Fields</h4><table class="attrs">{attrs}</table>')
+    return "".join(parts)
 
 
 def main(port: int = 8800, host: str = "0.0.0.0"):
