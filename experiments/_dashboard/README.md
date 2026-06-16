@@ -25,10 +25,11 @@ auto-detects scalar fields as filters (string→multiselect, number→range,
 bool→toggle; single-value and high-cardinality/long fields are dropped), shows a
 sortable table, and lazily loads each transcript in a drawer on click.
 
-Filtering/sorting happens client-side on attributes only; transcript text is
-fetched per-row, so it scales. The table caps at 8000 rows (warns if exceeded —
-that needs a smaller summary-source `records` file or future server-side
-filtering).
+Filtering and sorting run **server-side** (`POST /exp/<name>/rows`), so the
+browse page stays tiny (~kilobytes) and the full record set is filterable no
+matter how large — the server returns only the top page of matches. Transcript
+text is fetched per-row on click. Scales to tens of thousands of records on
+desktop and phone.
 
 ### `dashboard.json` (all keys optional)
 

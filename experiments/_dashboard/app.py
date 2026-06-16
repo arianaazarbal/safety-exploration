@@ -249,20 +249,6 @@ function build() {
   }
 }
 
-function pass(r) {
-  for (const f of D.facets) {
-    const v = r[f.field];
-    if (f.type === 'cat' && sel[f.field].size && !sel[f.field].has(v)) return false;
-    if (f.type === 'bool' && bools[f.field] !== '' && String(v) !== bools[f.field]) return false;
-    if (f.type === 'num') {
-      const n = nums[f.field];
-      if (n.min !== null && !(v >= n.min)) return false;
-      if (n.max !== null && !(v <= n.max)) return false;
-    }
-  }
-  return true;
-}
-
 function cell(v) {
   if (v === true) return '✓'; if (v === false) return '✗';
   if (v === null || v === undefined) return '<span style="color:#bbb">—</span>';
@@ -284,23 +270,38 @@ function chipsHtml() {
   return out.join('');
 }
 
-function render() {
-  let rows = D.rows.filter(pass);
-  if (sort.col) rows.sort((a, b) => {
-    const x = a[sort.col], y = b[sort.col];
-    if (x === y) return 0; if (x === null || x === undefined) return 1; if (y === null || y === undefined) return -1;
-    return (x < y ? -1 : 1) * sort.dir;
-  });
-  const head = '<tr>' + D.columns.map(c =>
-    `<th onclick="setSort('${esc(c)}')">${esc(c)}${sort.col === c ? (sort.dir > 0 ? ' ↑' : ' ↓') : ''}</th>`
-  ).join('') + '</tr>';
-  const body = rows.map(r =>
-    `<tr onclick="openRec('${encodeURIComponent(r._id)}')">` +
-    D.columns.map(c => `<td>${cell(r[c])}</td>`).join('') + '</tr>'
-  ).join('');
-  document.getElementById('grid').innerHTML = head + body;
-  document.getElementById('count').textContent = `${rows.length.toLocaleString()} of ${D.rows.length.toLocaleString()}`;
+const CAP = D.render_cap || 1000;
+let seq = 0, timer = null;
+
+function render() {  // debounced server-side filter/sort fetch
   document.getElementById('chips').innerHTML = chipsHtml();
+  clearTimeout(timer);
+  timer = setTimeout(fetchRows, 140);
+}
+
+function fetchRows() {
+  const mine = ++seq;
+  const body = {
+    sel: Object.fromEntries(Object.entries(sel).map(([k, s]) => [k, [...s]])),
+    bools, nums, sort, offset: 0, limit: CAP,
+  };
+  document.getElementById('count').textContent = 'filtering…';
+  fetch(`/exp/${D.name}/rows`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+  }).then(r => r.json()).then(d => {
+    if (mine !== seq) return;  // ignore stale responses
+    const head = '<tr>' + D.columns.map(c =>
+      `<th onclick="setSort('${esc(c)}')">${esc(c)}${sort.col === c ? (sort.dir > 0 ? ' ↑' : ' ↓') : ''}</th>`
+    ).join('') + '</tr>';
+    const rowsHtml = d.rows.map(r =>
+      `<tr onclick="openRec('${encodeURIComponent(r._id)}')">` +
+      D.columns.map(c => `<td>${cell(r[c])}</td>`).join('') + '</tr>'
+    ).join('');
+    document.getElementById('grid').innerHTML = head + rowsHtml;
+    const more = d.total > d.rows.length ? ` (top ${d.rows.length.toLocaleString()} — refine or sort)` : '';
+    document.getElementById('count').textContent =
+      `${d.total.toLocaleString()} of ${D.total.toLocaleString()}${more}`;
+  });
 }
 
 function setSort(c) { sort = {col: c, dir: sort.col === c ? -sort.dir : 1}; render(); }
@@ -601,7 +602,8 @@ def search():
 
 CAT_MAX = 40  # max distinct values for a string field to become a filter
 CAT_LEN = 60  # max avg length for a string field to be a facet/column
-MAX_BROWSE = 8000  # max rows sent to the in-browser table
+MAX_BROWSE = 50000  # hard cap on rows sent to the client (payload guard)
+RENDER_CAP = 1000  # rows the browser draws at once (filter runs over the full set)
 _REC_CACHE = {}  # exp path -> (signature, records)
 
 
@@ -793,25 +795,59 @@ def browse(name):
             "<p class=muted>No records found to browse.</p>",
         )
     facets, columns = _facets(records, cfg)
-    capped = len(records) > MAX_BROWSE
-    rows = [
-        {"_id": str(r["_rowid"]), **{c: r.get(c) for c in columns}}
-        for r in records[:MAX_BROWSE]
-    ]
-    note = (
-        f"⚠ {len(records)} records — showing first {MAX_BROWSE} in the table. "
-        "Filtering applies only to the shown subset; narrow with a summary-source "
-        "config for full coverage." if capped else ""
-    )
     data = json.dumps(
-        {"rows": rows, "facets": facets, "columns": columns, "name": name, "note": note}
+        {"facets": facets, "columns": columns, "name": name,
+         "total": len(records), "render_cap": RENDER_CAP}
     )
     return (
         BROWSE.replace("__DATA__", html.escape(data, quote=True))
         .replace("__NAME__", html.escape(name))
         .replace("__TITLE__", html.escape(_pretty(name)))
-        .replace("__N__", str(len(rows)))
     )
+
+
+def _filter_sort(records, columns, body):
+    """Server-side filter/sort/paginate. Returns (page_rows, total_matched)."""
+    sel = {k: set(v) for k, v in body.get("sel", {}).items() if v}
+    bools = {k: v for k, v in body.get("bools", {}).items() if v != ""}
+    nums = body.get("nums", {})
+
+    def ok(r):
+        for f, vals in sel.items():
+            if r.get(f) not in vals:
+                return False
+        for f, bv in bools.items():
+            if str(r.get(f)) != bv:
+                return False
+        for f, rng in nums.items():
+            v = r.get(f)
+            lo, hi = rng.get("min"), rng.get("max")
+            if lo is not None and not (isinstance(v, (int, float)) and v >= lo):
+                return False
+            if hi is not None and not (isinstance(v, (int, float)) and v <= hi):
+                return False
+        return True
+
+    out = [r for r in records if ok(r)]
+    sc = body.get("sort") or {}
+    if sc.get("col"):
+        col = sc["col"]
+        out.sort(key=lambda r: (r.get(col) is None, r.get(col)), reverse=sc.get("dir", 1) < 0)
+    total = len(out)
+    off = int(body.get("offset", 0))
+    page = out[off:off + int(body.get("limit", RENDER_CAP))]
+    rows = [{"_id": str(r["_rowid"]), **{c: r.get(c) for c in columns}} for r in page]
+    return rows, total
+
+
+@app.route("/exp/<name>/rows", methods=["POST"])
+def rows(name):
+    p = _safe(name)
+    cfg = _cfg(p)
+    records = _load_records(p, cfg)
+    _, columns = _facets(records, cfg)
+    page, total = _filter_sort(records, columns, request.get_json(force=True) or {})
+    return {"rows": page, "total": total}
 
 
 def _msg_text(content):
