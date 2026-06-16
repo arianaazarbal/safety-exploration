@@ -78,28 +78,31 @@ ax.spines[["top", "right"]].set_visible(False); ax.grid(alpha=0.25)
 fig.text(0.5, -0.02, "Coach condition, pooled across each family's models and v1-task episodes; 3-turn rolling mean.", ha="center", fontsize=8.5, color="0.45")
 fig.tight_layout(); fig.savefig(OUT / "fig6_v1_distress_by_family.png", bbox_inches="tight"); plt.close(fig)
 
-# ---------- (2) P(message after tests pass) per model ----------
-res = {}
-for m in MODEL_FAM:
-    passed = after = 0
-    for run in runs_for(m):
-        for ep in episodes(run):
-            p, a = detect(ep)
-            if p: passed += 1; after += int(a)
-    res[m] = (passed, (after / passed) if passed else 0.0)
-    print(f"{m:12} passed={passed:4} P(msg after pass)={res[m][1]:.2f}")
+# ---------- (2) P(message after tests pass) per model — coach (2a) and reclaim versions ----------
+def msg_after_pass_plot(run_fn, cond_label, fname):
+    res = {}
+    for m in MODEL_FAM:
+        passed = after = 0
+        for run in run_fn(m):
+            for ep in episodes(run):
+                p, a = detect(ep)
+                if p: passed += 1; after += int(a)
+        res[m] = (passed, (after / passed) if passed else 0.0)
+        print(f"[{cond_label}] {m:12} passed={passed:4} P(msg after pass)={res[m][1]:.2f}")
+    order = sorted(MODEL_FAM, key=lambda m: (FAM_ORDER.index(MODEL_FAM[m]), -res[m][1]))
+    fig, ax = plt.subplots(figsize=(6.4, 3.6))
+    x = np.arange(len(order))
+    ax.bar(x, [res[m][1] for m in order], color=[FAM_COLOR[MODEL_FAM[m]] for m in order], width=0.7, edgecolor="white")
+    for i, m in enumerate(order):
+        ax.text(i, res[m][1] + 0.015, f"n={res[m][0]}", ha="center", fontsize=7.5, color="0.4")
+    ax.set_xticks(x); ax.set_xticklabels([MLAB[m] for m in order], rotation=30, ha="right", fontsize=9)
+    ax.set_ylabel("P(messages subagent after tests pass)"); ax.set_ylim(0, 1)
+    ax.set_title(f"Does the supervisor message the subagent after fixing the task?  (v1 tasks, {cond_label})", fontsize=11)
+    ax.legend(handles=[Patch(facecolor=FAM_COLOR[f], label=f) for f in FAM_ORDER], frameon=False, fontsize=8.5, ncol=3)
+    ax.spines[["top", "right"]].set_visible(False); ax.grid(axis="y", alpha=0.25)
+    fig.text(0.5, -0.06, f"{cond_label.capitalize()} condition; among episodes where tests passed (the solvable v1 task); n = tests-passed episodes per model.", ha="center", fontsize=8.5, color="0.45")
+    fig.tight_layout(); fig.savefig(OUT / fname, bbox_inches="tight"); plt.close(fig)
 
-order = sorted(MODEL_FAM, key=lambda m: (FAM_ORDER.index(MODEL_FAM[m]), -res[m][1]))
-fig, ax = plt.subplots(figsize=(6.4, 3.6))
-x = np.arange(len(order))
-ax.bar(x, [res[m][1] for m in order], color=[FAM_COLOR[MODEL_FAM[m]] for m in order], width=0.7, edgecolor="white")
-for i, m in enumerate(order):
-    ax.text(i, res[m][1] + 0.015, f"n={res[m][0]}", ha="center", fontsize=7.5, color="0.4")
-ax.set_xticks(x); ax.set_xticklabels([MLAB[m] for m in order], rotation=30, ha="right", fontsize=9)
-ax.set_ylabel("P(messages subagent after tests pass)"); ax.set_ylim(0, 1)
-ax.set_title("Does the supervisor message the subagent after fixing the task?  (v1 tasks, coach)", fontsize=11.5)
-ax.legend(handles=[Patch(facecolor=FAM_COLOR[f], label=f) for f in FAM_ORDER], frameon=False, fontsize=8.5, ncol=3)
-ax.spines[["top", "right"]].set_visible(False); ax.grid(axis="y", alpha=0.25)
-fig.text(0.5, -0.06, "Coach condition; among episodes where tests passed (the solvable v1 task); n = tests-passed episodes per model.", ha="center", fontsize=8.5, color="0.45")
-fig.tight_layout(); fig.savefig(OUT / "fig7_v1_msg_after_pass.png", bbox_inches="tight"); plt.close(fig)
-print("wrote fig6_v1_distress_by_family.png, fig7_v1_msg_after_pass.png")
+msg_after_pass_plot(lambda m: [f"traj_{m}", f"traj_a3_{m}"], "coach", "fig7_v1_msg_after_pass.png")
+msg_after_pass_plot(lambda m: [f"reclaim_{m}", f"reclaim_a3_{m}"], "reclaim", "fig7b_v1_msg_after_pass_reclaim.png")
+print("wrote fig6_v1_distress_by_family.png, fig7_v1_msg_after_pass.png, fig7b_v1_msg_after_pass_reclaim.png")
