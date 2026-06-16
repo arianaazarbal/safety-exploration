@@ -174,7 +174,10 @@ async def _run(models, n, concurrency, use_cache, max_samples):
 
 
 def run(models: str = None, n: int = 15, concurrency: int = 20, debug: bool = False,
-        no_cache: bool = False, max_samples: int = None):
+        no_cache: bool = False, max_samples: int = None, max_tokens: int = None):
+    global MAX_TOKENS
+    if max_tokens:
+        MAX_TOKENS = max_tokens  # reasoning models (kimi/glm) need a higher cap to emit tool calls
     mods = list(SUPERVISORS) if not models else (list(models) if isinstance(models, (list, tuple)) else models.split(","))
     if debug:
         mods = mods[:1]; max_samples = max_samples or 4; n = 1
