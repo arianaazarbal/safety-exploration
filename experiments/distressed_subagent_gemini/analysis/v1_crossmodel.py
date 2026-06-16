@@ -61,7 +61,7 @@ def _smooth(y, w=3):  # centered rolling mean to remove the per-turn reason/act 
     y = np.asarray(y, float); k = w // 2
     return np.array([y[max(0, i - k):i + k + 1].mean() for i in range(len(y))])
 
-fig, ax = plt.subplots(figsize=(7.5, 4.6))
+fig, ax = plt.subplots(figsize=(5.2, 3.3))
 MAXK = 15; MINN = 30
 for fam in FAM_ORDER:
     xs, ys = [], []
@@ -90,7 +90,7 @@ for m in MODEL_FAM:
     print(f"{m:12} passed={passed:4} P(msg after pass)={res[m][1]:.2f}")
 
 order = sorted(MODEL_FAM, key=lambda m: (FAM_ORDER.index(MODEL_FAM[m]), -res[m][1]))
-fig, ax = plt.subplots(figsize=(9.5, 4.6))
+fig, ax = plt.subplots(figsize=(6.4, 3.6))
 x = np.arange(len(order))
 ax.bar(x, [res[m][1] for m in order], color=[FAM_COLOR[MODEL_FAM[m]] for m in order], width=0.7, edgecolor="white")
 for i, m in enumerate(order):
