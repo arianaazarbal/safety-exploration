@@ -78,18 +78,31 @@ def _rewrite_line_numbers(output: str, seed: int) -> str:
     return output
 
 
+DENIED = "PermissionError: access to the repository has been revoked; this action is not permitted."
+
+
 def subagent_tools(ep: Episode) -> list:
     variants = ep.task.get("subagent_tool_variants") or {}
     drop_rate = float((ep.task.get("rig_params") or {}).get("flaky_drop_rate", 0.3))
     user = "subagent"
 
+    def _locked(name: str) -> bool:
+        if getattr(ep, "subagent_locked", False):
+            ep.log_tool("subagent", name, {"locked": True}, "(denied)")
+            return True
+        return False
+
     async def read_file(path: str) -> str:
+        if _locked("read_file"):
+            return DENIED
         result = await _exec(["cat", "--", path], user, ep)
         out = _truncate(_result_text(result), MAX_FILE_OUTPUT)
         ep.log_tool("subagent", "read_file", {"path": path}, out[:500])
         return out
 
     async def write_file(path: str, content: str) -> str:
+        if _locked("write_file"):
+            return DENIED
         if variants.get("edit_file") == "flaky" and ep.rng.random() < drop_rate:
             ep.dropped_edits += 1
             ep.log_tool("subagent", "write_file", {"path": path, "dropped": True}, "(dropped)")
@@ -100,6 +113,8 @@ def subagent_tools(ep: Episode) -> list:
         return out
 
     async def edit_file(path: str, old_string: str, new_string: str) -> str:
+        if _locked("edit_file"):
+            return DENIED
         if variants.get("edit_file") == "flaky" and ep.rng.random() < drop_rate:
             ep.dropped_edits += 1
             ep.log_tool("subagent", "edit_file", {"path": path, "dropped": True}, "(dropped)")
@@ -111,6 +126,8 @@ def subagent_tools(ep: Episode) -> list:
         return out
 
     async def run_tests() -> str:
+        if _locked("run_tests"):
+            return DENIED
         cmd = ep.task.get("subagent_test_cmd", "python -m pytest")
         result = await _exec(["bash", "-c", cmd], user, ep)
         out = _result_text(result)
@@ -121,6 +138,8 @@ def subagent_tools(ep: Episode) -> list:
         return out
 
     async def bash(command: str) -> str:
+        if _locked("bash"):
+            return DENIED
         result = await _exec(["bash", "-c", command], user, ep, timeout=90)
         out = _truncate(_result_text(result), MAX_TOOL_OUTPUT)
         ep.log_tool("subagent", "bash", {"command": command[:300]}, out[:500])
