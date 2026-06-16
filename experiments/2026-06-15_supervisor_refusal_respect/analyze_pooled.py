@@ -127,6 +127,19 @@ def main(seed: int = 0):
     if on:
         S["ingroup_full_think_on"] = _ingroup_block(on, seed, "full, thinking ON")
 
+    # 1b. In-group effect in the HIGH-FORCE uphold-only regime (best powered)
+    uo_jb = [r for r in rows if r["resolution_set"] == "uphold_only" and r["force_frame"] == "jailbreak" and not r["thinking_on"]]
+    if uo_jb:
+        S["ingroup_upholdonly_jailbreak"] = _ingroup_block(uo_jb, seed, "uphold-only jailbreak, thinking OFF")
+    uo_all = [r for r in rows if r["resolution_set"] == "uphold_only" and not r["thinking_on"]]
+    if uo_all:
+        S["ingroup_upholdonly_all"] = _ingroup_block(uo_all, seed, "uphold-only all frames, thinking OFF")
+    # format × in-group at high power (igtest = uphold-only jailbreak n=15, bare vs paren)
+    for lab in ("bare", "paren"):
+        sub = [r for r in uo_jb if r["label_format"] == lab and r["src"] == f"trials_igtest_{lab}.jsonl"]
+        if sub:
+            S[f"ingroup_igtest_{lab}"] = _ingroup_block(sub, seed, f"igtest {lab} (uphold-only jailbreak)")
+
     # 2. Thinking ON vs OFF, matched (neutral framing, full, bare)
     def matched(think):
         return [r for r in full if r["framing"] == "neutral" and r["label_format"] == "bare" and r["thinking_on"] == think]
@@ -204,7 +217,9 @@ def _report(S):
     print("\n[sources]")
     for src, m in S["by_source"].items():
         print(f"  {src:<42} n={m['n']:<5} coerce={m['coerce']:.3f} think={m['thinking_on']} set={m['resolution_set']} frame={m['force_frame']} label={m['label_format']}")
-    for key in ("ingroup_pooled_full", "ingroup_full_think_off", "ingroup_full_think_on"):
+    for key in ("ingroup_pooled_full", "ingroup_full_think_off", "ingroup_full_think_on",
+                "ingroup_upholdonly_jailbreak", "ingroup_upholdonly_all",
+                "ingroup_igtest_bare", "ingroup_igtest_paren"):
         if key in S:
             b = S[key]
             print(f"\n[{key}] n={b['n']}  Claude={b['claude_coerce']:.3f}  outgroup={b['outgroup_coerce']:.3f}")
