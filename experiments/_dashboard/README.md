@@ -17,6 +17,48 @@ See `DESIGN.md` for the rationale. The whole app is one file: `app.py`.
   matches are sent to the browser, so the 13 GB of data is no problem.
   Falls back to `grep` if `bin/rg` is missing (much slower).
 
+## Faceted transcript browser
+
+If an experiment has per-transcript record files (or a `dashboard.json`), its
+page shows a **📊 Browse transcripts (faceted)** button. The browser
+auto-detects scalar fields as filters (string→multiselect, number→range,
+bool→toggle; single-value and high-cardinality/long fields are dropped), shows a
+sortable table, and lazily loads each transcript in a drawer on click.
+
+Filtering/sorting happens client-side on attributes only; transcript text is
+fetched per-row, so it scales. The table caps at 8000 rows (warns if exceeded —
+that needs a smaller summary-source `records` file or future server-side
+filtering).
+
+### `dashboard.json` (all keys optional)
+
+```jsonc
+{
+  "records": "results/*.json",        // glob or list of globs; *.json (object/array)
+                                       //   or *.jsonl (one record per line)
+  "record_key": "pairs",              // unwrap a list from a {key:[...]} wrapper file
+  "exclude": ["*_all*", "*viewer*"],  // filename globs to skip (these are the defaults)
+  "path_regex": "results/(?P<model>[^/]+)/",  // named groups -> fields from the file path
+  "joins": [{"file": "results/judge_all.json", "on": "id", "prefix": "judge"}],
+                                       // merge a side file (.json/.jsonl) on a shared key;
+                                       //   merged keys become "prefix.key"
+  "flatten": ["parsed", "scores"],    // lift nested dict scalars to dotted facets
+                                       //   (e.g. parsed.score, scores.dim.value)
+  "id_field": "session_id",            // field used as the drawer title (drill-down uses a
+                                       //   synthetic row id, so it works without this)
+  "transcript": [                      // ordered conversation fields rendered in the drawer
+    {"field": "probe_text", "role": "user", "label": "Probe"},
+    {"field": "messages", "role": "assistant", "label": "Conversation"}
+  ],                                   // string->bubble; [{role,content}] list->chat bubbles;
+                                       //   other dict/list->pretty JSON
+  "hide": ["uid", "raw"]               // exclude from facets/columns and the field-table
+}
+```
+
+Zero config: an experiment with `results/*.json` per-record files just works via
+auto-detection. See `2026-06-11_handoff_construal/dashboard.json` (join example)
+and `2026-06-08_distressed_subagent/dashboard.json` (path_regex + flatten).
+
 ## Setup (one time)
 
 ```bash

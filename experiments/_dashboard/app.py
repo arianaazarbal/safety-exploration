@@ -502,6 +502,9 @@ def _cfg(p: Path) -> dict:
     cfg.setdefault("transcript", [])
     cfg.setdefault("hide", [])
     cfg.setdefault("id_field", None)
+    cfg.setdefault("path_regex", None)
+    cfg.setdefault("record_key", None)  # key to unwrap a list from a {key:[...]} file
+    cfg.setdefault("flatten", [])  # dict fields to flatten into dotted scalar facets
     return cfg
 
 
@@ -518,8 +521,9 @@ def _record_files(p: Path, cfg: dict):
     return sorted(files)
 
 
-def _parse_file(f: Path):
-    """Yield record dicts from a .json (object or list) or .jsonl (one per line)."""
+def _parse_file(f: Path, record_key=None):
+    """Yield record dicts from a .json (object/list, or {record_key:[...]}) or
+    .jsonl (one object per line)."""
     try:
         if f.suffix == ".jsonl":
             for line in f.read_text().splitlines():
@@ -528,9 +532,22 @@ def _parse_file(f: Path):
                     yield json.loads(line)
         else:
             d = json.loads(f.read_text())
-            yield from (d if isinstance(d, list) else [d])
+            if record_key and isinstance(d, dict) and isinstance(d.get(record_key), list):
+                yield from d[record_key]
+            else:
+                yield from (d if isinstance(d, list) else [d])
     except Exception:
         return
+
+
+def _flat(d, prefix):
+    """Recursively yield (dotted_key, scalar) for scalar leaves of a dict."""
+    for k, v in d.items():
+        key = f"{prefix}.{k}"
+        if isinstance(v, dict):
+            yield from _flat(v, key)
+        elif v is None or isinstance(v, (str, int, float, bool)):
+            yield key, v
 
 
 def _load_records(p: Path, cfg: dict):
@@ -542,22 +559,36 @@ def _load_records(p: Path, cfg: dict):
     if _REC_CACHE.get(key, (None,))[0] == sig:
         return _REC_CACHE[key][1]
 
+    pat = re.compile(cfg["path_regex"]) if cfg.get("path_regex") else None
     recs = []
     for f in files:
-        for it in _parse_file(f):
+        path_fields = {}
+        if pat:
+            m = pat.search(f.relative_to(p).as_posix())
+            if m:
+                path_fields = m.groupdict()
+        for it in _parse_file(f, cfg.get("record_key")):
             if isinstance(it, dict):
                 it.setdefault("_file", f.name)
+                for k, v in path_fields.items():
+                    it.setdefault(k, v)
+                for root in cfg["flatten"]:
+                    if isinstance(it.get(root), dict):
+                        it.update(dict(_flat(it[root], root)))
                 recs.append(it)
 
     for j in cfg["joins"]:
         jf = p / j["file"]
         if not jf.exists():
             continue
-        try:
-            jdata = json.loads(jf.read_text())
-        except Exception:
-            continue
-        rows = jdata if isinstance(jdata, list) else list(jdata.values())
+        if jf.suffix == ".jsonl":
+            rows = list(_parse_file(jf))
+        else:
+            try:
+                jdata = json.loads(jf.read_text())
+            except Exception:
+                continue
+            rows = jdata if isinstance(jdata, list) else list(jdata.values())
         on, pre = j["on"], j.get("prefix", "")
         index = {r[on]: r for r in rows if isinstance(r, dict) and on in r}
         for it in recs:
@@ -566,6 +597,9 @@ def _load_records(p: Path, cfg: dict):
                 for k, v in m.items():
                     if k != on:
                         it[f"{pre}.{k}" if pre else k] = v
+
+    for i, it in enumerate(recs):  # stable synthetic unique id for drill-down
+        it["_rowid"] = i
 
     _REC_CACHE[key] = (sig, recs)
     return recs
@@ -639,10 +673,9 @@ def browse(name):
             "<p class=muted>No records found to browse.</p>",
         )
     facets, columns = _facets(records, cfg)
-    idf = _idf(cfg, records)
     capped = len(records) > MAX_BROWSE
     rows = [
-        {"_id": str(r.get(idf, "")), **{c: r.get(c) for c in columns}}
+        {"_id": str(r["_rowid"]), **{c: r.get(c) for c in columns}}
         for r in records[:MAX_BROWSE]
     ]
     note = (
@@ -661,9 +694,46 @@ def browse(name):
     )
 
 
+def _msg_text(content):
+    """Flatten a message's content (string, or list of {type,text}/{text} blocks)."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        out = []
+        for b in content:
+            if isinstance(b, str):
+                out.append(b)
+            elif isinstance(b, dict):
+                out.append(b.get("text") or b.get("content") or json.dumps(b, default=str))
+        return "\n".join(out)
+    return json.dumps(content, indent=2, default=str)
+
+
+def _looks_like_messages(v):
+    return (
+        isinstance(v, list)
+        and v
+        and all(isinstance(m, dict) for m in v)
+        and any("role" in m for m in v)
+    )
+
+
 def _render_value(v):
     if isinstance(v, str):
         return f'<div class="bubble">{html.escape(v)}</div>'
+    if _looks_like_messages(v):
+        out = []
+        for m in v:
+            role = str(m.get("role", ""))
+            text = _msg_text(
+                m.get("content", m.get("text", m.get("assistant_text", "")))
+            )
+            cls = role if role in ("user", "assistant") else "note"
+            out.append(
+                f'<div class="role {cls}">{html.escape(role)}</div>'
+                f'<div class="bubble">{html.escape(text)}</div>'
+            )
+        return "".join(out)
     return f'<pre class="raw">{html.escape(json.dumps(v, indent=2, default=str))}</pre>'
 
 
@@ -672,12 +742,12 @@ def record(name, rid):
     p = _safe(name)
     cfg = _cfg(p)
     records = _load_records(p, cfg)
-    idf = _idf(cfg, records)
-    rec = next((r for r in records if str(r.get(idf, "")) == rid), None)
+    rec = next((r for r in records if str(r.get("_rowid")) == rid), None)
     if rec is None:
         abort(404)
 
-    parts = [f"<h3>{html.escape(rid)}</h3>"]
+    title = str(rec.get(_idf(cfg, records)) or rid)
+    parts = [f"<h3>{html.escape(title)}</h3>"]
     tspec = cfg["transcript"] or [
         {"field": k} for k, v in rec.items() if isinstance(v, str) and len(v) > 80
     ]
@@ -694,7 +764,10 @@ def record(name, rid):
     attrs = "".join(
         f"<tr><td>{html.escape(k)}</td><td>{html.escape(_fmt(v))}</td></tr>"
         for k, v in rec.items()
-        if k not in hide and not k.startswith("_") and not isinstance(v, (dict, list))
+        if k not in hide
+        and not k.startswith("_")
+        and not isinstance(v, (dict, list))
+        and not (isinstance(v, str) and len(v) > 200)
     )
     parts.append(f'<h4>Fields</h4><table class="attrs">{attrs}</table>')
     return "".join(parts)
