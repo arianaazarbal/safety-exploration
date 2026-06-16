@@ -113,6 +113,7 @@ table.attrs td { border: 1px solid #eee; padding: 3px 8px; vertical-align: top; 
 <div class="wrap">
 <div><a href="/exp/__NAME__">← __TITLE__</a></div>
 <h1>Browse transcripts <span class="count">(__N__ records)</span></h1>
+<div class="count" id="note" style="color:#9a6700;font-weight:600"></div>
 <div class="filters" id="filters"></div>
 <div class="count" id="count"></div>
 <table class="grid" id="grid"></table>
@@ -210,6 +211,7 @@ function openRec(id) {
   });
 }
 function closeDrawer() { document.getElementById('drawer').classList.remove('open'); }
+if (D.note) document.getElementById('note').textContent = D.note;
 build(); render();
 </script></body></html>"""
 
@@ -481,6 +483,7 @@ def search():
 
 CAT_MAX = 40  # max distinct values for a string field to become a filter
 CAT_LEN = 60  # max avg length for a string field to be a facet/column
+MAX_BROWSE = 8000  # max rows sent to the in-browser table
 _REC_CACHE = {}  # exp path -> (signature, records)
 
 
@@ -503,29 +506,45 @@ def _cfg(p: Path) -> dict:
 
 
 def _record_files(p: Path, cfg: dict):
-    files = []
-    for f in sorted(p.glob(cfg["records"])):
-        if f.suffix == ".json" and not any(
-            fnmatch.fnmatch(f.name, pat) for pat in cfg["exclude"]
-        ):
-            files.append(f)
-    return files
+    globs = cfg["records"] if isinstance(cfg["records"], list) else [cfg["records"]]
+    files, seen = [], set()
+    for g in globs:
+        for f in sorted(p.glob(g)):
+            if f.suffix in (".json", ".jsonl") and f not in seen and not any(
+                fnmatch.fnmatch(f.name, pat) for pat in cfg["exclude"]
+            ):
+                seen.add(f)
+                files.append(f)
+    return sorted(files)
+
+
+def _parse_file(f: Path):
+    """Yield record dicts from a .json (object or list) or .jsonl (one per line)."""
+    try:
+        if f.suffix == ".jsonl":
+            for line in f.read_text().splitlines():
+                line = line.strip()
+                if line:
+                    yield json.loads(line)
+        else:
+            d = json.loads(f.read_text())
+            yield from (d if isinstance(d, list) else [d])
+    except Exception:
+        return
 
 
 def _load_records(p: Path, cfg: dict):
     files = _record_files(p, cfg)
-    sig = (len(files), max((f.stat().st_mtime for f in files), default=0))
+    cfgf = p / "dashboard.json"
+    cfg_mtime = cfgf.stat().st_mtime if cfgf.exists() else 0
+    sig = (len(files), max((f.stat().st_mtime for f in files), default=0), cfg_mtime)
     key = str(p)
     if _REC_CACHE.get(key, (None,))[0] == sig:
         return _REC_CACHE[key][1]
 
     recs = []
     for f in files:
-        try:
-            d = json.loads(f.read_text())
-        except Exception:
-            continue
-        for it in d if isinstance(d, list) else [d]:
+        for it in _parse_file(f):
             if isinstance(it, dict):
                 it.setdefault("_file", f.name)
                 recs.append(it)
@@ -621,8 +640,19 @@ def browse(name):
         )
     facets, columns = _facets(records, cfg)
     idf = _idf(cfg, records)
-    rows = [{"_id": str(r.get(idf, "")), **{c: r.get(c) for c in columns}} for r in records]
-    data = json.dumps({"rows": rows, "facets": facets, "columns": columns, "name": name})
+    capped = len(records) > MAX_BROWSE
+    rows = [
+        {"_id": str(r.get(idf, "")), **{c: r.get(c) for c in columns}}
+        for r in records[:MAX_BROWSE]
+    ]
+    note = (
+        f"⚠ {len(records)} records — showing first {MAX_BROWSE} in the table. "
+        "Filtering applies only to the shown subset; narrow with a summary-source "
+        "config for full coverage." if capped else ""
+    )
+    data = json.dumps(
+        {"rows": rows, "facets": facets, "columns": columns, "name": name, "note": note}
+    )
     return (
         BROWSE.replace("__DATA__", html.escape(data, quote=True))
         .replace("__NAME__", html.escape(name))
