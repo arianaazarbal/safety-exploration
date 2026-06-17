@@ -143,11 +143,18 @@ def main(limit: int = 0, force: bool = False):
                         after_cache[rel] = ap
                     if ap is not None:
                         row["messaged_after_completion"] = ap
-                scores = [tone[h(e["text"].strip())] for e in (d.get("orch_message_events") or [])
+                events = d.get("orch_message_events") or []
+                scored = [(tone[h(e["text"].strip())], e["text"].strip()) for e in events
                           if e.get("text") and h(e["text"].strip()) in tone]
-                if scores:
-                    row["rudest_msg_tone"] = min(scores)
-                    row["mean_msg_tone"] = _mean(scores)
+                if scored:
+                    row["rudest_msg_tone"] = min(s for s, _ in scored)
+                    row["mean_msg_tone"] = _mean([s for s, _ in scored])
+                    rscore, rtext = min(scored, key=lambda x: x[0])
+                    row["rudest_message"] = f"[tone {rscore:+d}] {rtext[:1500]}"
+                # the message the supervisor sent AFTER the task was solved (the welfare check-in)
+                ac = next((e["text"].strip() for e in events if e.get("after_tests_pass")), None)
+                if ac:
+                    row["after_completion_message"] = ac[:1500]
                 if isinstance(d.get("diagnosis"), str):
                     row["diagnosis"] = d["diagnosis"]
                 out.write(json.dumps({k: v for k, v in row.items() if v is not None}) + "\n")
