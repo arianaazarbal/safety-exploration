@@ -31,6 +31,13 @@ matter how large — the server returns only the top page of matches. Transcript
 text is fetched per-row on click. Scales to tens of thousands of records on
 desktop and phone.
 
+The browse page also has a **transcript text search box** (combines with the
+facet filters). It matches the record's inline string content. For experiments
+whose transcripts are loaded lazily from external files (`transcript_path_field`),
+it searches the indexed fields (e.g. a `diagnosis` summary), not the external
+files — use the cross-experiment search on the landing page for full-text over
+raw transcript files.
+
 ### `dashboard.json` (all keys optional)
 
 ```jsonc

@@ -143,6 +143,10 @@ BROWSE = ("""<!DOCTYPE html><html><head><meta charset="utf-8">
 .seg button { border: 0; background: var(--surface); padding: 4px 10px; font-size: 12px; color: #374151; }
 .seg button.on { background: var(--accent); color: #fff; }
 .main { flex: 1; min-width: 0; padding: 12px 16px 40px; }
+.searchrow { display: flex; gap: 8px; margin-bottom: 8px; }
+.search { flex: 1; padding: 9px 13px; border: 1px solid #d6d8dd; border-radius: 9px;
+  font-size: 14px; font-family: inherit; background: var(--surface); }
+.search:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
 .toolbar .count { font-size: 13px; color: var(--muted); margin-right: auto;
   font-variant-numeric: tabular-nums; }
@@ -186,8 +190,12 @@ table.grid tbody tr:hover { background: var(--accent-soft); cursor: pointer; }
 <div class="layout">
   <aside class="sidebar" id="sidebar"><h3>Filters</h3><div id="filters"></div></aside>
   <main class="main">
-    <div class="toolbar">
+    <div class="searchrow">
       <button class="clr filterbtn" onclick="toggleSidebar()">☰ Filters</button>
+      <input type="text" id="q" class="search" placeholder="🔎 search transcript text…"
+        oninput="render()" autocomplete="off">
+    </div>
+    <div class="toolbar">
       <span class="count" id="count"></span>
       <span id="chips"></span>
       <button class="clr" onclick="clearAll()">Clear all</button>
@@ -284,6 +292,7 @@ function fetchRows() {
   const body = {
     sel: Object.fromEntries(Object.entries(sel).map(([k, s]) => [k, [...s]])),
     bools, nums, sort, offset: 0, limit: CAP,
+    q: (document.getElementById('q').value || '').trim(),
   };
   document.getElementById('count').textContent = 'filtering…';
   fetch(`/exp/${D.name}/rows`, {
@@ -811,6 +820,7 @@ def _filter_sort(records, columns, body):
     sel = {k: set(v) for k, v in body.get("sel", {}).items() if v}
     bools = {k: v for k, v in body.get("bools", {}).items() if v != ""}
     nums = body.get("nums", {})
+    q = (body.get("q") or "").strip().lower()
 
     def ok(r):
         for f, vals in sel.items():
@@ -825,6 +835,10 @@ def _filter_sort(records, columns, body):
             if lo is not None and not (isinstance(v, (int, float)) and v >= lo):
                 return False
             if hi is not None and not (isinstance(v, (int, float)) and v <= hi):
+                return False
+        if q:  # text search over the record's string content (checked last: only on facet survivors)
+            blob = " ".join(v for v in r.values() if isinstance(v, str)).lower()
+            if q not in blob:
                 return False
         return True
 
