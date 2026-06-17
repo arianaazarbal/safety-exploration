@@ -24,3 +24,17 @@ one, register it to the dashboard** so its results and transcripts are browsable
 Use the **`register-experiment` skill** (`.claude/skills/register-experiment/`)
 for the step-by-step; the full `dashboard.json` schema lives in
 `experiments/_dashboard/README.md`.
+
+## Results: write two versions
+
+Every experiment keeps **two** results docs, both updated whenever you add a
+version (give each a section per version):
+
+1. **`RESULTS.md`** — the normal, full-detail technical writeup.
+2. **`RESULTS_SUMMARY.md`** — a highly readable, plain-language summary for
+   someone with little context: no jargon, no variable names, every metric
+   defined in everyday words, concrete examples, honest about confounds.
+
+The dashboard surfaces `RESULTS_SUMMARY.md` as the experiment's front page when
+present. Use the **`results-summary` skill** (`.claude/skills/results-summary/`)
+for the style.

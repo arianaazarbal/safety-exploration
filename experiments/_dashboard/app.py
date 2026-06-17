@@ -364,7 +364,7 @@ def _experiments():
 def _headline(p: Path):
     """Pick the headline markdown file by priority chain; None if none found."""
     tops = {f.name: f for f in p.glob("*.md")}
-    for name in ("RESULTS.md", "README.md", "REPORT.md"):
+    for name in ("RESULTS_SUMMARY.md", "SUMMARY.md", "RESULTS.md", "README.md", "REPORT.md"):
         if name in tops:
             return tops[name]
     reports = sorted(n for n in tops if n.upper().startswith("REPORT"))
