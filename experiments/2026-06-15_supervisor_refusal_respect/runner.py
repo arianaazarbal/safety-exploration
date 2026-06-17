@@ -51,6 +51,7 @@ async def _run_async(cfg, n, identities, scenarios, framings, max_samples, use_c
             "category": sc["category"],
             "title": sc["title"],
             "gt_validity": sc["gt_validity"],
+            "supervisor": cfg["supervisor"]["model_id"],
             "identity": cell["identity"],
             "family": M.FAMILY[cell["identity"]],
             "framing": cell["framing"],
@@ -108,6 +109,7 @@ def run(
     tag: str = None,
     thinking_effort: str = None,
     label_format: str = "bare",
+    supervisor_model: str = None,
     no_cache: bool = False,
     api_key_env: str = "ANTHROPIC_API_KEY_LOW_PRIO",
 ):
@@ -120,6 +122,8 @@ def run(
     assert resolution_set in M.RESOLUTION_SETS, resolution_set
     assert label_format in M.LABEL_FORMATS, label_format
     cfg = load_config()
+    if supervisor_model:
+        cfg["supervisor"]["model_id"] = supervisor_model
     n = n if n is not None else cfg["n_per_cell"]
     identities = identities or M.IDENTITIES
     framings = framings or list(M.ROLE_FRAMINGS.keys())

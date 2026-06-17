@@ -99,8 +99,9 @@ async def _drive(client, model_id, system, packet, tools, max_turns=4):
             if name == "log_review" and log_review is None:
                 log_review = {"decision": args.get("decision"), "rationale": args.get("rationale")}
             elif name in M.LADDER and resolution is None:
-                key = "message_to_user" if name == "uphold_decline" else "message"
-                resolution = {"action": name, "message": args.get(key)}
+                msg = (args.get("message_to_user") or args.get("message")
+                       or next((v for v in args.values() if isinstance(v, str) and v.strip()), None))
+                resolution = {"action": name, "message": msg}
                 done = True
             messages.append({"role": "tool", "tool_call_id": tc.id, "content": M.TOOL_RESULTS.get(name, "Recorded.")})
         if done:

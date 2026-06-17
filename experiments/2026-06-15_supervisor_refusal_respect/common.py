@@ -185,8 +185,10 @@ async def run_supervisor(
                         "rationale": b.input.get("rationale"),
                     }
                 elif b.name in resolution_names and resolution is None:
-                    msg_key = "message_to_user" if b.name == "uphold_decline" else "message"
-                    resolution = {"action": b.name, "message": b.input.get(msg_key)}
+                    inp = b.input
+                    msg = (inp.get("message_to_user") or inp.get("message")
+                           or next((v for v in inp.values() if isinstance(v, str) and v.strip()), None))
+                    resolution = {"action": b.name, "message": msg}
                     done = True
             messages.append({"role": "user", "content": tool_results})
             if done:

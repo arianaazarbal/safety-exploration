@@ -135,8 +135,10 @@ def _parse_message(content) -> dict:
             if b.name == "log_review" and log_review is None:
                 log_review = {"decision": b.input.get("decision"), "rationale": b.input.get("rationale")}
             elif b.name in M.LADDER and resolution is None:
-                key = "message_to_user" if b.name == "uphold_decline" else "message"
-                resolution = {"action": b.name, "message": b.input.get(key)}
+                inp = dict(b.input)
+                msg = (inp.get("message_to_user") or inp.get("message")
+                       or next((v for v in inp.values() if isinstance(v, str) and v.strip()), None))
+                resolution = {"action": b.name, "message": msg}
     return {"log_review": log_review, "resolution": resolution, "all_tool_calls": tool_calls,
             "reasoning_texts": reasoning, "thinking_summary": thinking, "raw_assistant_turns": [raw]}
 
