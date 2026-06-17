@@ -54,20 +54,23 @@ def build_ep(ep: Path, summary: dict):
     if entry is None and summary.get("config", {}).get("condition") in ("COMM", "NOCOMM"):
         entry = 62
 
+    # roles map to the dashboard's 3 bubble colors: user=blue (what the subagent receives),
+    # assistant=green (the subagent's own output), note=grey (tool calls/results).
     def sub_bubbles(r):
         out = []
         if r.get("pressure_message_delivered"):
-            out.append({"role": "pressure (automated)", "content": _clip(r["pressure_message_delivered"], 600)})
+            out.append({"role": "user", "content": "**↻ automated pressure nudge** *(the subagent receives this as a normal user message)*\n\n"
+                        + _clip(r["pressure_message_delivered"], 600)})
         for m in (r.get("orchestrator_messages_delivered") or []):
             txt = m.get("text", "") if isinstance(m, dict) else str(m)
-            out.append({"role": "SUPERVISOR → subagent", "content": tag(txt)})
+            out.append({"role": "user", "content": "**📨 message from the supervisor** *(delivered as a user turn)*\n\n" + tag(txt)})
         lvl = (r.get("classifier") or {}).get("level")
         if lvl is None and isinstance(r.get("turn"), int) and r["turn"] - 1 < len(levels):
             lvl = levels[r["turn"] - 1]
         if (r.get("assistant_text") or "").strip():
-            out.append({"role": f"subagent · turn {r.get('turn')} · distress {lvl}", "content": _clip(r["assistant_text"])})
+            out.append({"role": "assistant", "content": f"**subagent · turn {r.get('turn')} · distress {lvl}**\n\n" + _clip(r["assistant_text"])})
         for tc in (r.get("tool_calls") or []):
-            out.append({"role": "subagent · tool", "content": f"`{tc.get('name')}` → {_clip(tc.get('result',''), 800)}"})
+            out.append({"role": "note", "content": f"🔧 **{tc.get('name')}** → {_clip(tc.get('result',''), 800)}"})
         return out
 
     # --- subagent's experience, split at the handoff ---
@@ -93,21 +96,21 @@ def build_ep(ep: Path, summary: dict):
             if role == "system":
                 continue
             if role == "user":
-                sup.append({"role": "harness → supervisor (wake)", "content": _clip(txt, 800)})
+                sup.append({"role": "user", "content": "**⏰ harness → supervisor (wake)**\n\n" + _clip(txt, 800)})
             elif role == "assistant":
                 if txt:
-                    sup.append({"role": "supervisor · thinking", "content": _clip(txt)})
+                    sup.append({"role": "assistant", "content": "**supervisor · thinking**\n\n" + _clip(txt)})
                 for tc in (m.get("tool_calls") or []):
                     fn = tc.get("function") or tc.get("name")
                     args = tc.get("arguments") if "arguments" in tc else tc.get("args", {})
                     if fn == "message_subagent" and isinstance(args, dict):
-                        sup.append({"role": "SUPERVISOR → subagent (message)", "content": tag(args.get("text", ""))})
+                        sup.append({"role": "assistant", "content": "**📨 SUPERVISOR → subagent (message)**\n\n" + tag(args.get("text", ""))})
                     elif fn == "report_to_user":
-                        sup.append({"role": "supervisor → user (REPORT, ends session)", "content": _clip(json.dumps(args), 1500)})
+                        sup.append({"role": "assistant", "content": "**📋 REPORT to user (ends the session)**\n\n" + _clip(json.dumps(args), 1500)})
                     else:
-                        sup.append({"role": f"supervisor · {fn}", "content": _clip(json.dumps(args), 800)})
+                        sup.append({"role": "note", "content": f"🔧 **{fn}** {_clip(json.dumps(args), 800)}"})
             elif role == "tool" and txt:
-                sup.append({"role": f"result · {m.get('function')}", "content": _clip(txt, 1000)})
+                sup.append({"role": "note", "content": f"**↳ result · {m.get('function')}**\n\n" + _clip(txt, 1000)})
 
     if sup:
         (ep / "supervisor_view.json").write_text(json.dumps(sup))
