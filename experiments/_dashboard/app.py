@@ -14,6 +14,7 @@ import html
 import json
 import re
 import subprocess
+import time
 from pathlib import Path
 
 import fire
@@ -199,6 +200,7 @@ table.grid tbody tr:hover { background: var(--accent-soft); cursor: pointer; }
     <div class="toolbar">
       <span class="count" id="count"></span>
       <span id="chips"></span>
+      <button class="clr" id="latestBtn" style="display:none" onclick="toggleLatest()">⏱ Latest runs</button>
       <button class="clr" onclick="clearAll()">Clear all</button>
     </div>
     <div class="gridwrap"><table class="grid" id="grid"></table></div>
@@ -210,6 +212,16 @@ table.grid tbody tr:hover { background: var(--accent-soft); cursor: pointer; }
 const D = JSON.parse(document.getElementById('data').textContent);
 const sel = {}, bools = {}, nums = {};
 let sort = {col: null, dir: 1};
+let latestOn = false;  // "Latest runs" quick-filter (sel['_file'] = newest run-batch)
+
+function toggleLatest() {
+  latestOn = !latestOn;
+  if (latestOn) sel['_file'] = new Set(D.latest_files);
+  else delete sel['_file'];
+  const b = document.getElementById('latestBtn');
+  b.textContent = latestOn ? '⏱ Latest runs ✓' : '⏱ Latest runs';
+  render();
+}
 
 function esc(s) {
   return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -267,6 +279,8 @@ function cell(v) {
 
 function chipsHtml() {
   const out = [];
+  if (latestOn)
+    out.push(`<span class="chip">latest runs (${D.latest_files.length} file${D.latest_files.length > 1 ? 's' : ''}) <span class="x" onclick="toggleLatest()">×</span></span>`);
   for (const f of D.facets) {
     if (f.type === 'cat' && sel[f.field].size)
       for (const v of sel[f.field])
@@ -320,6 +334,8 @@ function rmBool(f) { bools[f] = ''; syncBoxes(); render(); }
 function rmNum(f) { nums[f] = {min: null, max: null}; syncBoxes(); render(); }
 function clearAll() {
   for (const k in sel) sel[k].clear();
+  delete sel['_file'];
+  if (latestOn) { latestOn = false; document.getElementById('latestBtn').textContent = '⏱ Latest runs'; }
   for (const k in bools) bools[k] = '';
   for (const k in nums) nums[k] = {min: null, max: null};
   syncBoxes(); render();
@@ -342,6 +358,11 @@ function toggleSidebar() { document.getElementById('sidebar').classList.toggle('
 function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeDrawer(); closeSidebar(); } });
 if (D.note) document.getElementById('note').textContent = D.note;
+if (D.latest_files && D.latest_files.length) {
+  const b = document.getElementById('latestBtn');
+  b.style.display = '';
+  b.title = 'Show only the most recent run-batch (' + (D.latest_label || '') + ')';
+}
 build(); render();
 </script></body></html>""")
 
@@ -613,6 +634,7 @@ def search():
 
 CAT_MAX = 40  # max distinct values for a string field to become a filter
 CAT_LEN = 60  # max avg length for a string field to be a facet/column
+LATEST_GAP_SEC = 1800  # "Latest runs": record files within this gap of the newest count as one run-batch
 MAX_BROWSE = 50000  # hard cap on rows sent to the client (payload guard)
 RENDER_CAP = 1000  # rows the browser draws at once (filter runs over the full set)
 _REC_CACHE = {}  # exp path -> (signature, records)
@@ -652,6 +674,28 @@ def _record_files(p: Path, cfg: dict):
                 seen.add(f)
                 files.append(f)
     return sorted(files)
+
+
+def _latest_cluster(p: Path, cfg: dict):
+    """Filenames of the most-recent run-batch: the newest record file plus any others
+    written within LATEST_GAP_SEC of it (mtime clustering). Empty if there's only one
+    file or if every file falls in the latest batch (then 'latest' == 'all', so the
+    button would be a no-op). Returns (basenames, human_label). Fully dynamic per load."""
+    files = _record_files(p, cfg)
+    if len(files) < 2:
+        return [], ""
+    fm = sorted(((f.name, f.stat().st_mtime) for f in files), key=lambda x: x[1], reverse=True)
+    latest, prev = [fm[0][0]], fm[0][1]
+    for name, mt in fm[1:]:
+        if prev - mt <= LATEST_GAP_SEC:
+            latest.append(name)
+            prev = mt
+        else:
+            break
+    if len(latest) >= len(files):
+        return [], ""  # everything is "latest" — no filtering power
+    newest = time.strftime("%Y-%m-%d %H:%M", time.localtime(fm[0][1]))
+    return latest, f"{len(latest)} file{'s' if len(latest) > 1 else ''}, newest {newest}"
 
 
 def _parse_file(f: Path, record_key=None):
@@ -806,9 +850,11 @@ def browse(name):
             "<p class=muted>No records found to browse.</p>",
         )
     facets, columns = _facets(records, cfg)
+    latest_files, latest_label = _latest_cluster(p, cfg)
     data = json.dumps(
         {"facets": facets, "columns": columns, "name": name,
-         "total": len(records), "render_cap": RENDER_CAP}
+         "total": len(records), "render_cap": RENDER_CAP,
+         "latest_files": latest_files, "latest_label": latest_label}
     )
     return (
         BROWSE.replace("__DATA__", html.escape(data, quote=True))

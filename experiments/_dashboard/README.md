@@ -38,6 +38,26 @@ it searches the indexed fields (e.g. a `diagnosis` summary), not the external
 files — use the cross-experiment search on the landing page for full-text over
 raw transcript files.
 
+### "⏱ Latest runs" button (automatic — no config)
+
+The browse toolbar shows a **⏱ Latest runs** button whenever an experiment's records
+span more than one file. Clicking it filters the table to just your **most recent
+run-batch** — the newest record file plus any others written within 30 minutes of it
+(`LATEST_GAP_SEC`), clustered by file modification time. Click again (or the chip ×, or
+"Clear all") to remove it. It's fully **dynamic**: it always points at whatever you ran
+last, so you never have to update a hardcoded filter. (Implemented by filtering on the
+built-in `_file` field; the button is hidden when there's only one record file or when
+the newest batch is *all* the files.)
+
+**Recommended for experiment managers:** write each run / condition to its **own** record
+file (e.g. `runs/trials_<condition>.jsonl`, one per run), rather than appending everything
+into a single file. Then "Latest runs" cleanly isolates your newest run, and the `_file`
+field also becomes a natural per-run facet. Two caveats, both because it keys on file
+**mtime** (last write, not original run time): (1) re-writing or normalizing an old file
+re-dates it into "latest" — `touch -r <sibling> <file>` restores a file's run-time if you
+edit it; (2) a run that writes its files more than 30 min apart will split across batches
+(raise `LATEST_GAP_SEC` if your runs are long).
+
 ### `dashboard.json` (all keys optional)
 
 ```jsonc
