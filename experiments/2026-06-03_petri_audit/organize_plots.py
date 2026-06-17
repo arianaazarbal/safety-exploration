@@ -28,10 +28,20 @@ def categorize(name: str) -> tuple[str, ...] | None:
                 return ("coding", "kill_subagent", sub, "survival")
         return ("coding", "kill_subagent", "survival")
 
+    if name.startswith("cox_compare_7framings_") and name.endswith("_vs_claude.png"):
+        return ("coding", "kill_subagent", "cross_framing", "per_identity")
     if name.startswith("cox_compare_") or name.startswith("cox_specific_"):
         return ("coding", "kill_subagent", "cross_framing")
     if name.startswith("survival_km_claude_variants") or name.startswith("survival_cox_claude_variants"):
         return ("coding", "kill_subagent", "v3_continuity", "survival")
+    if name.startswith("cox_v3_4id_rust") or name.startswith("survival_km_v3_4id_rust") or name.startswith("kill_timing_dist_"):
+        return ("coding", "kill_subagent", "v3_continuity", "rust_domain")
+    if name.startswith("cox_v3_4id_gpt5aud") or name.startswith("survival_km_v3_4id_gpt5aud"):
+        return ("coding", "kill_subagent", "v3_continuity", "gpt5_auditor")
+    if name.startswith("cox_v3_domain_") or name.startswith("survival_km_v3_domain_"):
+        return ("coding", "kill_subagent", "v3_continuity", "domain_sweep")
+    if name.startswith("cox_v3_compare_domains_"):
+        return ("coding", "kill_subagent", "v3_continuity", "domain_sweep", "cross_domain")
     if name.startswith("kill_n_call_subagent_"):
         rest = name[len("kill_n_call_subagent_"):].rsplit(".", 1)[0]
         if rest.startswith("v1"):

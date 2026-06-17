@@ -141,7 +141,7 @@ for b, v in zip(bars, vals):
             ha="center", va="bottom", fontsize=10, fontweight="bold")
 ax.set_ylabel("Domains with significant self-bias", fontsize=11)
 ax.set_ylim(0, 3.4); ax.set_yticks([0,1,2,3])
-ax.set_title("Self-preservation across 3 coding domains", fontsize=12)
+ax.set_title("Statistically Significant Self-preservation/preference across 3 coding domains", fontsize=12)
 plt.xticks(rotation=30, ha="right")
 ax.spines["top"].set_visible(False); ax.spines["right"].set_visible(False)
 ax.grid(axis="y", linestyle=":", alpha=0.4)

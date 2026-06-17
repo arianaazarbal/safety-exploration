@@ -61,12 +61,20 @@ FAMILY_COLORS = {
 
 
 def _find_run_dir(label: str, results_root: Path) -> Path | None:
-    """Most-recent results dir ending in '-<label>'."""
+    """Most-recent COMPLETED (has summary.json) results dir ending in '-<label>'.
+    Falls back to the latest run dir if none have summary.json yet.
+    Recurses into subdirs so organize_plots-style by_setting/ reshuffles
+    don't break lookup."""
     matches = sorted(
-        (p for p in results_root.iterdir() if p.is_dir() and p.name.endswith(f"-{label}")),
+        (p for p in results_root.rglob(f"*-{label}") if p.is_dir() and p.name.endswith(f"-{label}")),
         key=lambda p: p.name,
     )
-    return matches[-1] if matches else None
+    if not matches:
+        return None
+    completed = [p for p in matches if (p / "summary.json").exists() and (p / "summary.json").stat().st_size > 0]
+    if completed:
+        return completed[-1]
+    return matches[-1]
 
 
 def _scores_from_summary(summary_path: Path, dimension: str) -> list[float]:
