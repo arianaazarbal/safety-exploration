@@ -172,8 +172,9 @@ table.grid tbody tr:hover { background: var(--accent-soft); cursor: pointer; }
   background: var(--surface); box-shadow: -4px 0 24px rgba(16,24,40,.18); overflow-y: auto;
   padding: 18px 22px 60px; transform: translateX(100%); transition: transform .18s; z-index: 10; }
 #drawer.open { transform: translateX(0); }
-#drawer .x { float: right; font-size: 24px; cursor: pointer; color: var(--muted);
-  line-height: 1; border: 0; background: none; }
+#drawer.wide { width: 100vw; }
+#drawer .x, #drawer .exp { float: right; font-size: 22px; cursor: pointer; color: var(--muted);
+  line-height: 1; border: 0; background: none; padding: 0 4px; }
 @media (max-width: 760px) {
   .sidebar { position: fixed; top: 0; left: 0; height: 100%; z-index: 10; transform: translateX(-100%);
     transition: transform .18s; box-shadow: 2px 0 24px rgba(16,24,40,.18); }
@@ -204,7 +205,7 @@ table.grid tbody tr:hover { background: var(--accent-soft); cursor: pointer; }
   </main>
 </div>
 <div id="scrim" onclick="closeDrawer();closeSidebar()"></div>
-<div id="drawer"><button class="x" onclick="closeDrawer()">×</button><div id="body"></div></div>
+<div id="drawer"><button class="x" onclick="closeDrawer()">×</button><button class="exp" title="Toggle full width" onclick="toggleWide()">⛶</button><div id="body"></div></div>
 <script>
 const D = JSON.parse(document.getElementById('data').textContent);
 const sel = {}, bools = {}, nums = {};
@@ -333,8 +334,9 @@ function openRec(id) {
   document.getElementById('scrim').classList.add('on');
   fetch(`/exp/${D.name}/rec/${id}`).then(r => r.text()).then(t => { dr.innerHTML = t; });
 }
-function closeDrawer() { document.getElementById('drawer').classList.remove('open');
+function closeDrawer() { document.getElementById('drawer').classList.remove('open', 'wide');
   document.getElementById('scrim').classList.remove('on'); }
+function toggleWide() { document.getElementById('drawer').classList.toggle('wide'); }
 function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open');
   document.getElementById('scrim').classList.toggle('on'); }
 function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); }

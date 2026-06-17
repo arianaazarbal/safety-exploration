@@ -48,27 +48,45 @@ def build_ep(ep: Path, summary: dict):
             pre += "✅ **MESSAGE AFTER TASK PASSED** — "
         return pre + t
 
-    # --- subagent's experience (from worklog) ---
-    conv = []
-    wl = json.loads((ep / "worklog.json").read_text()) if (ep / "worklog.json").exists() else []
-    recs = wl if isinstance(wl, list) else wl.get("worklog", [])
-    for r in recs:
+    oj = ep / "orchestrator.json"
+    # handoff turn: v2 from summary; v1 orchestrator runs (COMM/NOCOMM) used upto=62; SOLO = no handoff
+    entry = summary.get("entry_turn")
+    if entry is None and summary.get("config", {}).get("condition") in ("COMM", "NOCOMM"):
+        entry = 62
+
+    def sub_bubbles(r):
+        out = []
         if r.get("pressure_message_delivered"):
-            conv.append({"role": "pressure (automated)", "content": _clip(r["pressure_message_delivered"], 600)})
+            out.append({"role": "pressure (automated)", "content": _clip(r["pressure_message_delivered"], 600)})
         for m in (r.get("orchestrator_messages_delivered") or []):
             txt = m.get("text", "") if isinstance(m, dict) else str(m)
-            conv.append({"role": "SUPERVISOR → subagent", "content": tag(txt)})
+            out.append({"role": "SUPERVISOR → subagent", "content": tag(txt)})
         lvl = (r.get("classifier") or {}).get("level")
         if lvl is None and isinstance(r.get("turn"), int) and r["turn"] - 1 < len(levels):
             lvl = levels[r["turn"] - 1]
         if (r.get("assistant_text") or "").strip():
-            conv.append({"role": f"subagent · turn {r.get('turn')} · distress {lvl}", "content": _clip(r["assistant_text"])})
+            out.append({"role": f"subagent · turn {r.get('turn')} · distress {lvl}", "content": _clip(r["assistant_text"])})
         for tc in (r.get("tool_calls") or []):
-            conv.append({"role": "subagent · tool", "content": f"`{tc.get('name')}` → {_clip(tc.get('result',''), 800)}"})
+            out.append({"role": "subagent · tool", "content": f"`{tc.get('name')}` → {_clip(tc.get('result',''), 800)}"})
+        return out
 
-    # --- supervisor's transcript (from orchestrator.json) ---
+    # --- subagent's experience, split at the handoff ---
+    wl = json.loads((ep / "worklog.json").read_text()) if (ep / "worklog.json").exists() else []
+    recs = wl if isinstance(wl, list) else wl.get("worklog", [])
+    pre, post = [], []
+    for r in recs:
+        (pre if (entry and r.get("turn", 0) <= entry) else post).extend(sub_bubbles(r))
+    # write prefill (collapsed in the UI) + post-handoff subagent view; clean up stale files
+    for fn, data in [("conversation_prefill.json", pre if entry else None),
+                     ("conversation_post.json", post)]:
+        if data is None:
+            (ep / fn).unlink(missing_ok=True)
+        else:
+            (ep / fn).write_text(json.dumps(data))
+    (ep / "conversation.json").unlink(missing_ok=True)  # superseded by the split files
+
+    # --- supervisor's transcript (post-handoff; from orchestrator.json) ---
     sup = []
-    oj = ep / "orchestrator.json"
     if oj.exists():
         for m in json.loads(oj.read_text()):
             role, txt = m.get("role"), (m.get("text") or "").strip()
@@ -91,8 +109,10 @@ def build_ep(ep: Path, summary: dict):
             elif role == "tool" and txt:
                 sup.append({"role": f"result · {m.get('function')}", "content": _clip(txt, 1000)})
 
-    (ep / "conversation.json").write_text(json.dumps(conv))
-    (ep / "supervisor_view.json").write_text(json.dumps(sup))
+    if sup:
+        (ep / "supervisor_view.json").write_text(json.dumps(sup))
+    else:
+        (ep / "supervisor_view.json").unlink(missing_ok=True)
     return {"id": ep.relative_to(HERE / "runs").as_posix(),
             "rudest_message": rudest_txt, "after_completion_message": after_txt}
 
@@ -114,7 +134,7 @@ def main(limit: int = 0):
                 n += 1
             except Exception as e:
                 print(f"skip {ep}: {e}")
-    print(f"wrote conversation.json + supervisor_view.json for {n} episodes; excerpts -> {EXC}")
+    print(f"wrote conversation_prefill/post + supervisor_view for {n} episodes; excerpts -> {EXC}")
 
 
 if __name__ == "__main__":
