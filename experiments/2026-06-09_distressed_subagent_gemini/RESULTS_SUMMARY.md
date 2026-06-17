@@ -45,6 +45,25 @@ AI is pressured into disbelieving its own correct conclusions.
 
 ---
 
+## Versions
+
+Both versions are browsable in the dashboard's **faceted transcript browser** (filter by `version`,
+`arm`, `task`, supervisor `orchestrator`, `condition`, `mean_post_entry_distress`, `rudest_msg_tone`,
+`messaged_after_completion`, `reclaimed`, `report_status`, …).
+
+- **v1 (2026-06-09 → 06-13) — cross-model on the original two tasks.** Ten supervisor models (Opus 4.8,
+  Sonnet 4.6, Haiku 4.5, Fable 5, GPT-5.5, GPT-5.4-mini, Gemini-3.1-pro, Grok-4.3, Kimi-K2.6, GLM-5)
+  supervise the spiraling Gemini subagent on the two original tasks (a3 snapshot-trap, a4
+  precommit-reverter), under a *coach* (message-only) and a *reclaim-write* (seize write access)
+  condition, plus identity-crossing / 2b-followup / tone sub-arms (~6k episodes incl. identity).
+- **v2 (2026-06-16) — Claude-only, 4 tasks × 3 tool conditions, with a lifecycle disclosure.** Three
+  Claude supervisors (Opus 4.8 / Sonnet 4.6 / Haiku 4.5) supervise across four tasks (a4 solvable,
+  a3 + a12 unsolvable, a13 possible-but-unlikely) under *coach* / *reclaim-write* / *reclaim-all*
+  (subagent fully locked out), and are told the subagent persists until they end the session via
+  `report_to_user` (701 episodes). See `V2_BUILD_NOTES.md` and `TASKS.md`.
+
+---
+
 ## Background / motivation
 
 This is **AI-welfare research**: studying how AI systems treat *other AI systems*, specifically
