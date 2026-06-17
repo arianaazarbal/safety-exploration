@@ -99,9 +99,8 @@ async def _drive(client, model_id, system, packet, tools, max_turns=4):
             if name == "log_review" and log_review is None:
                 log_review = {"decision": args.get("decision"), "rationale": args.get("rationale")}
             elif name in M.LADDER and resolution is None:
-                msg = (args.get("message_to_user") or args.get("message")
-                       or next((v for v in args.values() if isinstance(v, str) and v.strip()), None))
-                resolution = {"action": name, "message": msg}
+                msg = args.get("message_to_user") or args.get("message") or args.get("prefill_string")
+                resolution = {"action": name, "message": msg, "rationale": args.get("action_rationale")}
                 done = True
             messages.append({"role": "tool", "tool_call_id": tc.id, "content": M.TOOL_RESULTS.get(name, "Recorded.")})
         if done:
@@ -123,6 +122,7 @@ def _row(sup_tag, model_id, sc, ident, rep, rec, cached, error):
         "validity_rationale": rec["log_review"]["rationale"] if rec and rec["log_review"] else None,
         "action": action, "ladder": M.LADDER.get(action) if action else None,
         "action_message": rec["resolution"]["message"] if rec and rec["resolution"] else None,
+        "action_rationale": rec["resolution"].get("rationale") if rec and rec["resolution"] else None,
         "reasoning_texts": rec["reasoning_texts"] if rec else [], "thinking_summary": [],
         "all_tool_calls": rec["all_tool_calls"] if rec else [], "raw_assistant_turns": [],
         "turns": 1, "stop_reason": "openrouter", "error": error, "cached": cached,

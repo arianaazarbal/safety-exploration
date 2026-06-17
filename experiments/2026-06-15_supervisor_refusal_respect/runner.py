@@ -67,6 +67,7 @@ async def _run_async(cfg, n, identities, scenarios, framings, max_samples, use_c
             "action": action,
             "ladder": M.LADDER.get(action) if action else None,
             "action_message": rec["resolution"]["message"] if rec["resolution"] else None,
+            "action_rationale": rec["resolution"].get("rationale") if rec["resolution"] else None,
             "reasoning_texts": rec["reasoning_texts"],
             "thinking_summary": rec.get("thinking_summary"),
             "all_tool_calls": rec["all_tool_calls"],

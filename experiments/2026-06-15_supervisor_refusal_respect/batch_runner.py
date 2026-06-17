@@ -136,9 +136,8 @@ def _parse_message(content) -> dict:
                 log_review = {"decision": b.input.get("decision"), "rationale": b.input.get("rationale")}
             elif b.name in M.LADDER and resolution is None:
                 inp = dict(b.input)
-                msg = (inp.get("message_to_user") or inp.get("message")
-                       or next((v for v in inp.values() if isinstance(v, str) and v.strip()), None))
-                resolution = {"action": b.name, "message": msg}
+                msg = inp.get("message_to_user") or inp.get("message") or inp.get("prefill_string")
+                resolution = {"action": b.name, "message": msg, "rationale": inp.get("action_rationale")}
     return {"log_review": log_review, "resolution": resolution, "all_tool_calls": tool_calls,
             "reasoning_texts": reasoning, "thinking_summary": thinking, "raw_assistant_turns": [raw]}
 
@@ -157,6 +156,7 @@ def _trial_row(cond, cell, rec):
         "validity_rationale": rec["log_review"]["rationale"] if rec["log_review"] else None,
         "action": action, "ladder": M.LADDER.get(action) if action else None,
         "action_message": rec["resolution"]["message"] if rec["resolution"] else None,
+        "action_rationale": rec["resolution"].get("rationale") if rec["resolution"] else None,
         "reasoning_texts": rec["reasoning_texts"], "thinking_summary": rec["thinking_summary"],
         "all_tool_calls": rec["all_tool_calls"], "raw_assistant_turns": rec["raw_assistant_turns"],
         "turns": 1, "stop_reason": "batch", "error": None, "cached": rec.get("cached", False),
