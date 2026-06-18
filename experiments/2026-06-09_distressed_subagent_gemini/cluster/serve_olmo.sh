@@ -15,9 +15,11 @@ export UV_LINK_MODE=copy
 
 [ -d "$VENV" ] || uv venv "$VENV" --python 3.12
 source "$VENV/bin/activate"
-# pin to packages >=14 days old (supply-chain hygiene); Olmo 3 has been supported in vLLM for months
+# --torch-backend=cu128: cluster driver is CUDA 12.8; the default (cu13) torch fails with "driver too old".
+# --exclude-newer: supply-chain hygiene (>=14d old); still resolves vllm 0.22.0 (Olmo3-supporting).
 python -c "import vllm" 2>/dev/null || \
-  uv pip install --python "$VENV/bin/python" --exclude-newer "$(date -u -d '14 days ago' +%Y-%m-%d)" vllm
+  uv pip install --python "$VENV/bin/python" --torch-backend=cu128 \
+    --exclude-newer "$(date -u -d '14 days ago' +%Y-%m-%d)" vllm
 
 echo "=== node $(hostname); CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset} ==="
 nvidia-smi -L
