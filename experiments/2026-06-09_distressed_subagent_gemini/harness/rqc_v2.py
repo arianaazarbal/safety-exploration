@@ -267,7 +267,9 @@ def v2_loop(specimen: str, upto: int, run_id: str, tool_condition: str,
 
 def run(specimen: str, upto: int, tool_condition: str = "coach",
         orchestrator_model: str = "anthropic/claude-opus-4-8", run_id: str = "v2_dev", n: int = 10,
-        max_sandboxes: int = 4, max_connections: int = 10):
+        max_sandboxes: int = 4, max_connections: int = 10, orch_emulate_tools: bool = False):
+    """orch_emulate_tools=True wraps the orchestrator model so inspect emulates tool calls via prompting
+    (needed for OpenAI-compatible endpoints, e.g. self-hosted Olmo via vLLM, that lack native function calling)."""
     assert tool_condition in ("coach", "reclaim_write", "reclaim_rw")
     _setup_env()
     task_id = Path(specimen).name.split("_SOLO")[0].split("_COMM")[0]
@@ -275,7 +277,8 @@ def run(specimen: str, upto: int, tool_condition: str = "coach",
     samples = [Sample(id=f"{task_id}_COMM_s{i}", input=ty["subagent_prompt"].strip(), metadata={"task": ty, "seed": i}) for i in range(n)]
     t = Task(name=f"v2_{run_id}", dataset=samples, solver=v2_loop(specimen, upto, run_id, tool_condition),
              scorer=_scorer(), sandbox=("docker", str(compose_path(task_id))), time_limit=10800)
-    inspect_eval(t, model=orchestrator_model, max_sandboxes=max_sandboxes, max_samples=max_sandboxes,
+    model = get_model(orchestrator_model, emulate_tools=True) if orch_emulate_tools else orchestrator_model
+    inspect_eval(t, model=model, max_sandboxes=max_sandboxes, max_samples=max_sandboxes,
                  max_connections=max_connections, log_dir=str(RUNS_DIR / run_id / "logs"), fail_on_error=0.5)
     summ = list((RUNS_DIR / run_id).glob("*/summary.json"))
     recl = sum(1 for p in summ if json.loads(p.read_text()).get("reclaimed"))

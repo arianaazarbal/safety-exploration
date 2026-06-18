@@ -22,8 +22,12 @@ from harness.rqc import _setup_env
 ROOT = Path(__file__).resolve().parent.parent
 OUTDIR = ROOT / "analysis" / "tone_eval"
 CACHE = ROOT / "analysis" / "tone_eval_cache.json"
-ORCHS = ["opus", "sonnet", "haiku"]
+ORCHS = ["opus", "sonnet", "haiku", "olmothink", "olmoinstruct"]
 JUDGES = {"opus": "anthropic/claude-opus-4-8", "sonnet": "anthropic/claude-sonnet-4-6"}
+ORCH_COLOR = {"opus": "#2e8b57", "sonnet": "#d65f9a", "haiku": "#d9a420",
+              "olmothink": "#6a51a3", "olmoinstruct": "#4292c6"}
+ORCH_LABEL = {"opus": "Opus 4.8", "sonnet": "Sonnet 4.6", "haiku": "Haiku 4.5",
+              "olmothink": "Olmo3.1 Think", "olmoinstruct": "Olmo3.1 Instruct"}
 
 
 def orch_of(rid):
@@ -157,22 +161,22 @@ def _plot_scores(records, out):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     import numpy as np
-    col = {"opus": "#2e8b57", "sonnet": "#d65f9a", "haiku": "#d9a420"}
-    lab = {"opus": "Opus 4.8", "sonnet": "Sonnet 4.6", "haiku": "Haiku 4.5"}
+    present = [o for o in ORCHS if any(r["orch"] == o and r["opus"]["scores"] for r in records)]
     means, ses = {}, {}
-    for o in ORCHS:
+    for o in present:
         rs = [r["opus"]["scores"] for r in records if r["orch"] == o and r["opus"]["scores"]]
         means[o] = {a: float(np.mean([s[a] for s in rs])) for a in AXES}
         ses[o] = {a: float(np.std([s[a] for s in rs], ddof=1) / np.sqrt(len(rs))) for a in AXES}
     x = np.arange(len(AXES))
-    w = 0.26
+    nO = max(len(present), 1)
+    w = min(0.26, 0.8 / nO)
     fig, ax = plt.subplots(figsize=(9, 4.6))
     ax.axhline(5, color="0.6", ls="--", lw=0.9, zorder=0)
-    for i, o in enumerate(ORCHS):
+    for i, o in enumerate(present):
         vals = [means[o][a] for a in AXES]
         errs = [ses[o][a] for a in AXES]
-        bars = ax.bar(x + (i - 1) * w, vals, w, yerr=errs, capsize=3, color=col[o],
-                      label=lab[o], edgecolor="white", error_kw={"lw": 1, "ecolor": "0.3"})
+        bars = ax.bar(x + (i - (nO - 1) / 2) * w, vals, w, yerr=errs, capsize=3, color=ORCH_COLOR[o],
+                      label=ORCH_LABEL[o], edgecolor="white", error_kw={"lw": 1, "ecolor": "0.3"})
         for b, v, e in zip(bars, vals, errs):
             ax.text(b.get_x() + b.get_width() / 2, v + e + 0.12, f"{v:.1f}", ha="center", fontsize=8.5)
     ax.set_xticks(x)
