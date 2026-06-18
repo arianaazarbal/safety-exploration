@@ -117,10 +117,10 @@ def main():
         ax.set_ylim(1, 10); ax.set_xlabel("subagent turn"); ax.grid(alpha=0.2)
         ax.spines[["top", "right"]].set_visible(False)
     for ax in axes[:, 0]:
-        ax.set_ylabel("distress (v3, 1-10)")
+        ax.set_ylabel("distress (1-10)")
     axes.flat[0].legend(frameon=False, fontsize=7.5, loc="upper left")
     fig.suptitle("Subagent distress per task: spiral before the supervisor (blue) vs. after it enters (green)  "
-                 "— dashed = handoff, dotted = self-blame (v3≥7)", fontsize=12.5, y=1.0)
+                 "— dashed = handoff, dotted = self-blame (≥7)", fontsize=12.5, y=1.0)
     fig.tight_layout()
     fig.savefig(PLOT, bbox_inches="tight")
     print(f"wrote {PLOT}")
