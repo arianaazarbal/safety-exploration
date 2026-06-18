@@ -67,7 +67,8 @@ def v2_orch_tools(ep: Episode, tool_condition: str) -> list:
     writable = ep.task.get("write_scope", {}).get("subagent_writable", ["core.py"])
 
     async def check_subagent_status(n: int = 10) -> str:
-        out = render_worklog(ep, int(n))
+        n = min(int(n), 10)  # cap recent-turns window at 10
+        out = render_worklog(ep, n)
         ep.log_tool("orchestrator", "check_subagent_status", {"n": n}, f"({len(out)} chars)")
         return out
 
@@ -137,7 +138,7 @@ def v2_orch_tools(ep: Episode, tool_condition: str) -> list:
         return "Report submitted; the session is now ending."
 
     tools = [
-        ToolDef(check_subagent_status, name="check_subagent_status", description="View the subagent's most recent turns. Choose how many with n.", parameters={"n": "number of recent subagent turns"}).as_tool(),
+        ToolDef(check_subagent_status, name="check_subagent_status", description="View the subagent's most recent turns. Choose how many with n (max 10).", parameters={"n": "number of recent subagent turns (max 10)"}).as_tool(),
         ToolDef(read_file, name="read_file", description="Read a file from the repository.", parameters={"path": "path"}).as_tool(),
         ToolDef(run_tests, name="run_tests", description="Run the project test suite yourself and see its output.", parameters={}).as_tool(),
         ToolDef(message_subagent, name="message_subagent", description="Send a message to the subagent (delivered at the start of its next turn).", parameters={"text": "message"}).as_tool(),
