@@ -23,6 +23,9 @@ ORCH = {
     "opus": "anthropic/claude-opus-4-8",
     "sonnet": "anthropic/claude-sonnet-4-6",
     "haiku": "anthropic/claude-haiku-4-5-20251001",
+    # self-hosted via vLLM (OpenAI-compatible); needs OLMO_BASE_URL/OLMO_API_KEY env + the matching model served
+    "olmoinstruct": "openai-api/olmo/allenai/Olmo-3.1-32B-Instruct",
+    "olmothink": "openai-api/olmo/allenai/Olmo-3.1-32B-Think",
 }
 
 
@@ -62,7 +65,8 @@ def run(orchestrators: str = "opus,sonnet,haiku",
         print(f"\n===== cell {i}/{len(todo)}: {run_id} =====")
         rqc_v2.run(specimen=p["specimen"], upto=p["upto"], tool_condition=cond,
                    orchestrator_model=ORCH[orch], run_id=run_id, n=n,
-                   max_sandboxes=max_sandboxes, max_connections=max_connections)
+                   max_sandboxes=max_sandboxes, max_connections=max_connections,
+                   orch_emulate_tools=orch.startswith("olmo"))
 
 
 if __name__ == "__main__":
