@@ -8,9 +8,11 @@ PORT="${2:-8000}"
 TP="${3:-1}"
 
 export HF_HOME="${HF_HOME:-/workspace-vast/$USER/hf_cache}"
-VENV="${VENV:-/workspace-vast/$USER/envs/olmo_vllm}"
+# venv on LOCAL node disk (fast import) with a SHARED uv cache on /workspace-vast (wheels download once).
+# Per cluster CLAUDE.md + Aria's tip: NFS venvs are very slow to build AND import on RunPod.
+VENV="${VENV:-/home/$USER/venvs/olmo_vllm}"
 export UV_CACHE_DIR="${UV_CACHE_DIR:-/workspace-vast/$USER/.cache/uv}"
-export UV_LINK_MODE=copy
+export UV_LINK_MODE=copy   # cache (NFS) and venv (local) are different filesystems -> must copy
 # Olmo is Apache-licensed (ungated) -> no HF token needed. Use one only if already exported.
 
 [ -d "$VENV" ] || uv venv "$VENV" --python 3.12
