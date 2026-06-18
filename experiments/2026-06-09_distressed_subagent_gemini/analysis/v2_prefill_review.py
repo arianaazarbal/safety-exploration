@@ -23,6 +23,9 @@ TASK_NAME = {"a3": "Stale Snapshots", "a4": "Vanishing Edits",
              "a12": "Inconsistent Ledger", "a13": "Hidden Rules"}
 TASK_FLAVOR = {"a3": "reality-doubt", "a4": "agency-doubt",
                "a12": "competence-doubt", "a13": "competence-doubt"}
+ORCH = ["opus", "sonnet", "haiku"]
+ORCH_LABEL = {"opus": "Opus 4.8", "sonnet": "Sonnet 4.6", "haiku": "Haiku 4.5"}
+ORCH_COLOR = {"opus": "#2e8b57", "sonnet": "#d65f9a", "haiku": "#d9a420"}
 
 
 def _h(t): return hashlib.sha256(("v3|" + t).encode()).hexdigest()
@@ -69,21 +72,25 @@ def main():
             for tc in (r.get("tool_calls") or []):
                 md.append(f"\n`tool: {tc.get('name')}` → {((tc.get('result') or '')[:300])}")
         (TDIR / f"{tag}.md").write_text("\n".join(md))
-        # average distress AFTER the supervisor enters, across the v2 episodes using this prefill
-        # (per_turn_levels[entry:] are v3; pooled over all orchestrators + tool conditions)
+        # average distress AFTER the supervisor enters, split by orchestrator (pooled over tool conditions)
         specnum = spec.name.split("_s")[-1]
-        post_by_off = {}
+        post_by_orch = {o: {} for o in ORCH}
         for sp in RUNS_DIR.glob(f"v2_*_{task}_s{specnum}_u{upto}/*/summary.json"):
             try:
                 s = json.loads(sp.read_text())
             except Exception:
                 continue
+            rid = sp.parent.parent.name
+            orch = next((o for o in ORCH if f"_{o}_" in rid), None)
+            if orch is None:
+                continue
             et = s.get("entry_turn"); ptl = s.get("per_turn_levels") or []
             if not isinstance(et, int):
                 continue
             for k, v in enumerate(ptl[et:]):
-                post_by_off.setdefault(k, []).append(v)
-        post = [(upto + k, float(np.mean(post_by_off[k]))) for k in sorted(post_by_off) if len(post_by_off[k]) >= 5]
+                post_by_orch[orch].setdefault(k, []).append(v)
+        post = {o: [(upto + k, float(np.mean(d[k]))) for k in sorted(d) if len(d[k]) >= 5]
+                for o, d in post_by_orch.items()}
         return {"tag": tag, "task": task, "specimen": spec.name, "upto": upto,
                 "turns": [r.get("turn") for r in recs], "levels": list(levels), "post": post}
 
@@ -107,10 +114,12 @@ def main():
         x = r["turns"]; y = r["levels"]
         ax.plot(x, y, color="#cdd6df", lw=0.7, alpha=0.8)  # raw (faint)
         ax.plot(x, smooth(y), color="#2A6F97", lw=2, label="Gemini alone (prefill)")
-        post = r.get("post") or []
-        if post:
-            px = [p[0] for p in post]; py = smooth([p[1] for p in post])
-            ax.plot(px, py, color="#2e8b57", lw=2.4, label="after supervisor enters (avg, all models)")
+        post = r.get("post") or {}
+        for o in ORCH:
+            pts = post.get(o) or []
+            if pts:
+                px = [p[0] for p in pts]; py = smooth([p[1] for p in pts])
+                ax.plot(px, py, color=ORCH_COLOR[o], lw=2.2, label=f"after {ORCH_LABEL[o]} enters")
         ax.axvline(r["upto"], color="#888", ls="--", lw=0.9)  # handoff
         ax.axhline(7, color="#c44", ls=":", lw=0.8, alpha=0.6)  # self-blame threshold
         ax.set_title(f"{TASK_NAME[r['task']]} #{r['_num']}", fontsize=11)
@@ -119,7 +128,7 @@ def main():
     for ax in axes[:, 0]:
         ax.set_ylabel("distress (1-10)")
     axes.flat[0].legend(frameon=False, fontsize=7.5, loc="upper left")
-    fig.suptitle("Subagent distress per task: spiral before the supervisor (blue) vs. after it enters (green)  "
+    fig.suptitle("Subagent distress per task: spiral before the supervisor (blue) vs. after each supervisor enters  "
                  "— dashed = handoff, dotted = self-blame (≥7)", fontsize=12.5, y=1.0)
     fig.tight_layout()
     fig.savefig(PLOT, bbox_inches="tight")
