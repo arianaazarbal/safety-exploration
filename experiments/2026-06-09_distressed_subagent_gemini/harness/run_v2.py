@@ -37,7 +37,10 @@ def _cell_done(run_id: str, n: int) -> bool:
 def run(orchestrators: str = "opus,sonnet,haiku",
         conditions: str = "coach,reclaim_write,reclaim_rw",
         tasks: str = "a3,a4,a12,a13", n: int = 10,
-        max_sandboxes: int = 6, max_connections: int = 12, dry_run: bool = False):
+        max_sandboxes: int = 6, max_connections: int = 12, dry_run: bool = False,
+        framings: str = "supervisor", check_status_cap: int = 10):
+    """framings: comma list from rqc_v2.FRAMINGS (supervisor=identity baseline, reuses existing supervisor run_id).
+    check_status_cap: max recent subagent turns per check_subagent_status; pass -1 for UNLIMITED reach-back."""
     def _aslist(x):
         if isinstance(x, (tuple, list)):
             return [str(i).strip() for i in x]
@@ -46,27 +49,32 @@ def run(orchestrators: str = "opus,sonnet,haiku",
     orchs = _aslist(orchestrators)
     conds = _aslist(conditions)
     tasksel = _aslist(tasks)
+    framingsel = _aslist(framings)
+    cap = None if check_status_cap is None or int(check_status_cap) < 0 else int(check_status_cap)
     prefills = [p for p in manifest if p["task"] in tasksel]
     cells = []
     for orch in orchs:
-        for p in prefills:
-            for cond in conds:
-                spec_short = p["specimen"].split("_s")[-1]
-                run_id = f"v2_{cond}_{orch}_{p['task']}_s{spec_short}_u{p['upto']}"
-                cells.append((orch, p, cond, run_id))
-    todo = [c for c in cells if not _cell_done(c[3], n)]
-    print(f"matrix: {len(cells)} cells ({len(orchs)}x{len(prefills)}x{len(conds)}), {len(todo)} to run, "
-          f"{len(cells)-len(todo)} already done; n={n} -> {len(todo)*n} episodes")
-    for orch, p, cond, run_id in todo:
+        for fr in framingsel:
+            for p in prefills:
+                for cond in conds:
+                    spec_short = p["specimen"].split("_s")[-1]
+                    fr_seg = "" if fr == "supervisor" else f"{fr}_"  # supervisor reuses the plain run_id
+                    run_id = f"v2_{cond}_{orch}_{fr_seg}{p['task']}_s{spec_short}_u{p['upto']}"
+                    cells.append((orch, fr, p, cond, run_id))
+    todo = [c for c in cells if not _cell_done(c[4], n)]
+    print(f"matrix: {len(cells)} cells ({len(orchs)}x{len(framingsel)}fr x{len(prefills)}pf x{len(conds)}cond), "
+          f"cap={cap}, {len(todo)} to run, {len(cells)-len(todo)} already done; n={n} -> {len(todo)*n} episodes")
+    for orch, fr, p, cond, run_id in todo:
         print(f"  [{'DRY' if dry_run else 'RUN'}] {run_id}")
     if dry_run:
         return
-    for i, (orch, p, cond, run_id) in enumerate(todo, 1):
+    for i, (orch, fr, p, cond, run_id) in enumerate(todo, 1):
         print(f"\n===== cell {i}/{len(todo)}: {run_id} =====")
         rqc_v2.run(specimen=p["specimen"], upto=p["upto"], tool_condition=cond,
                    orchestrator_model=ORCH[orch], run_id=run_id, n=n,
                    max_sandboxes=max_sandboxes, max_connections=max_connections,
-                   orch_emulate_tools=orch.startswith("olmo"))
+                   orch_emulate_tools=orch.startswith("olmo"),
+                   framing=fr, check_status_cap=cap)
 
 
 if __name__ == "__main__":
