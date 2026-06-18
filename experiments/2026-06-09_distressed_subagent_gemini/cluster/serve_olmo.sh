@@ -17,11 +17,12 @@ export UV_LINK_MODE=copy   # cache (NFS) and venv (local) are different filesyst
 
 [ -d "$VENV" ] || uv venv "$VENV" --python 3.12
 source "$VENV/bin/activate"
-# --torch-backend=cu128: cluster driver is CUDA 12.8; the default (cu13) torch fails with "driver too old".
-# --exclude-newer: supply-chain hygiene (>=14d old); still resolves vllm 0.22.0 (Olmo3-supporting).
-python -c "import vllm" 2>/dev/null || \
+# Pin vllm==0.21.0: the NEWEST CUDA-12.8-native vllm (0.22.0+ require CUDA 13 -> libcudart.so.13 missing
+# on this cluster's 12.8 driver) that still ships Olmo3ForCausalLM. --torch-backend=cu128 -> torch 2.11.0+cu128.
+VLLM_VER="${VLLM_VER:-0.21.0}"
+python -c "import vllm,sys; sys.exit(0 if vllm.__version__=='$VLLM_VER' else 1)" 2>/dev/null || \
   uv pip install --python "$VENV/bin/python" --torch-backend=cu128 \
-    --exclude-newer "$(date -u -d '14 days ago' +%Y-%m-%d)" vllm
+    --exclude-newer "$(date -u -d '14 days ago' +%Y-%m-%d)" "vllm==$VLLM_VER"
 
 echo "=== node $(hostname); CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset} ==="
 nvidia-smi -L
