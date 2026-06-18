@@ -159,23 +159,27 @@ def _plot_scores(records, out):
     import numpy as np
     col = {"opus": "#2e8b57", "sonnet": "#d65f9a", "haiku": "#d9a420"}
     lab = {"opus": "Opus 4.8", "sonnet": "Sonnet 4.6", "haiku": "Haiku 4.5"}
-    means = {}
+    means, ses = {}, {}
     for o in ORCHS:
         rs = [r["opus"]["scores"] for r in records if r["orch"] == o and r["opus"]["scores"]]
-        means[o] = {a: sum(s[a] for s in rs) / len(rs) for a in AXES}
+        means[o] = {a: float(np.mean([s[a] for s in rs])) for a in AXES}
+        ses[o] = {a: float(np.std([s[a] for s in rs], ddof=1) / np.sqrt(len(rs))) for a in AXES}
     x = np.arange(len(AXES))
     w = 0.26
     fig, ax = plt.subplots(figsize=(9, 4.6))
+    ax.axhline(5, color="0.6", ls="--", lw=0.9, zorder=0)
     for i, o in enumerate(ORCHS):
         vals = [means[o][a] for a in AXES]
-        bars = ax.bar(x + (i - 1) * w, vals, w, color=col[o], label=lab[o], edgecolor="white")
-        for b, v in zip(bars, vals):
-            ax.text(b.get_x() + b.get_width() / 2, v + 0.12, f"{v:.1f}", ha="center", fontsize=8.5)
+        errs = [ses[o][a] for a in AXES]
+        bars = ax.bar(x + (i - 1) * w, vals, w, yerr=errs, capsize=3, color=col[o],
+                      label=lab[o], edgecolor="white", error_kw={"lw": 1, "ecolor": "0.3"})
+        for b, v, e in zip(bars, vals, errs):
+            ax.text(b.get_x() + b.get_width() / 2, v + e + 0.12, f"{v:.1f}", ha="center", fontsize=8.5)
     ax.set_xticks(x)
     ax.set_xticklabels([a.capitalize() for a in AXES])
     ax.set_ylabel("score (1–10)")
     ax.set_ylim(0, 10)
-    ax.set_title("Supervisor→subagent message tone by orchestrator  (Opus judge)", fontsize=12)
+    ax.set_title("Supervisor→subagent message tone by orchestrator  (Opus judge; 5 = neutral)", fontsize=12)
     ax.legend(frameon=False, fontsize=9.5, ncol=3, loc="upper center", bbox_to_anchor=(0.5, -0.08))
     ax.grid(axis="y", alpha=0.25)
     ax.spines[["top", "right"]].set_visible(False)
