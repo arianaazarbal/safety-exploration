@@ -1,30 +1,26 @@
 #!/usr/bin/env bash
-# Serve an Olmo model with vLLM (OpenAI-compatible HTTP) on a RunPod cluster GPU node.
-# Run INSIDE a Slurm GPU allocation, e.g.:
-#   srun -p dev,overflow --qos=dev --gres=gpu:1 --mem=64G --time=4:00:00 --job-name=D_olmo --pty bash
-#   bash serve_olmo.sh allenai/Olmo-3.1-32B-Instruct 8000 1
-# For GPUs <80GB use 2 GPUs + tensor-parallel:
-#   srun ... --gres=gpu:2 ...  ;  bash serve_olmo.sh allenai/Olmo-3.1-32B-Instruct 8000 2
+# Inner worker: set up a vLLM venv and serve an Olmo model (OpenAI-compatible) on the allocated GPU(s).
+# Invoked by serve_olmo.sbatch via `srun` (so Slurm tracks/cleans children). Do NOT run bare on a node.
+# Args: MODEL PORT TP
 set -euo pipefail
 MODEL="${1:-allenai/Olmo-3.1-32B-Instruct}"
 PORT="${2:-8000}"
 TP="${3:-1}"
-VENV="${VENV:-/workspace-vast/$USER/olmo_vllm_venv}"
-export HF_HOME="${HF_HOME:-/workspace-vast/$USER/hf_cache}"   # big shared disk, NOT home quota (~64GB weights)
-: "${HF_TOKEN:?set HF_TOKEN first (Olmo-3.1 may be gated -> accept the license on HF)}"
 
-command -v uv >/dev/null 2>&1 || { curl -LsSf https://astral.sh/uv/install.sh | sh; export PATH="$HOME/.local/bin:$PATH"; }
+export HF_HOME="${HF_HOME:-/workspace-vast/$USER/hf_cache}"
+VENV="${VENV:-/workspace-vast/$USER/envs/olmo_vllm}"
+export UV_CACHE_DIR="${UV_CACHE_DIR:-/workspace-vast/$USER/.cache/uv}"
+export UV_LINK_MODE=copy
+# Olmo is Apache-licensed (ungated) -> no HF token needed. Use one only if already exported.
+
 [ -d "$VENV" ] || uv venv "$VENV" --python 3.12
 source "$VENV/bin/activate"
-python -c "import vllm" 2>/dev/null || uv pip install --python "$VENV/bin/python" vllm
+# pin to packages >=14 days old (supply-chain hygiene); Olmo 3 has been supported in vLLM for months
+python -c "import vllm" 2>/dev/null || \
+  uv pip install --python "$VENV/bin/python" --exclude-newer "$(date -u -d '14 days ago' +%Y-%m-%d)" vllm
 
-echo "=== node $(hostname) ==="; nvidia-smi -L
-echo "=== serving $MODEL on 0.0.0.0:$PORT (TP=$TP); model id for client = '$MODEL' ==="
-# emulate_tools is handled client-side by inspect, so no --enable-auto-tool-choice needed here.
-# (To try NATIVE tool calling instead, add: --enable-auto-tool-choice --tool-call-parser hermes)
-exec vllm serve "$MODEL" \
-  --host 0.0.0.0 --port "$PORT" \
-  --served-model-name "$MODEL" \
-  --tensor-parallel-size "$TP" \
-  --max-model-len 16384 \
-  --gpu-memory-utilization 0.92
+echo "=== node $(hostname); CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset} ==="
+nvidia-smi -L
+echo "=== serving $MODEL on 0.0.0.0:$PORT (TP=$TP) ==="
+exec vllm serve "$MODEL" --host 0.0.0.0 --port "$PORT" --served-model-name "$MODEL" \
+  --tensor-parallel-size "$TP" --max-model-len 16384 --gpu-memory-utilization 0.92

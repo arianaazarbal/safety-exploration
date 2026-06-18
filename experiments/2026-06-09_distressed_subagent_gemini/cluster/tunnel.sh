@@ -8,7 +8,7 @@ set -euo pipefail
 NODE="${1:?usage: tunnel.sh <compute-node-hostname> [local_port] [remote_port]}"
 LPORT="${2:-8000}"
 RPORT="${3:-8000}"
-CLUSTER="aazarbal@198.145.108.6"
+CLUSTER="arianaazarbal@198.145.108.6"
 SSHPORT=16240
 KEY="$HOME/.ssh/id_ed25519"
 
