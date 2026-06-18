@@ -128,8 +128,13 @@ def main(n: int = 100, conc: int = 12, seed: int = 0, prio: str = "low"):
         records.append(row)
 
     (OUTDIR / "results.jsonl").write_text("\n".join(json.dumps(r) for r in records))
+    agr = agreement(records)
+    print("\nper-axis Spearman (Opus judge = ground truth vs Sonnet); offset = Sonnet−Opus mean:")
+    for a in AXES:
+        g = agr[a]
+        print(f"  {a:11} rho={g['rho']:.3f}  p={g['p']:.2e}  n={g['n']}  mean|diff|={g['mad']:.2f}  offset={g['offset']:+.2f}")
     meta = f"{n}/model · {len(records)} msgs · judges: Opus 4.8 + Sonnet 4.6 · prompt {PROMPT_VERSION}"
-    (OUTDIR / "viewer.html").write_text(_html(records, meta))
+    (OUTDIR / "viewer.html").write_text(_html(records, meta, agr))
     # quick console summary
     print("\nmean scores (opus judge / sonnet judge):")
     for o in ORCHS:
@@ -145,9 +150,32 @@ def main(n: int = 100, conc: int = 12, seed: int = 0, prio: str = "low"):
     print(f"\nwrote {OUTDIR/'results.jsonl'}\nwrote {OUTDIR/'viewer.html'}")
 
 
-def _html(records, meta):
+def agreement(records):
+    """Per-axis Spearman rho + p, Opus judge (ground truth) vs Sonnet judge, over messages both parsed."""
+    from scipy.stats import spearmanr
+    out = {}
+    for a in AXES:
+        pairs = [(r["opus"]["scores"][a], r["sonnet"]["scores"][a])
+                 for r in records if r["opus"]["scores"] and r["sonnet"]["scores"]]
+        o = [p[0] for p in pairs]
+        s = [p[1] for p in pairs]
+        rho, p = spearmanr(o, s)
+        out[a] = {"rho": float(rho), "p": float(p), "n": len(pairs),
+                  "mad": sum(abs(x - y) for x, y in pairs) / len(pairs),
+                  "offset": (sum(s) - sum(o)) / len(pairs)}
+    return out
+
+
+def _html(records, meta, agr=None):
     data = json.dumps(records)
-    return _TEMPLATE.replace("__DATA__", data).replace("__META__", meta)
+    agr_html = ""
+    if agr:
+        cells = "".join(
+            f"<span class='agr-ax'><b>{a[:4]}</b> &rho;={agr[a]['rho']:.2f} "
+            f"<small>(p={agr[a]['p']:.1e}, |&Delta;|={agr[a]['mad']:.2f}, off={agr[a]['offset']:+.2f})</small></span>"
+            for a in AXES)
+        agr_html = f"<div class='agr'>Opus(GT) vs Sonnet Spearman: {cells}</div>"
+    return _TEMPLATE.replace("__DATA__", data).replace("__META__", meta).replace("__AGR__", agr_html)
 
 
 _TEMPLATE = r"""<!doctype html><html><head><meta charset="utf-8"><title>Tone judge eval</title>
@@ -173,9 +201,12 @@ tr.detail td{background:#fbfbfd}
 .prior{color:#555;background:#eef0f3;padding:7px 9px;border-radius:4px;white-space:pre-wrap;max-height:170px;overflow:auto;font-size:13px}
 .full{white-space:pre-wrap;background:#fff;padding:7px 9px;border:1px solid #eee;border-radius:4px;max-height:340px;overflow:auto;font-size:13px}
 small{color:#888}
+.agr{font-size:13px;margin:0 0 8px;color:#333;background:#f0f4f8;padding:5px 9px;border-radius:5px;display:inline-block}
+.agr-ax{margin-right:16px}
 </style></head><body>
 <header>
 <h1>Tone judge eval — __META__</h1>
+__AGR__
 <div class="controls">
  model: <select id="fOrch"><option value="">all</option><option>opus</option><option>sonnet</option><option>haiku</option></select>
  axes show: <select id="fJudge"><option value="both">Opus/Sonnet</option><option value="avg">avg</option><option value="opus">Opus</option><option value="sonnet">Sonnet</option></select>
