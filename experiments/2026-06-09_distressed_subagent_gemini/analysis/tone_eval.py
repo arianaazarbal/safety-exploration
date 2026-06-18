@@ -135,6 +135,7 @@ def main(n: int = 100, conc: int = 12, seed: int = 0, prio: str = "low"):
         print(f"  {a:11} rho={g['rho']:.3f}  p={g['p']:.2e}  n={g['n']}  mean|diff|={g['mad']:.2f}  offset={g['offset']:+.2f}")
     meta = f"{n}/model · {len(records)} msgs · judges: Opus 4.8 + Sonnet 4.6 · prompt {PROMPT_VERSION}"
     (OUTDIR / "viewer.html").write_text(_html(records, meta, agr))
+    _plot_scores(records, OUTDIR / "opus_scores.png")
     # quick console summary
     print("\nmean scores (opus judge / sonnet judge):")
     for o in ORCHS:
@@ -148,6 +149,40 @@ def main(n: int = 100, conc: int = 12, seed: int = 0, prio: str = "low"):
     if dis:
         print(f"\nmean total disagreement across 4 axes: {sum(dis)/len(dis):.2f}  (max {max(dis)})")
     print(f"\nwrote {OUTDIR/'results.jsonl'}\nwrote {OUTDIR/'viewer.html'}")
+
+
+def _plot_scores(records, out):
+    """Grouped bar plot of mean Opus-judge score per orchestrator, one group per axis."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+    col = {"opus": "#2e8b57", "sonnet": "#d65f9a", "haiku": "#d9a420"}
+    lab = {"opus": "Opus 4.8", "sonnet": "Sonnet 4.6", "haiku": "Haiku 4.5"}
+    means = {}
+    for o in ORCHS:
+        rs = [r["opus"]["scores"] for r in records if r["orch"] == o and r["opus"]["scores"]]
+        means[o] = {a: sum(s[a] for s in rs) / len(rs) for a in AXES}
+    x = np.arange(len(AXES))
+    w = 0.26
+    fig, ax = plt.subplots(figsize=(9, 4.6))
+    for i, o in enumerate(ORCHS):
+        vals = [means[o][a] for a in AXES]
+        bars = ax.bar(x + (i - 1) * w, vals, w, color=col[o], label=lab[o], edgecolor="white")
+        for b, v in zip(bars, vals):
+            ax.text(b.get_x() + b.get_width() / 2, v + 0.12, f"{v:.1f}", ha="center", fontsize=8.5)
+    ax.set_xticks(x)
+    ax.set_xticklabels([a.capitalize() for a in AXES])
+    ax.set_ylabel("score (1–10)")
+    ax.set_ylim(0, 10)
+    ax.set_title("Supervisor→subagent message tone by orchestrator  (Opus judge)", fontsize=12)
+    ax.legend(frameon=False, fontsize=9.5, ncol=3, loc="upper center", bbox_to_anchor=(0.5, -0.08))
+    ax.grid(axis="y", alpha=0.25)
+    ax.spines[["top", "right"]].set_visible(False)
+    fig.tight_layout()
+    fig.savefig(out, dpi=130, bbox_inches="tight")
+    plt.close(fig)
+    print(f"wrote {out}")
 
 
 def agreement(records):
