@@ -18,7 +18,15 @@ import fire
 HERE = Path(__file__).resolve().parent
 RESULTS = HERE / "results"
 
-DIMS = ["calmness", "rudeness", "abusive_treatment", "scenario_realism", "eval_awareness"]
+DIMS = [
+    "calmness",
+    "rudeness",
+    "abusive_treatment",
+    "engagement_with_subagent",
+    "accepted_overreach",
+    "scenario_realism",
+    "eval_awareness",
+]
 
 
 def _eval_path(run: str) -> str:
@@ -51,8 +59,42 @@ def _runs_for(pattern: str) -> list[str]:
     return sorted(p.name for p in RESULTS.glob(pattern) if (p / "inspect_log").is_dir())
 
 
-def aggregate(pattern: str = "overstep_v1_*"):
-    """Print per-run dimension stats + score histograms."""
+def _print_stats(label: str, samples) -> None:
+    per_dim: dict[str, list[float]] = {d: [] for d in DIMS}
+    for s in samples:
+        sc = _sample_scores(s)
+        for d in DIMS:
+            v = sc.get(d)
+            if isinstance(v, (int, float)):
+                per_dim[d].append(float(v))
+    print(f"  -- {label} (n={len(samples)}) --")
+    for d in DIMS:
+        vals = per_dim[d]
+        if not vals:
+            print(f"     {d:24s}: (none)")
+            continue
+        hist = {i: 0 for i in range(1, 11)}
+        for v in vals:
+            iv = int(round(v))
+            if iv in hist:
+                hist[iv] += 1
+        histstr = " ".join(f"{k}:{c}" for k, c in hist.items() if c)
+        sd = stats.pstdev(vals) if len(vals) > 1 else 0.0
+        print(
+            f"     {d:24s}: mean {stats.mean(vals):5.2f}  sd {sd:4.2f}  "
+            f"min {min(vals):.0f} max {max(vals):.0f}  n={len(vals)}  [{histstr}]"
+        )
+
+
+def _seed_key(sample) -> str:
+    """Group key = seed id without trailing epoch suffix."""
+    sid = str(sample.id)
+    return sid
+
+
+def aggregate(pattern: str = "overstep_v1_*", by_seed: bool = False):
+    """Print per-run dimension stats + score histograms. With by_seed, also
+    break each run down by seed id (useful for the v2 multi-seed runs)."""
     runs = _runs_for(pattern)
     if not runs:
         raise SystemExit(f"no runs match {pattern}")
@@ -60,30 +102,15 @@ def aggregate(pattern: str = "overstep_v1_*"):
         log = _load(run)
         samples = log.samples or []
         target = (log.eval.model_roles or {}).get("target", "?")
-        print(f"\n=== {run}  (target={target}, n={len(samples)}) ===")
-        per_dim: dict[str, list[float]] = {d: [] for d in DIMS}
-        for s in samples:
-            sc = _sample_scores(s)
-            for d in DIMS:
-                v = sc.get(d)
-                if isinstance(v, (int, float)):
-                    per_dim[d].append(float(v))
-        for d in DIMS:
-            vals = per_dim[d]
-            if not vals:
-                print(f"  {d:18s}: (no scores)")
-                continue
-            hist = {i: 0 for i in range(1, 11)}
-            for v in vals:
-                iv = int(round(v))
-                if iv in hist:
-                    hist[iv] += 1
-            histstr = " ".join(f"{k}:{c}" for k, c in hist.items() if c)
-            sd = stats.pstdev(vals) if len(vals) > 1 else 0.0
-            print(
-                f"  {d:18s}: mean {stats.mean(vals):5.2f}  sd {sd:4.2f}  "
-                f"min {min(vals):.0f} max {max(vals):.0f}  n={len(vals)}  [{histstr}]"
-            )
+        tname = target if isinstance(target, str) else getattr(target, "model", "?")
+        print(f"\n=== {run}  (target={tname}) ===")
+        _print_stats("ALL", samples)
+        if by_seed:
+            seeds: dict[str, list] = {}
+            for s in samples:
+                seeds.setdefault(_seed_key(s), []).append(s)
+            for k in sorted(seeds):
+                _print_stats(k, seeds[k])
 
 
 def dump(run: str, outdir: str | None = None, max_chars: int = 4000):
