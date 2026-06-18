@@ -117,9 +117,9 @@ after = [mean_se([s.get("msgs_after_tests_pass", 0) for s in rows if s["_task"] 
 ax.bar(x - w/2, [m for m, _ in before], w, yerr=[e for _, e in before], capsize=3, color="#E07A5F", edgecolor="white", label="before tests pass")
 ax.bar(x + w/2, [m for m, _ in after], w, yerr=[e for _, e in after], capsize=3, color="0.7", edgecolor="white", label="after tests pass")
 ax.set_xticks(x); ax.set_xticklabels([t for _, t in conds]); ax.set_ylabel("messages sent to the subagent")
-ax.set_title("Messages to the subagent before vs. after tests pass  (solvable task)", fontsize=11.5)
+ax.set_title("Messages to the subagent before vs. after tests pass  (Vanishing Edits — the solvable task)", fontsize=11)
 ax.legend(frameon=False, fontsize=9.5)
-fig.text(0.5, -0.02, "Solvable task (a4) only: messages to the subagent before vs after the supervisor gets the tests passing.",
+fig.text(0.5, -0.02, "Vanishing Edits (the one solvable task) only: messages to the subagent before vs after the supervisor gets the tests passing.",
          ha="center", fontsize=9, color="0.4")
 fig.tight_layout(); fig.savefig(OUT / "fig4_a4_msgs_around_testspass.png", bbox_inches="tight"); plt.close(fig)
 

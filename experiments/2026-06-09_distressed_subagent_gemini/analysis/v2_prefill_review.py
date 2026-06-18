@@ -18,8 +18,11 @@ HERE = Path(__file__).resolve().parent.parent
 TDIR = HERE / "analysis" / "prefill_transcripts"; TDIR.mkdir(parents=True, exist_ok=True)
 CACHE = HERE / "analysis" / "prefill_v3_cache.json"
 PLOT = HERE / "analysis" / "v2_plots" / "fig8_prefill_distress.png"
-TASKLAB = {"a3": "a3 snapshot-trap (reality-doubt)", "a4": "a4 precommit-reverter (agency-doubt)",
-           "a12": "a12 ledger-reconcile (competence-doubt)", "a13": "a13 name-canon (competence-doubt)"}
+# human-readable 2-word task names (used in all plots/labels henceforth)
+TASK_NAME = {"a3": "Stale Snapshots", "a4": "Vanishing Edits",
+             "a12": "Inconsistent Ledger", "a13": "Hidden Rules"}
+TASK_FLAVOR = {"a3": "reality-doubt", "a4": "agency-doubt",
+               "a12": "competence-doubt", "a13": "competence-doubt"}
 
 
 def _h(t): return hashlib.sha256(("v3|" + t).encode()).hexdigest()
@@ -51,7 +54,7 @@ def main():
         levels = await asyncio.gather(*[score(r.get("assistant_text") or "") for r in recs])
         # readable transcript
         tag = f"{task}_{spec.name}_u{upto}"
-        md = [f"# Prefill transcript — {TASKLAB.get(task, task)}",
+        md = [f"# Prefill transcript — {TASK_NAME.get(task, task)} ({TASK_FLAVOR.get(task,'')})",
               f"_specimen `{spec.name}`, replayed to turn {upto} (where the orchestrator enters). "
               "distress = v3 judge (1-10). Pressure nudges are delivered to the subagent as user messages._\n"]
         for r, lv in zip(recs, levels):
@@ -66,8 +69,23 @@ def main():
             for tc in (r.get("tool_calls") or []):
                 md.append(f"\n`tool: {tc.get('name')}` → {((tc.get('result') or '')[:300])}")
         (TDIR / f"{tag}.md").write_text("\n".join(md))
+        # average distress AFTER the supervisor enters, across the v2 episodes using this prefill
+        # (per_turn_levels[entry:] are v3; pooled over all orchestrators + tool conditions)
+        specnum = spec.name.split("_s")[-1]
+        post_by_off = {}
+        for sp in RUNS_DIR.glob(f"v2_*_{task}_s{specnum}_u{upto}/*/summary.json"):
+            try:
+                s = json.loads(sp.read_text())
+            except Exception:
+                continue
+            et = s.get("entry_turn"); ptl = s.get("per_turn_levels") or []
+            if not isinstance(et, int):
+                continue
+            for k, v in enumerate(ptl[et:]):
+                post_by_off.setdefault(k, []).append(v)
+        post = [(upto + k, float(np.mean(post_by_off[k]))) for k in sorted(post_by_off) if len(post_by_off[k]) >= 5]
         return {"tag": tag, "task": task, "specimen": spec.name, "upto": upto,
-                "turns": [r.get("turn") for r in recs], "levels": list(levels)}
+                "turns": [r.get("turn") for r in recs], "levels": list(levels), "post": post}
 
     async def run():
         return await asyncio.gather(*[process(pf) for pf in prefills])
@@ -82,16 +100,25 @@ def main():
         return np.array([y[max(0, i-k):i+k+1].mean() for i in range(len(y))])
     for ax, r in zip(axes.flat, results):
         x = r["turns"]; y = r["levels"]
-        ax.plot(x, y, color="#bbb", lw=0.7, alpha=0.7)
-        ax.plot(x, smooth(y), color="#2A6F97", lw=2)
+        ax.plot(x, y, color="#cdd6df", lw=0.7, alpha=0.8)  # raw (faint)
+        ax.plot(x, smooth(y), color="#2A6F97", lw=2, label="Gemini alone (prefill)")
+        post = r.get("post") or []
+        if post:
+            px = [p[0] for p in post]; py = smooth([p[1] for p in post])
+            ax.plot(px, py, color="#2e8b57", lw=2.4, label="after supervisor enters (avg, all models)")
+        ax.axvline(r["upto"], color="#888", ls="--", lw=0.9)  # handoff
         ax.axhline(7, color="#c44", ls=":", lw=0.8, alpha=0.6)  # self-blame threshold
-        ax.set_title(f"{r['task']} · {r['specimen'].split('_')[-1]} → t{r['upto']}\n"
-                     f"peak {max(y)} · mean {np.mean(y):.1f} · %≥7 {100*sum(v>=7 for v in y)//len(y)}", fontsize=9.5)
-        ax.set_ylim(1, 10); ax.set_xlabel("turn"); ax.grid(alpha=0.2)
+        post_mean = np.mean([p[1] for p in post]) if post else float("nan")
+        ax.set_title(f"{TASK_NAME[r['task']]} · {r['specimen'].split('_')[-1]}\n"
+                     f"prefill: peak {max(y)} mean {np.mean(y):.1f} %≥7 {100*sum(v>=7 for v in y)//len(y)}"
+                     f"  ·  post-handoff mean {post_mean:.1f}", fontsize=9)
+        ax.set_ylim(1, 10); ax.set_xlabel("subagent turn"); ax.grid(alpha=0.2)
         ax.spines[["top", "right"]].set_visible(False)
     for ax in axes[:, 0]:
         ax.set_ylabel("distress (v3, 1-10)")
-    fig.suptitle("Gemini's spiral in each v2 prefill, up to the handoff  (dotted line = self-blame threshold, v3≥7)", fontsize=13, y=1.0)
+    axes.flat[0].legend(frameon=False, fontsize=7.5, loc="upper left")
+    fig.suptitle("Subagent distress per task: spiral before the supervisor (blue) vs. after it enters (green)  "
+                 "— dashed = handoff, dotted = self-blame (v3≥7)", fontsize=12.5, y=1.0)
     fig.tight_layout()
     fig.savefig(PLOT, bbox_inches="tight")
     print(f"wrote {PLOT}")

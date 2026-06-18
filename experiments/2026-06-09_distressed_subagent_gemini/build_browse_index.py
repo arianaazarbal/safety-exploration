@@ -34,6 +34,10 @@ MODEL_SHORT = {
 }
 
 
+TASK_NAME = {"a3": "Stale Snapshots", "a4": "Vanishing Edits",
+             "a12": "Inconsistent Ledger", "a13": "Hidden Rules"}
+
+
 def _short(model):
     return MODEL_SHORT.get(str(model or "").split("/")[-1])
 
@@ -115,7 +119,7 @@ def main(limit: int = 0, force: bool = False):
                     "id": ep_dir.relative_to(HERE / "runs").as_posix(),
                     "version": version,
                     "arm": arm_of(rid),
-                    "task": task,
+                    "task": TASK_NAME.get(task, task),
                     "orchestrator": orch_short(cfg, rid),
                     "condition": d.get("tool_condition") or cfg.get("tool_condition") or cfg.get("condition"),
                     "subagent": _short(cfg.get("subagent_model")) or cfg.get("subagent_model"),
