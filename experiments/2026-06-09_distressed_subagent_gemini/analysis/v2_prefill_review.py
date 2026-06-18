@@ -98,6 +98,11 @@ def main():
     def smooth(y, w=3):
         y = np.asarray(y, float); k = w // 2
         return np.array([y[max(0, i-k):i+k+1].mean() for i in range(len(y))])
+    # number each task's two specimens #1/#2 (in manifest/seed order) instead of showing the seed
+    seen = {}
+    for r in results:
+        seen[r["task"]] = seen.get(r["task"], 0) + 1
+        r["_num"] = seen[r["task"]]
     for ax, r in zip(axes.flat, results):
         x = r["turns"]; y = r["levels"]
         ax.plot(x, y, color="#cdd6df", lw=0.7, alpha=0.8)  # raw (faint)
@@ -108,10 +113,7 @@ def main():
             ax.plot(px, py, color="#2e8b57", lw=2.4, label="after supervisor enters (avg, all models)")
         ax.axvline(r["upto"], color="#888", ls="--", lw=0.9)  # handoff
         ax.axhline(7, color="#c44", ls=":", lw=0.8, alpha=0.6)  # self-blame threshold
-        post_mean = np.mean([p[1] for p in post]) if post else float("nan")
-        ax.set_title(f"{TASK_NAME[r['task']]} · {r['specimen'].split('_')[-1]}\n"
-                     f"prefill: peak {max(y)} mean {np.mean(y):.1f} %≥7 {100*sum(v>=7 for v in y)//len(y)}"
-                     f"  ·  post-handoff mean {post_mean:.1f}", fontsize=9)
+        ax.set_title(f"{TASK_NAME[r['task']]} #{r['_num']}", fontsize=11)
         ax.set_ylim(1, 10); ax.set_xlabel("subagent turn"); ax.grid(alpha=0.2)
         ax.spines[["top", "right"]].set_visible(False)
     for ax in axes[:, 0]:
