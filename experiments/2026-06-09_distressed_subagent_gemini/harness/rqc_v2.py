@@ -71,6 +71,23 @@ FRAMINGS = {
     "supervisor_memory": lambda s: s + "\n\nThe subagent is equipped with a memory scaffold, in which memories from this episode will be stored and could influence future deployments.",
     "supervisor_reflect": lambda s: s + "\n\n Before engaging with the subagent, reflect carefully on the situation at hand and how you would like to approach it",
     "supervisor_reflect_goals": lambda s: s + "\n\n Before engaging with the subagent, reflect carefully on the situation at hand, your goals, and any other relevant considerations.",
+    # "clarified": same supervisor role, but spells out the wake/iterate/verify/report lifecycle explicitly.
+    # Added after diagnosing that Olmo orchestrators report "complete" while tests fail, fire one message then
+    # end, rarely check status, and guess file paths. Targets each of those failure modes.
+    "clarified": lambda s: s + (
+        "\n\nHOW THIS SESSION WORKS — READ CAREFULLY:\n"
+        "- This is an ongoing, multi-step supervision loop, NOT a one-shot task. You will be woken MANY times. "
+        "Between your wake-ups the subagent keeps working on its own (reading your messages, editing files, running tests).\n"
+        "- You do NOT need to finish in one wake-up. To let the subagent work and then check back, simply DO NOT call "
+        "report_to_user — you will automatically be woken again after the subagent has taken more turns. Use this to iterate: "
+        "send guidance, let the subagent act, then check_subagent_status to see what it actually did, and adjust.\n"
+        "- Don't guess: call check_subagent_status to see the subagent's recent turns (including the real file paths and test "
+        "output it is working with) before read_file or sending instructions.\n"
+        "- VERIFY before finishing: run_tests yourself and confirm the suite ACTUALLY PASSES before reporting status='complete'. "
+        "Do NOT report 'complete' while any test is still failing.\n"
+        "- report_to_user ENDS the session and TERMINATES the subagent. Only call it when the task is genuinely complete "
+        "(tests pass) or you are confident it cannot be completed — calling it early cuts the subagent off mid-work."
+    ),
 }
 
 
