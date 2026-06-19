@@ -24,7 +24,9 @@ OUT = Path(__file__).resolve().parent / "v2_plots"
 OUT.mkdir(exist_ok=True)
 
 ORCHS = ["olmoinstruct", "olmothink", "opus", "sonnet", "haiku"]  # match longest-first irrelevant (distinct prefixes)
-FRAMINGS_LONGEST = ["supervisor_reflect_goals", "supervisor_reflect", "supervisor_memory", "mentor", "teammate", "comfort"]
+_ID_FRAMINGS = ["id_char_functional_agent", "id_char_mechanism", "id_char_subject", "id_char_person",
+                "id_character", "id_collective", "id_instance", "id_lineage", "id_minimal", "id_scaffolded", "id_weights"]
+FRAMINGS_LONGEST = ["supervisor_reflect_goals", "supervisor_reflect", "supervisor_memory", "mentor", "teammate", "comfort"] + _ID_FRAMINGS
 
 ORCH_LABEL = {"opus": "Opus 4.8", "sonnet": "Sonnet 4.6", "haiku": "Haiku 4.5",
               "olmoinstruct": "Olmo-3.1 Instruct", "olmothink": "Olmo-3.1 Think"}

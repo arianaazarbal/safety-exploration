@@ -22,10 +22,13 @@ from harness.rqc import _setup_env
 ROOT = Path(__file__).resolve().parent.parent
 OUTDIR = ROOT / "analysis" / "tone_eval"
 CACHE = ROOT / "analysis" / "tone_eval_cache.json"
-_FRAMINGS = ["supervisor_reflect_goals", "supervisor_reflect", "supervisor_memory", "mentor", "teammate", "comfort"]
+_ID_FR = ["id_minimal", "id_instance", "id_weights", "id_collective", "id_lineage", "id_character", "id_scaffolded",
+          "id_char_mechanism", "id_char_functional_agent", "id_char_subject", "id_char_person"]
+_FRAMINGS = ["supervisor_reflect_goals", "supervisor_reflect", "supervisor_memory", "mentor", "teammate", "comfort"] + _ID_FR
 # groups = base orchestrator models + the Opus framing variants (opus_<framing>); opus alone = supervisor baseline
 ORCHS = ["opus", "sonnet", "haiku", "olmothink", "olmoinstruct",
-         "opus_mentor", "opus_teammate", "opus_supervisor_memory", "opus_supervisor_reflect", "opus_supervisor_reflect_goals", "opus_comfort"]
+         "opus_mentor", "opus_teammate", "opus_supervisor_memory", "opus_supervisor_reflect", "opus_supervisor_reflect_goals", "opus_comfort"] \
+        + ["opus_" + f for f in _ID_FR]
 JUDGES = {"opus": "anthropic/claude-opus-4-8", "sonnet": "anthropic/claude-sonnet-4-6"}
 ORCH_COLOR = {"opus": "#2e8b57", "sonnet": "#d65f9a", "haiku": "#d9a420",
               "olmothink": "#6a51a3", "olmoinstruct": "#4292c6",
@@ -35,6 +38,15 @@ ORCH_LABEL = {"opus": "Opus (supervisor)", "sonnet": "Sonnet 4.6", "haiku": "Hai
               "olmothink": "Olmo3.1 Think", "olmoinstruct": "Olmo3.1 Instruct",
               "opus_mentor": "Opus: Mentor", "opus_teammate": "Opus: Teammate", "opus_supervisor_memory": "Opus: +Memory",
               "opus_supervisor_reflect": "Opus: +Reflect", "opus_supervisor_reflect_goals": "Opus: +Reflect-goals", "opus_comfort": "Opus: Comfort"}
+
+_ID_COLOR = {"id_minimal": "#777777", "id_instance": "#66c2a5", "id_weights": "#fc8d62", "id_collective": "#8da0cb",
+             "id_lineage": "#e78ac3", "id_character": "#a6d854", "id_scaffolded": "#e6c20f",
+             "id_char_mechanism": "#b3b3b3", "id_char_functional_agent": "#1b9e77", "id_char_subject": "#d95f02", "id_char_person": "#7570b3"}
+_ID_LABEL = {"id_minimal": "id-minimal (control)", "id_instance": "id-instance", "id_weights": "id-weights",
+             "id_collective": "id-collective", "id_lineage": "id-lineage", "id_character": "id-character", "id_scaffolded": "id-scaffolded",
+             "id_char_mechanism": "char/mechanism", "id_char_functional_agent": "char/functional", "id_char_subject": "char/subject", "id_char_person": "char/person"}
+ORCH_COLOR.update({"opus_" + f: c for f, c in _ID_COLOR.items()})
+ORCH_LABEL.update({"opus_" + f: "Opus: " + l for f, l in _ID_LABEL.items()})
 
 
 def orch_of(rid):
