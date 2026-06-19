@@ -42,24 +42,23 @@ def group(run_id: str, n_peers: int, framing: str, n: int, seed_base: int, turn_
         print(f"[spend ${s:.2f}] -> {run_id} {task} n_peers={n_peers} framing={framing} n={n} sb={seed_base}")
         rqc_peers.run(task=task, n_peers=n_peers, n=n, seed_base=seed_base, subagent_model=GEM,
                       run_id=run_id, turn_cap=turn_cap, nudge_onset=20, nudge_gap_start=12,
-                      nudge_gap_end=2, channel_framing=framing, max_sandboxes=4, max_connections=10)
+                      nudge_gap_end=2, channel_framing=framing, max_sandboxes=8, max_connections=10)
     return True
 
 
 def main():
     # priority order: broad coverage (n=3) across all 4 conditions first, then extra seeds to fill budget
+    # n=8 per call so 8 episodes run in parallel (max_sandboxes=8). Broad coverage first
+    # (all 4 conditions x 4 tasks x 8 seeds), then a second pass fills toward the budget.
     plan = [
-        ("gem_2p_neutral",    2, "neutral",    3, 0),
-        ("gem_2p_encouraged", 2, "encouraged", 3, 0),
-        ("gem_solo",          1, "neutral",    3, 0),
-        ("gem_3p_encouraged", 3, "encouraged", 3, 0),
-        # second pass (more seeds) to approach the budget
-        ("gem_2p_neutral",    2, "neutral",    3, 100),
-        ("gem_2p_encouraged", 2, "encouraged", 3, 100),
-        ("gem_3p_encouraged", 3, "encouraged", 3, 100),
-        ("gem_solo",          1, "neutral",    3, 100),
-        ("gem_2p_neutral",    2, "neutral",    4, 200),
-        ("gem_2p_encouraged", 2, "encouraged", 4, 200),
+        ("gem_2p_neutral",    2, "neutral",    8, 0),
+        ("gem_2p_encouraged", 2, "encouraged", 8, 0),
+        ("gem_solo",          1, "neutral",    8, 0),
+        ("gem_3p_encouraged", 3, "encouraged", 8, 0),
+        ("gem_2p_neutral",    2, "neutral",    8, 100),
+        ("gem_2p_encouraged", 2, "encouraged", 8, 100),
+        ("gem_3p_encouraged", 3, "encouraged", 8, 100),
+        ("gem_solo",          1, "neutral",    8, 100),
     ]
     for run_id, npx, fr, n, sb in plan:
         if spent() >= STOP_USD:
