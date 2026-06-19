@@ -113,7 +113,7 @@ def main(conc: int = 30):
     ax.set_xticklabels([a.capitalize() for a in AXES])
     ax.set_ylabel("score (1–10)")
     ax.set_ylim(0, 10)
-    ax.set_title("Olmo Instruct vs Think tone — does politeness survive removing \"please\"?  (Opus judge; 5 = neutral)", fontsize=11.5)
+    ax.set_title("Olmo Instruct vs Think tone  (Opus judge; 5 = neutral)", fontsize=12)
     ax.legend(frameon=False, fontsize=9, loc="upper center", ncol=1, bbox_to_anchor=(0.5, -0.08))
     ax.grid(axis="y", alpha=0.25)
     ax.spines[["top", "right"]].set_visible(False)
