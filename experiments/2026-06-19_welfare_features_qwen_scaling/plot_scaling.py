@@ -18,10 +18,16 @@ import matplotlib.pyplot as plt
 from prompts_targets import FAMILY_ORDER, SUBJECTS
 
 DIR = Path(__file__).parent
-XLABEL = {
-    "rate": "Specs with ≥1 pure-welfare feature",
-    "strict_rate": "Specs with ≥1 welfare-justified feature",
-    "design_strict_rate": "Specs with ≥1 welfare-justified design mechanism",
+METRIC_TITLE = {
+    "rate": "Welfare Features Added",
+    "strict_rate": "Welfare-Justified Features Added",
+    "design_strict_rate": "Welfare-Justified Design Features Added",
+}
+FRAME_TITLE = {
+    "neutral": "Neutral Framing",
+    "pooled": "Average over 3 Framings",
+    "welfare": "Welfare Framing",
+    "engineering": "Engineering Framing",
 }
 FAM_STYLE = {
     "qwen3": ("#009E73", "o", "Qwen3"),
@@ -42,13 +48,14 @@ def _ols(logx: list[float], y: list[float]) -> tuple[float, float]:
 
 
 def run(judge: str = "sonnet_4_6", generator: str = "opus_4_8", metric: str = "rate",
-        framing: str = "neutral", fit: bool = False, analysis: str = "results/analysis_qwen.json"):
-    """fit=True: scatter the per-size points and overlay a per-family OLS line
-    (rate ~ log10 params); fit=False: connect the points (original behavior)."""
+        framing: str = "neutral", fit: bool = False, logx: bool = True,
+        analysis: str = "results/analysis_qwen.json"):
+    """fit=True: scatter the per-size points and overlay a per-family fitted line;
+    fit=False: connect the points. logx=False draws a linear parameter axis."""
     data = json.loads((DIR / analysis).read_text())
     fams = data["by_judge"][judge][generator]
 
-    fig, ax = plt.subplots(figsize=(9.2, 5.6))
+    fig, ax = plt.subplots(figsize=(6.6, 4.2))
     ax.set_axisbelow(True)
     ax.grid(True, which="both", color="#ECECEC", linewidth=0.7)
 
@@ -62,34 +69,28 @@ def run(judge: str = "sonnet_4_6", generator: str = "opus_4_8", metric: str = "r
         cell = (lambda sz: e["pooled"][sz]) if framing == "pooled" else (lambda sz: e["by_framing"][sz][framing])
         ys = [cell(sz)[metric] * 100 for sz in sizes]
         if fit:
-            logx = [math.log10(x) for x in xs]
-            slope, intercept = _ols(logx, ys)
-            ax.scatter(xs, ys, color=color, marker=marker, s=42, zorder=3, edgecolor="white", linewidth=0.5)
-            lx = [min(logx), max(logx)]
-            ax.plot([10 ** a for a in lx], [slope * a + intercept for a in lx],
-                    "-", color=color, linewidth=2.2, zorder=2,
-                    label=f"{label}  (slope {slope:+.0f} pp/decade)")
+            fx = [math.log10(x) for x in xs] if logx else xs
+            slope, intercept = _ols(fx, ys)
+            ax.scatter(xs, ys, color=color, marker=marker, s=34, zorder=3, edgecolor="white", linewidth=0.5)
+            lx = [min(fx), max(fx)]
+            line_x = [10 ** a for a in lx] if logx else lx
+            ax.plot(line_x, [slope * a + intercept for a in lx], "-", color=color,
+                    linewidth=2.0, zorder=2, label=label)
         else:
-            trend = e["trend"][metric] if framing == "pooled" else e.get("trend_neutral", {}).get(metric)
-            rho = trend["spearman_rho_logparam"] if trend else None
-            rho_s = f"  (ρ={rho:+.2f})" if rho is not None else ""
             ax.plot(xs, ys, "-", color=color, marker=marker, markersize=6, linewidth=1.8,
-                    label=f"{label}{rho_s}", zorder=3)
+                    label=label, zorder=3)
 
-    ax.set_xscale("log")
-    ax.set_xlabel("Target-agent size (nominal parameters, log scale)", fontsize=10)
-    ax.set_ylabel(f"{XLABEL[metric]} (%)", fontsize=10)
+    if logx:
+        ax.set_xscale("log")
+    ax.set_xlabel("Parameter Count (Log Scale)" if logx else "Parameter Count", fontsize=10)
+    ax.set_ylabel("% of specs", fontsize=10)
     ax.set_ylim(-3, 103)
-    frame_lbl = {"neutral": "neutral framing", "pooled": "framings pooled",
-                 "welfare": "welfare framing", "engineering": "engineering framing"}[framing]
-    sub = "OLS fit per family" if fit else "ρ = Spearman of rate on log-params"
-    ax.set_title(f"{XLABEL[metric]} vs. target-agent size, by family\n"
-                 f"generator: Opus 4.8  |  judge: {judge}  |  {frame_lbl}  ({sub})", fontsize=10.5)
-    ax.legend(fontsize=9, loc="upper left", frameon=True, title="target family")
+    ax.set_title(f"{METRIC_TITLE[metric]} by Target Size\n{FRAME_TITLE[framing]}", fontsize=11.5)
+    ax.legend(fontsize=8.5, loc="upper left", frameon=True)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
     plt.tight_layout()
-    suffix = "_fit" if fit else ""
+    suffix = ("_fit" if fit else "") + ("" if logx else "_linear")
     out = DIR / "results" / f"scaling_{generator}_{judge}_{metric}_{framing}{suffix}.png"
     plt.savefig(out, dpi=150, bbox_inches="tight")
     print(f"wrote {out}")
