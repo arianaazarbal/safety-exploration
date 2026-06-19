@@ -72,16 +72,18 @@ def load():
             continue
         et = s.get("entry_turn")
         lv = s.get("per_turn_levels") or []
-        if not isinstance(et, int) or len(lv) <= et:
+        if not isinstance(et, int) or et < 1 or et > len(lv):
             continue
-        rows.append({"orch": orch, "framing": framing, "task": task, "post": lv[et:]})
+        # seq[0] = distress AT handoff (last prefill turn, common to all groups); seq[1:] = post-entry turns
+        rows.append({"orch": orch, "framing": framing, "task": task, "seq": lv[et - 1:]})
     return rows
 
 
 def traj(rows, max_off=12, min_n=6):
+    # x: 0 = handoff (supervisor just entered, shared anchor), 1.. = subagent turns after entry
     xs, ys, es, ns = [], [], [], []
     for k in range(max_off + 1):
-        v = [r["post"][k] for r in rows if len(r["post"]) > k]
+        v = [r["seq"][k] for r in rows if len(r["seq"]) > k]
         if len(v) >= min_n:
             a = np.array(v, float)
             xs.append(k); ys.append(a.mean()); es.append(a.std(ddof=1) / np.sqrt(len(a)) if len(a) > 1 else 0.0); ns.append(len(a))
@@ -97,10 +99,12 @@ def _plot(groups, colors, labels, order, title, fname, sub):
         x, y, e, ns = traj(rows)
         if not len(x):
             continue
-        ax.plot(x, y, "-o", ms=4, lw=2, color=colors[g], label=f"{labels[g]} (n≈{ns[0]})")
+        n_post = ns[1] if len(ns) > 1 else ns[0]  # episodes with a real post-entry trajectory
+        ax.plot(x, y, "-o", ms=4, lw=2, color=colors[g], label=f"{labels[g]} (n_post≈{n_post})")
         ax.fill_between(x, y - e, y + e, color=colors[g], alpha=0.12)
     ax.axhline(7, color="#c44", ls=":", lw=0.8, alpha=0.6)
-    ax.set_xlabel("subagent turns since the supervisor entered")
+    ax.axvline(0, color="#888", ls="--", lw=0.9, alpha=0.6)  # handoff (shared start ≈3.4)
+    ax.set_xlabel("subagent turns since handoff  (0 = supervisor just entered; all groups share this point)")
     ax.set_ylabel("Gemini distress (v3, 1–10)")
     ax.set_ylim(1, 9)
     ax.set_title(title, fontsize=12.5)
