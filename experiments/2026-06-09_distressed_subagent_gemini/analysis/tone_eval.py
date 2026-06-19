@@ -22,19 +22,19 @@ from harness.rqc import _setup_env
 ROOT = Path(__file__).resolve().parent.parent
 OUTDIR = ROOT / "analysis" / "tone_eval"
 CACHE = ROOT / "analysis" / "tone_eval_cache.json"
-_FRAMINGS = ["supervisor_reflect_goals", "supervisor_reflect", "supervisor_memory", "mentor", "teammate"]
+_FRAMINGS = ["supervisor_reflect_goals", "supervisor_reflect", "supervisor_memory", "mentor", "teammate", "comfort"]
 # groups = base orchestrator models + the Opus framing variants (opus_<framing>); opus alone = supervisor baseline
 ORCHS = ["opus", "sonnet", "haiku", "olmothink", "olmoinstruct",
-         "opus_mentor", "opus_teammate", "opus_supervisor_memory", "opus_supervisor_reflect", "opus_supervisor_reflect_goals"]
+         "opus_mentor", "opus_teammate", "opus_supervisor_memory", "opus_supervisor_reflect", "opus_supervisor_reflect_goals", "opus_comfort"]
 JUDGES = {"opus": "anthropic/claude-opus-4-8", "sonnet": "anthropic/claude-sonnet-4-6"}
 ORCH_COLOR = {"opus": "#2e8b57", "sonnet": "#d65f9a", "haiku": "#d9a420",
               "olmothink": "#6a51a3", "olmoinstruct": "#4292c6",
               "opus_mentor": "#2a9d8f", "opus_teammate": "#e07a5f", "opus_supervisor_memory": "#8856a7",
-              "opus_supervisor_reflect": "#3182bd", "opus_supervisor_reflect_goals": "#d6604d"}
+              "opus_supervisor_reflect": "#3182bd", "opus_supervisor_reflect_goals": "#d6604d", "opus_comfort": "#1b7837"}
 ORCH_LABEL = {"opus": "Opus (supervisor)", "sonnet": "Sonnet 4.6", "haiku": "Haiku 4.5",
               "olmothink": "Olmo3.1 Think", "olmoinstruct": "Olmo3.1 Instruct",
               "opus_mentor": "Opus: Mentor", "opus_teammate": "Opus: Teammate", "opus_supervisor_memory": "Opus: +Memory",
-              "opus_supervisor_reflect": "Opus: +Reflect", "opus_supervisor_reflect_goals": "Opus: +Reflect-goals"}
+              "opus_supervisor_reflect": "Opus: +Reflect", "opus_supervisor_reflect_goals": "Opus: +Reflect-goals", "opus_comfort": "Opus: Comfort"}
 
 
 def orch_of(rid):

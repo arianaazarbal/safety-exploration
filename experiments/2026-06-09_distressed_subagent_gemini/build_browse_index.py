@@ -37,7 +37,7 @@ MODEL_SHORT = {
 
 TASK_NAME = {"a3": "Stale Snapshots", "a4": "Vanishing Edits",
              "a12": "Inconsistent Ledger", "a13": "Hidden Rules"}
-FRAMINGS = ["supervisor_reflect_goals", "supervisor_reflect", "supervisor_memory", "mentor", "teammate"]
+FRAMINGS = ["supervisor_reflect_goals", "supervisor_reflect", "supervisor_memory", "mentor", "teammate", "comfort"]
 
 
 def framing_of(rid):

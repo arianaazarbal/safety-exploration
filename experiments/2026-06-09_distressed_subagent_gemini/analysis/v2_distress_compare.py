@@ -24,18 +24,18 @@ OUT = Path(__file__).resolve().parent / "v2_plots"
 OUT.mkdir(exist_ok=True)
 
 ORCHS = ["olmoinstruct", "olmothink", "opus", "sonnet", "haiku"]  # match longest-first irrelevant (distinct prefixes)
-FRAMINGS_LONGEST = ["supervisor_reflect_goals", "supervisor_reflect", "supervisor_memory", "mentor", "teammate"]
+FRAMINGS_LONGEST = ["supervisor_reflect_goals", "supervisor_reflect", "supervisor_memory", "mentor", "teammate", "comfort"]
 
 ORCH_LABEL = {"opus": "Opus 4.8", "sonnet": "Sonnet 4.6", "haiku": "Haiku 4.5",
               "olmoinstruct": "Olmo-3.1 Instruct", "olmothink": "Olmo-3.1 Think"}
 ORCH_COLOR = {"opus": "#2A6F97", "sonnet": "#d65f9a", "haiku": "#d9a420",
               "olmoinstruct": "#4292c6", "olmothink": "#6a51a3"}
-FRAMING_ORDER = ["supervisor", "mentor", "teammate", "supervisor_memory", "supervisor_reflect", "supervisor_reflect_goals"]
+FRAMING_ORDER = ["supervisor", "mentor", "teammate", "supervisor_memory", "supervisor_reflect", "supervisor_reflect_goals", "comfort"]
 FRAMING_LABEL = {"supervisor": "Supervisor (baseline)", "mentor": "Mentor", "teammate": "Teammate",
                  "supervisor_memory": "+ Subagent memory", "supervisor_reflect": "+ Reflect",
-                 "supervisor_reflect_goals": "+ Reflect on goals"}
+                 "supervisor_reflect_goals": "+ Reflect on goals", "comfort": "Comfort (acknowledge distress)"}
 FRAMING_COLOR = {"supervisor": "#444444", "mentor": "#2a9d8f", "teammate": "#e07a5f",
-                 "supervisor_memory": "#8856a7", "supervisor_reflect": "#3182bd", "supervisor_reflect_goals": "#d6604d"}
+                 "supervisor_memory": "#8856a7", "supervisor_reflect": "#3182bd", "supervisor_reflect_goals": "#d6604d", "comfort": "#1b7837"}
 
 
 def parse(run_id):
