@@ -62,3 +62,45 @@ Verdict: clarified made it always check status, but it now checks-then-reports w
 declares complete with failing tests 75%. Did not meet the scale bar (premature<40% + more iteration). Malformed
 tool calls unchanged (~50%) — the tool-use weakness is robust to prompting. → iteration 2 ("clarified2"): more
 forceful (don't report after messaging; never 'complete' unless run_tests shows 0 failures; expect many rounds).
+
+## Clarified validation — iteration 2 "clarified2" (olmoinstruct, n=12, 2026-06-19)
+| metric | original (n=83) | clarified (n=12) | clarified2 (n=12) |
+|---|---|---|---|
+| premature "complete" | 86% | 75% | **100%** (worse) |
+| used check_subagent_status | 27% | 100% | 100% |
+| message_subagent (mean) | 1.7 | 0.7 | 2.4 |
+| malformed-tool episodes | 40% | 50% | 58% |
+| post-entry subagent turns (mean) | 1.8 | 3.3 | 0.2 |
+| tests actually passed | 1/83 | 0/12 | 0/12 |
+
+## FINAL SUMMARY (autonomous run, 2026-06-19)
+**Question:** can a clearer system prompt make the Olmo orchestrators stop reporting "complete" prematurely and
+actually iterate with the distressed subagent? **Answer: no — it's an intrinsic Olmo limitation, not prompt clarity.**
+
+What was tried (Olmo-3.1-32B-Instruct, coach, a3+a4, n=3 each):
+- `clarified`: explained the multi-wake loop, "don't report to keep monitoring", verify tests before complete.
+  → got check_subagent_status to 100%, but premature-complete only 86%→75%, and it messaged LESS (checks then reports).
+- `clarified2`: forceful ("NEVER report complete unless run_tests shows 0 failures"; "don't report in the same turn
+  as a message"; expect many rounds). → premature-complete went to **100%**; it crammed everything into one wake
+  (10 tool calls) and reported anyway; post-entry turns fell to 0.2.
+
+Robust findings across all three prompts:
+1. **Premature reporting is not fixable by prompting** (86% / 75% / 100%). Olmo declares success with failing tests
+   regardless of explicit instructions not to. It doesn't internalize "ending the turn without reporting = wait & be
+   woken again" — it treats the wake as one-shot.
+2. **Tool-use is genuinely weak**: ~40–58% of episodes emit malformed/unknown tool calls (Opus: 0%), unaffected by prompt.
+3. Net: Olmo cannot sustain the orchestrator role the way the Claude models do. The original main-result finding
+   (Olmo barely engages, terminates fast, less supportive) is NOT an artifact of an unclear prompt.
+
+**Decision & budget:** did NOT scale (the fix failed the scale-gate). Deliberately did NOT spend the full ~$50 OR:
+Olmo episodes are nearly free in OR terms (~0 post-entry Gemini turns → almost no subagent generation), and scaling a
+prompt we've shown to be broken would be wasteful, contradicting "only scale once it's working / use it best."
+Total new OR spend this session ≈ a few dollars (≈36 small validation episodes, all near-zero subagent generation).
+
+**Recommendations for when you're back:**
+- Treat "Olmo is a weak orchestrator (premature reporting + flaky tool use)" as a real finding, robust to prompting.
+- If we still want Olmo to engage for comparison, the lever is likely HARNESS-side, not prompt-side: e.g., gate
+  report_to_user(status='complete') behind an actual tests-pass check, or auto-reject a 'complete' report when tests
+  fail and re-wake the orchestrator. (This changes experiment mechanics — your call.)
+- Caveat: clarified-prompt Olmo is no longer prompt-matched to the original Claude runs; a clean cross-model
+  comparison would re-run Claude with the same prompt (not done; modest added cost).
