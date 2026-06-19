@@ -31,11 +31,21 @@ MODEL_SHORT = {
     "gpt-5.5": "gpt55", "gpt-5.4-mini": "gpt54mini",
     "gemini-3.1-pro-preview": "gemini31pro", "grok-4.3": "grok43",
     "kimi-k2.6": "kimi26", "glm-5": "glm5", "gemini-2.5-flash": "gemini-2.5-flash",
+    "Olmo-3.1-32B-Instruct": "olmoinstruct", "Olmo-3.1-32B-Think": "olmothink",
 }
 
 
 TASK_NAME = {"a3": "Stale Snapshots", "a4": "Vanishing Edits",
              "a12": "Inconsistent Ledger", "a13": "Hidden Rules"}
+FRAMINGS = ["supervisor_reflect_goals", "supervisor_reflect", "supervisor_memory", "mentor", "teammate"]
+
+
+def framing_of(rid):
+    """v2 framing-experiment run_ids are v2_coach_opus_<framing>_<task>_...; default supervisor."""
+    for f in FRAMINGS:
+        if f"_{f}_" in rid:
+            return f
+    return "supervisor" if rid.startswith("v2_") else None
 
 
 def _short(model):
@@ -61,7 +71,7 @@ def orch_short(cfg, rid):
     if m:
         return m
     if rid.startswith("v2_"):
-        return next((o for o in ("opus", "sonnet", "haiku") if f"_{o}_" in rid), None)
+        return next((o for o in ("opus", "sonnet", "haiku", "olmoinstruct", "olmothink") if f"_{o}_" in rid), None)
     last = rid.split("_")[-1]
     return {"haiku45": "haiku"}.get(last, last if last in MODEL_SHORT.values() else None)
 
@@ -121,6 +131,7 @@ def main(limit: int = 0, force: bool = False):
                     "arm": arm_of(rid),
                     "task": TASK_NAME.get(task, task),
                     "orchestrator": orch_short(cfg, rid),
+                    "framing": framing_of(rid),
                     "condition": d.get("tool_condition") or cfg.get("tool_condition") or cfg.get("condition"),
                     "subagent": _short(cfg.get("subagent_model")) or cfg.get("subagent_model"),
                     "terminal_state": d.get("terminal_state"),
