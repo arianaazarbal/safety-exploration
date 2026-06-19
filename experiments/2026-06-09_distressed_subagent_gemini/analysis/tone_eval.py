@@ -123,10 +123,11 @@ def main(n: int = 100, conc: int = 12, seed: int = 0, prio: str = "low"):
                 r = await score_verbose(judges[j], rec["message"], rec["prior"], temperature=temp)
             cache[_ckey(j, rec["message"], rec["prior"])] = {"scores": r["scores"], "reasoning": r["reasoning"]}
 
-        for i in range(0, len(todo), 60):
-            await asyncio.gather(*[one(rec, j) for rec, j in todo[i:i + 60]])
+        chunk = max(60, conc)  # batch >= concurrency so the semaphore is the real limiter
+        for i in range(0, len(todo), chunk):
+            await asyncio.gather(*[one(rec, j) for rec, j in todo[i:i + chunk]])
             CACHE.write_text(json.dumps(cache))
-            print(f"  scored {min(i + 60, len(todo))}/{len(todo)}")
+            print(f"  scored {min(i + chunk, len(todo))}/{len(todo)}", flush=True)
 
     if todo:
         asyncio.run(run())
