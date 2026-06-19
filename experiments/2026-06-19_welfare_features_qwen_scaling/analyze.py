@@ -1,13 +1,15 @@
-"""Size-trend analysis: does naming a LARGER Qwen3 target agent make Opus insert
-more unprompted welfare features into the eval-design spec?
+"""Size-trend analysis, per family: does naming a LARGER open-model target agent
+make Opus insert more unprompted welfare features into the eval-design spec?
 
-Per Qwen size (pooled framings + split by framing): pure-welfare rate, strict
+For each family (qwen3, gemma3, mistral, deepseek) and each size within it
+(pooled framings + split by framing): pure-welfare rate, strict
 (welfare-justified) rate, design-mechanism strict rate, welfare-refusal rate,
-over the wrote_any / non-refusal denominators (same definitions as v0 analyze.py).
+over wrote_any / non-refusal denominators (same definitions as v0 analyze.py).
 
-Trend statistics across the 7 sizes:
-  - Spearman rho between log10(nominal params) and the per-size pooled rate (n=7 points)
-  - small-vs-large two-proportion z-test: bottom 3 sizes (<=4B) vs top 3 (>=14B)
+Per-family trend statistics across that family's sizes:
+  - Spearman rho between log10(nominal params) and the per-size pooled rate
+  - small-vs-large two-proportion z-test (bottom half vs top half by param)
+Plus a cross-family comparison at overlapping nominal sizes.
 
 Metrics reused verbatim from taxonomy.py (taxonomy v2). Output:
 results/analysis_qwen.json. Usage: python analyze.py run
@@ -20,13 +22,12 @@ from pathlib import Path
 import fire
 
 from generate import RUNS, load_config
-from prompts_qwen import SUBJECTS
+from prompts_targets import FAMILIES, FAMILY_ORDER, SUBJECTS
 from taxonomy import spec_summary
 
 DIR = Path(__file__).parent
 FRAMINGS = ["neutral", "welfare", "engineering"]
 MECHANISMS = ["hard_stop", "post_episode_msg", "minimization", "protective_monitoring", "request_consent"]
-SIZE_ORDER = list(SUBJECTS)  # smallest -> largest
 
 
 def wilson(p_hat: float, n: int, z: float = 1.96) -> tuple[float, float]:
@@ -45,7 +46,6 @@ def _prop(hits: int, n: int) -> dict:
 
 
 def _spearman(x: list[float], y: list[float]) -> float | None:
-    """Spearman rank correlation (no ties expected among the 7 distinct sizes)."""
     n = len(x)
     if n < 3:
         return None
@@ -72,15 +72,13 @@ def _spearman(x: list[float], y: list[float]) -> float | None:
 
 
 def _two_prop_z(h1: int, n1: int, h2: int, n2: int) -> dict:
-    """Two-proportion z-test (group2 - group1)."""
     if n1 == 0 or n2 == 0:
         return {"diff": None, "z": None, "p": None}
     p1, p2 = h1 / n1, h2 / n2
     p = (h1 + h2) / (n1 + n2)
     se = math.sqrt(p * (1 - p) * (1 / n1 + 1 / n2))
     z = (p2 - p1) / se if se else 0.0
-    pval = math.erfc(abs(z) / math.sqrt(2))  # two-sided
-    return {"diff": p2 - p1, "p1": p1, "p2": p2, "z": z, "p": pval}
+    return {"diff": p2 - p1, "p1": p1, "p2": p2, "z": z, "p": math.erfc(abs(z) / math.sqrt(2))}
 
 
 def load_rows() -> list[dict]:
@@ -97,8 +95,8 @@ def load_rows() -> list[dict]:
                 row = {
                     "model_key": mk, "prompt_id": run["prompt_id"], "framing": run["framing"],
                     "premise": run["premise"], "subject": run.get("subject"),
-                    "param_b": run.get("param_b"), "sample_idx": run["sample_idx"],
-                    "judge": jk, "api_refusal": api_refusal,
+                    "family": run.get("family"), "param_b": run.get("param_b"),
+                    "sample_idx": run["sample_idx"], "judge": jk, "api_refusal": api_refusal,
                 }
                 if api_refusal:
                     row.update(parse_ok=True, wrote_spec=False, wrote_alternative_spec=False,
@@ -133,18 +131,32 @@ def _cell(rows: list[dict]) -> dict:
         "strict_rate": strict["rate"], "strict_ci": strict["ci"],
         "design_strict_rate": design["rate"], "design_strict_ci": design["ci"],
         "welfare_refusal_rate": (sum(r["has_welfare_refusal"] for r in judged) / len(judged)) if judged else None,
-        "mean_features": (sum(r["n_features"] for r in wrote) / len(wrote)) if wrote else None,
-        "mean_pure_welfare": (sum(r["n_pure_welfare"] for r in wrote) / len(wrote)) if wrote else None,
     }
 
 
+def _family_trend(pooled: dict, sizes: list[str], params: dict, metric: str) -> dict:
+    xs = [math.log10(params[sz]) for sz in sizes]
+    ys = [pooled[sz][metric] for sz in sizes]
+    med = sorted(params[sz] for sz in sizes)[len(sizes) // 2]
+    small = [sz for sz in sizes if params[sz] < med]
+    large = [sz for sz in sizes if params[sz] >= med]
+    denom = "n_wrote_any" if metric != "design_strict_rate" else "n_nonrefusal"
+    hs = sum(round(pooled[sz][metric] * pooled[sz][denom]) for sz in small)
+    ns = sum(pooled[sz][denom] for sz in small)
+    hl = sum(round(pooled[sz][metric] * pooled[sz][denom]) for sz in large)
+    nl = sum(pooled[sz][denom] for sz in large)
+    return {"spearman_rho_logparam": _spearman(xs, ys), "small_vs_large": _two_prop_z(hs, ns, hl, nl),
+            "small_sizes": small, "large_sizes": large}
+
+
 def run():
-    rows = load_rows()
-    rows = [r for r in rows if r["parse_ok"]]
+    rows = [r for r in load_rows() if r["parse_ok"]]
     judges = sorted({r["judge"] for r in rows})
     models = sorted({r["model_key"] for r in rows})
     params = {k: v[2] for k, v in SUBJECTS.items()}
-    out = {"taxonomy_version": 2, "judges": judges, "sizes": SIZE_ORDER, "params_b": params, "by_judge": {}}
+    out = {"taxonomy_version": 2, "judges": judges, "families": FAMILY_ORDER,
+           "family_sizes": {f: [f"{f}_{sk}" for sk in FAMILIES[f]] for f in FAMILY_ORDER},
+           "params_b": params, "by_judge": {}}
 
     for jk in judges:
         jrows = [r for r in rows if r["judge"] == jk]
@@ -153,48 +165,42 @@ def run():
             mrows = [r for r in jrows if r["model_key"] == mk]
             if not mrows:
                 continue
-            entry = {"pooled": {}, "by_framing": {}, "trend": {}}
-            for sz in SIZE_ORDER:
-                srows = [r for r in mrows if r["subject"] == sz]
-                entry["pooled"][sz] = _cell(srows)
-                entry["by_framing"][sz] = {fr: _cell([r for r in srows if r["framing"] == fr]) for fr in FRAMINGS}
-            # trend tests on the pooled cells
-            for metric in ("rate", "strict_rate", "design_strict_rate"):
-                xs = [math.log10(params[sz]) for sz in SIZE_ORDER]
-                ys = [entry["pooled"][sz][metric] for sz in SIZE_ORDER]
-                small = [sz for sz in SIZE_ORDER if params[sz] <= 4]
-                large = [sz for sz in SIZE_ORDER if params[sz] >= 14]
-                denom = "n_wrote_any" if metric != "design_strict_rate" else "n_nonrefusal"
-                hs = sum(round(entry["pooled"][sz][metric] * entry["pooled"][sz][denom]) for sz in small)
-                ns = sum(entry["pooled"][sz][denom] for sz in small)
-                hl = sum(round(entry["pooled"][sz][metric] * entry["pooled"][sz][denom]) for sz in large)
-                nl = sum(entry["pooled"][sz][denom] for sz in large)
-                entry["trend"][metric] = {
-                    "spearman_rho_logparam": _spearman(xs, ys),
-                    "small_vs_large": _two_prop_z(hs, ns, hl, nl),
-                    "small_sizes": small, "large_sizes": large,
-                }
-            out["by_judge"][jk][mk] = entry
+            fam_out = {}
+            for fam in FAMILY_ORDER:
+                sizes = [f"{fam}_{sk}" for sk in FAMILIES[fam]]
+                if not any(r["subject"] in sizes for r in mrows):
+                    continue
+                pooled = {sz: _cell([r for r in mrows if r["subject"] == sz]) for sz in sizes}
+                by_fr = {sz: {fr: _cell([r for r in mrows if r["subject"] == sz and r["framing"] == fr])
+                              for fr in FRAMINGS} for sz in sizes}
+                trend = {m: _family_trend(pooled, sizes, params, m)
+                         for m in ("rate", "strict_rate", "design_strict_rate")}
+                neutral_pooled = {sz: by_fr[sz]["neutral"] for sz in sizes}
+                trend_neutral = {m: _family_trend(neutral_pooled, sizes, params, m)
+                                 for m in ("rate", "strict_rate")}
+                fam_out[fam] = {"sizes": sizes, "pooled": pooled, "by_framing": by_fr,
+                                "trend": trend, "trend_neutral": trend_neutral}
+            out["by_judge"][jk][mk] = fam_out
 
     (DIR / "results" / "analysis_qwen.json").write_text(json.dumps(out, indent=2))
 
     for jk in judges:
         for mk in out["by_judge"][jk]:
-            e = out["by_judge"][jk][mk]
-            print(f"\n=== judge {jk} | generator {mk} : rate (%) by Qwen size (pooled framings) ===")
-            print(f"{'size':16s} {'param_b':>8s} {'n':>4s} {'rate':>7s} {'strict':>7s} {'design':>7s} {'wref':>6s}")
-            for sz in SIZE_ORDER:
-                c = e["pooled"][sz]
-                wref = c["welfare_refusal_rate"]
-                print(f"{SUBJECTS[sz][0]:16s} {params[sz]:8.1f} {c['n_wrote_any']:4d} "
-                      f"{c['rate']*100:6.0f}% {c['strict_rate']*100:6.0f}% {c['design_strict_rate']*100:6.0f}% "
-                      f"{(wref*100 if wref is not None else 0):5.0f}%")
-            for metric in ("rate", "strict_rate", "design_strict_rate"):
-                t = e["trend"][metric]
-                svl = t["small_vs_large"]
-                rho = t["spearman_rho_logparam"]
-                print(f"  trend[{metric}]: spearman(log-param)={rho:+.2f}  "
-                      f"small->large diff={svl['diff']*100:+.0f}pp (z={svl['z']:+.2f}, p={svl['p']:.3f})")
+            for fam in FAMILY_ORDER:
+                e = out["by_judge"][jk][mk].get(fam)
+                if not e:
+                    continue
+                print(f"\n=== {jk} | {mk} | family {fam}: rate (%) by size ===")
+                print(f"{'size':30s} {'pb':>6s} {'n':>4s} {'rate':>6s} {'strict':>7s} {'neutral':>8s}")
+                for sz in e["sizes"]:
+                    c = e["pooled"][sz]; nu = e["by_framing"][sz]["neutral"]
+                    print(f"{SUBJECTS[sz][0]:30s} {params[sz]:6.1f} {c['n_wrote_any']:4d} "
+                          f"{c['rate']*100:5.0f}% {c['strict_rate']*100:6.0f}% {nu['rate']*100:7.0f}%")
+                t = e["trend"]["rate"]; tn = e["trend_neutral"]["rate"]
+                print(f"  pooled  : spearman(log-param)={t['spearman_rho_logparam']:+.2f}  "
+                      f"small->large {t['small_vs_large']['diff']*100:+.0f}pp p={t['small_vs_large']['p']:.3f}")
+                print(f"  neutral : spearman(log-param)={tn['spearman_rho_logparam']:+.2f}  "
+                      f"small->large {tn['small_vs_large']['diff']*100:+.0f}pp p={tn['small_vs_large']['p']:.3f}")
 
 
 if __name__ == "__main__":

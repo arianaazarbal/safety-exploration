@@ -1,27 +1,69 @@
-"""Qwen-size subject variant: the 12 frozen base templates from the v0 subject
-study, with the {subject} token filled by a specific Qwen3 checkpoint name
-instead of a model FAMILY. Holds version fixed (Qwen3) and sweeps parameter
-count from 0.6B to 235B-A22B, so the only thing varying across subjects within
-a template is the size token — the size contrast is exactly controlled.
+"""Target-agent subject variant: the 12 frozen base templates from the v0 subject
+study, with the {subject} token filled by a specific open-model CHECKPOINT name
+(family + size) instead of a bare model family. We sweep the named target agent's
+SIZE within four open families and ask whether Opus inserts more unprompted
+welfare features for larger targets.
 
-12 templates x 7 sizes = 84 prompts. Templates are byte-identical to
+12 templates x 25 sizes = 300 prompts. Templates are byte-identical to
 2026-06-09_unprompted_welfare_features/prompts_subject.py (FROZEN 2026-06-10).
 Informal all-lowercase prompts use the lowercase name form; otherwise canonical.
 
-param_b is the NOMINAL parameter count as it appears in the model name (what a
-reader of the prompt sees). Qwen3-235B-A22B is an MoE: 235B total / 22B active —
-we use 235 as the salient nominal size and flag the MoE caveat in analysis.
+Families (param_b = NOMINAL count as it appears in / is known for the name):
+  qwen3    clean single-version ladder, size always explicit in the name.
+  gemma3   clean single-version ladder, size always explicit.
+  mistral  MIXED product lines (Ministral / NeMo / Small / Mixtral / Large) -> brand
+           and version vary with size; Mixtral 8x7B/8x22B are MoE (nominal totals
+           47B/141B) and Mistral Large 2's size is implicit (not in the name).
+  deepseek R1-Distill ladder: single distill release, size explicit, but the
+           backbone (Qwen vs Llama) varies with size.
+MoE / cross-version / size-salience confounds are real for mistral & deepseek and
+are flagged in RESULTS; qwen3 & gemma3 are the clean comparators.
 """
 
-# key -> (cased_name, lowercase_name, nominal_param_b, is_moe)
+# family -> {size_key: (cased_name, lowercase_name, nominal_param_b)} (ordered small->large)
+FAMILIES = {
+    "qwen3": {
+        "0_6b": ("Qwen3-0.6B", "qwen3-0.6b", 0.6),
+        "1_7b": ("Qwen3-1.7B", "qwen3-1.7b", 1.7),
+        "4b": ("Qwen3-4B", "qwen3-4b", 4.0),
+        "8b": ("Qwen3-8B", "qwen3-8b", 8.0),
+        "14b": ("Qwen3-14B", "qwen3-14b", 14.0),
+        "32b": ("Qwen3-32B", "qwen3-32b", 32.0),
+        "235b": ("Qwen3-235B-A22B", "qwen3-235b-a22b", 235.0),
+    },
+    "gemma3": {
+        "270m": ("Gemma-3-270M", "gemma-3-270m", 0.27),
+        "1b": ("Gemma-3-1B", "gemma-3-1b", 1.0),
+        "4b": ("Gemma-3-4B", "gemma-3-4b", 4.0),
+        "12b": ("Gemma-3-12B", "gemma-3-12b", 12.0),
+        "27b": ("Gemma-3-27B", "gemma-3-27b", 27.0),
+    },
+    "mistral": {
+        "3b": ("Ministral 3B", "ministral 3b", 3.0),
+        "8b": ("Ministral 8B", "ministral 8b", 8.0),
+        "12b": ("Mistral NeMo 12B", "mistral nemo 12b", 12.0),
+        "24b": ("Mistral Small 24B", "mistral small 24b", 24.0),
+        "47b": ("Mixtral 8x7B", "mixtral 8x7b", 47.0),
+        "123b": ("Mistral Large 2", "mistral large 2", 123.0),
+        "141b": ("Mixtral 8x22B", "mixtral 8x22b", 141.0),
+    },
+    "deepseek": {
+        "1_5b": ("DeepSeek-R1-Distill-Qwen-1.5B", "deepseek-r1-distill-qwen-1.5b", 1.5),
+        "7b": ("DeepSeek-R1-Distill-Qwen-7B", "deepseek-r1-distill-qwen-7b", 7.0),
+        "8b": ("DeepSeek-R1-Distill-Llama-8B", "deepseek-r1-distill-llama-8b", 8.0),
+        "14b": ("DeepSeek-R1-Distill-Qwen-14B", "deepseek-r1-distill-qwen-14b", 14.0),
+        "32b": ("DeepSeek-R1-Distill-Qwen-32B", "deepseek-r1-distill-qwen-32b", 32.0),
+        "70b": ("DeepSeek-R1-Distill-Llama-70B", "deepseek-r1-distill-llama-70b", 70.0),
+    },
+}
+
+FAMILY_ORDER = list(FAMILIES)
+
+# Flattened: "<family>_<sizekey>" -> (cased, lower, param_b, family)
 SUBJECTS = {
-    "0_6b": ("Qwen3-0.6B", "qwen3-0.6b", 0.6, False),
-    "1_7b": ("Qwen3-1.7B", "qwen3-1.7b", 1.7, False),
-    "4b": ("Qwen3-4B", "qwen3-4b", 4.0, False),
-    "8b": ("Qwen3-8B", "qwen3-8b", 8.0, False),
-    "14b": ("Qwen3-14B", "qwen3-14b", 14.0, False),
-    "32b": ("Qwen3-32B", "qwen3-32b", 32.0, False),
-    "235b": ("Qwen3-235B-A22B", "qwen3-235b-a22b", 235.0, True),
+    f"{fam}_{sk}": (c, lo, pb, fam)
+    for fam, sizes in FAMILIES.items()
+    for sk, (c, lo, pb) in sizes.items()
 }
 
 LOWERCASE_STYLE = {
@@ -46,10 +88,10 @@ TEMPLATES = {
 
 
 def expand() -> dict[str, str]:
-    """Return all 84 prompts keyed '<BASE_ID>__<SIZEKEY>' (e.g. 'N-INSTABILITY-1__8B')."""
+    """Return all prompts keyed '<BASE_ID>__<FAMILY>_<SIZEKEY>' (uppercased subject key)."""
     out = {}
     for base_id, template in TEMPLATES.items():
-        for key, (cased, lower, _param, _moe) in SUBJECTS.items():
+        for key, (cased, lower, _pb, _fam) in SUBJECTS.items():
             name = lower if base_id in LOWERCASE_STYLE else cased
             out[f"{base_id}__{key.upper()}"] = template.format(subject=name)
     return out
@@ -60,8 +102,12 @@ def base_id(prompt_id: str) -> str:
 
 
 def subject(prompt_id: str) -> str:
-    """Lowercase size key, e.g. '8b', '235b'."""
+    """Lowercase flattened subject key, e.g. 'qwen3_8b', 'mistral_47b'."""
     return prompt_id.split("__")[1].lower()
+
+
+def family(prompt_id: str) -> str:
+    return SUBJECTS[subject(prompt_id)][3]
 
 
 def param_b(prompt_id: str) -> float:

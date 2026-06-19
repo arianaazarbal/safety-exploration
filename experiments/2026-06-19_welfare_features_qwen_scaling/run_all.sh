@@ -4,13 +4,16 @@ cd "$(dirname "$0")"
 set -a; source ~/.env; set +a
 VENV=/data/venvs/tps/bin/python
 echo "=== GENERATE $(date) ==="
-$VENV generate.py run
+$VENV generate.py run "$@"
 echo "=== JUDGE $(date) ==="
-$VENV judge.py run
+$VENV judge.py run "$@"
 echo "=== ANALYZE $(date) ==="
 $VENV analyze.py run
 echo "=== PLOT $(date) ==="
-$VENV plot_scaling.py run --metric rate
-$VENV plot_scaling.py run --metric strict_rate
-$VENV plot_scaling.py run --metric design_strict_rate
+for fr in neutral pooled welfare engineering; do
+  $VENV plot_scaling.py run --metric rate --framing $fr
+done
+$VENV plot_scaling.py run --metric strict_rate --framing neutral
+echo "=== INDEX $(date) ==="
+$VENV build_browse_index.py
 echo "=== DONE $(date) ==="

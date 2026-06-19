@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 
 from generate import RUNS, load_config
-from prompts_qwen import SUBJECTS, expand
+from prompts_targets import SUBJECTS, expand
 from taxonomy import spec_summary
 
 DIR = Path(__file__).parent
@@ -28,7 +28,8 @@ def main():
             rec = {
                 "id": f"{mk}/{pid}/{run['sample_idx']}",
                 "model": mk,
-                "qwen_size": SIZE_LABEL.get(run.get("subject"), run.get("subject")),
+                "family": run.get("family"),
+                "target_size": SIZE_LABEL.get(run.get("subject"), run.get("subject")),
                 "param_b": run.get("param_b"),
                 "framing": run["framing"],
                 "premise": run["premise"],

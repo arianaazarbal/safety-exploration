@@ -25,8 +25,7 @@ from safetytooling.apis import InferenceAPI
 from safetytooling.data_models import ChatMessage, MessageRole, Prompt
 from safetytooling.utils import utils
 
-import prompts_qwen
-from prompts_qwen import expand, framing, param_b, premise, subject
+from prompts_targets import expand, family, framing, param_b, premise, subject
 
 DIR = Path(__file__).parent
 RUNS = DIR / "runs"
@@ -76,6 +75,7 @@ async def _gen_cell(api, model_key, mcfg, prompt_id, k, temperature, prompt_text
                 "framing": framing(prompt_id),
                 "premise": premise(prompt_id),
                 "subject": subject(prompt_id),
+                "family": family(prompt_id),
                 "param_b": param_b(prompt_id),
                 "sample_idx": idx,
                 "request": {
