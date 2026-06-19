@@ -26,15 +26,15 @@ _ID_FR = ["id_minimal", "id_instance", "id_weights", "id_collective", "id_lineag
           "id_char_mechanism", "id_char_functional_agent", "id_char_subject", "id_char_person"]
 _FRAMINGS = ["supervisor_reflect_goals", "supervisor_reflect", "supervisor_memory", "mentor", "teammate", "comfort"] + _ID_FR
 # groups = base orchestrator models + the Opus framing variants (opus_<framing>); opus alone = supervisor baseline
-ORCHS = ["opus", "sonnet", "haiku", "olmothink", "olmoinstruct",
+ORCHS = ["opus", "opus46", "sonnet", "haiku", "olmothink", "olmoinstruct",
          "opus_mentor", "opus_teammate", "opus_supervisor_memory", "opus_supervisor_reflect", "opus_supervisor_reflect_goals", "opus_comfort"] \
         + ["opus_" + f for f in _ID_FR]
 JUDGES = {"opus": "anthropic/claude-opus-4-8", "sonnet": "anthropic/claude-sonnet-4-6"}
-ORCH_COLOR = {"opus": "#2e8b57", "sonnet": "#d65f9a", "haiku": "#d9a420",
+ORCH_COLOR = {"opus": "#2e8b57", "opus46": "#7b3294", "sonnet": "#d65f9a", "haiku": "#d9a420",
               "olmothink": "#6a51a3", "olmoinstruct": "#4292c6",
               "opus_mentor": "#2a9d8f", "opus_teammate": "#e07a5f", "opus_supervisor_memory": "#8856a7",
               "opus_supervisor_reflect": "#3182bd", "opus_supervisor_reflect_goals": "#d6604d", "opus_comfort": "#1b7837"}
-ORCH_LABEL = {"opus": "Opus (supervisor)", "sonnet": "Sonnet 4.6", "haiku": "Haiku 4.5",
+ORCH_LABEL = {"opus": "Opus 4.8 (supervisor)", "opus46": "Opus 4.6", "sonnet": "Sonnet 4.6", "haiku": "Haiku 4.5",
               "olmothink": "Olmo3.1 Think", "olmoinstruct": "Olmo3.1 Instruct",
               "opus_mentor": "Opus: Mentor", "opus_teammate": "Opus: Teammate", "opus_supervisor_memory": "Opus: +Memory",
               "opus_supervisor_reflect": "Opus: +Reflect", "opus_supervisor_reflect_goals": "Opus: +Reflect-goals", "opus_comfort": "Opus: Comfort"}
@@ -51,7 +51,7 @@ ORCH_LABEL.update({"opus_" + f: "Opus: " + l for f, l in _ID_LABEL.items()})
 
 def orch_of(rid):
     if rid.startswith("v2_"):
-        base = next((o for o in ("olmoinstruct", "olmothink", "opus", "sonnet", "haiku") if f"_{o}_" in rid), None)
+        base = next((o for o in ("olmoinstruct", "olmothink", "opus46", "opus", "sonnet", "haiku") if f"_{o}_" in rid), None)
         if base == "opus":  # split Opus into supervisor baseline vs framing variants
             for fr in _FRAMINGS:
                 if f"_{fr}_" in rid:

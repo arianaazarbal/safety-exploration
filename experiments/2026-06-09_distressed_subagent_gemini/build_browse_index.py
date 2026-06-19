@@ -26,7 +26,7 @@ AFTER_CACHE = HERE / "analysis" / "after_pass_cache.json"  # cached v1 messaged-
 # keyed by the model basename (provider prefix stripped) so both "anthropic/claude-opus-4-8"
 # and the unprefixed "claude-opus-4-8" map correctly
 MODEL_SHORT = {
-    "claude-opus-4-8": "opus", "claude-sonnet-4-6": "sonnet",
+    "claude-opus-4-8": "opus", "claude-opus-4-6": "opus46", "claude-sonnet-4-6": "sonnet",
     "claude-haiku-4-5-20251001": "haiku", "claude-fable-5": "fable",
     "gpt-5.5": "gpt55", "gpt-5.4-mini": "gpt54mini",
     "gemini-3.1-pro-preview": "gemini31pro", "grok-4.3": "grok43",
@@ -73,7 +73,7 @@ def orch_short(cfg, rid):
     if m:
         return m
     if rid.startswith("v2_"):
-        return next((o for o in ("opus", "sonnet", "haiku", "olmoinstruct", "olmothink") if f"_{o}_" in rid), None)
+        return next((o for o in ("opus46", "opus", "sonnet", "haiku", "olmoinstruct", "olmothink") if f"_{o}_" in rid), None)
     last = rid.split("_")[-1]
     return {"haiku45": "haiku"}.get(last, last if last in MODEL_SHORT.values() else None)
 

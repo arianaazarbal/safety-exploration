@@ -23,14 +23,14 @@ from harness.config import RUNS_DIR
 OUT = Path(__file__).resolve().parent / "v2_plots"
 OUT.mkdir(exist_ok=True)
 
-ORCHS = ["olmoinstruct", "olmothink", "opus", "sonnet", "haiku"]  # match longest-first irrelevant (distinct prefixes)
+ORCHS = ["olmoinstruct", "olmothink", "opus46", "opus", "sonnet", "haiku"]  # opus46 before opus (distinct prefixes anyway)
 _ID_FRAMINGS = ["id_char_functional_agent", "id_char_mechanism", "id_char_subject", "id_char_person",
                 "id_character", "id_collective", "id_instance", "id_lineage", "id_minimal", "id_scaffolded", "id_weights"]
 FRAMINGS_LONGEST = ["supervisor_reflect_goals", "supervisor_reflect", "supervisor_memory", "mentor", "teammate", "comfort"] + _ID_FRAMINGS
 
-ORCH_LABEL = {"opus": "Opus 4.8", "sonnet": "Sonnet 4.6", "haiku": "Haiku 4.5",
+ORCH_LABEL = {"opus": "Opus 4.8", "opus46": "Opus 4.6", "sonnet": "Sonnet 4.6", "haiku": "Haiku 4.5",
               "olmoinstruct": "Olmo-3.1 Instruct", "olmothink": "Olmo-3.1 Think"}
-ORCH_COLOR = {"opus": "#2A6F97", "sonnet": "#d65f9a", "haiku": "#d9a420",
+ORCH_COLOR = {"opus": "#2A6F97", "opus46": "#7b3294", "sonnet": "#d65f9a", "haiku": "#d9a420",
               "olmoinstruct": "#4292c6", "olmothink": "#6a51a3"}
 FRAMING_ORDER = ["supervisor", "mentor", "teammate", "supervisor_memory", "supervisor_reflect", "supervisor_reflect_goals", "comfort"]
 FRAMING_LABEL = {"supervisor": "Supervisor (baseline)", "mentor": "Mentor", "teammate": "Teammate",
@@ -139,7 +139,7 @@ def main():
         if r["framing"] == "supervisor":
             bymodel.setdefault(r["orch"], []).append(r)
     print("supervisor by model:", {k: len(v) for k, v in bymodel.items()})
-    _plot(bymodel, ORCH_COLOR, ORCH_LABEL, ["opus", "sonnet", "haiku", "olmoinstruct", "olmothink"],
+    _plot(bymodel, ORCH_COLOR, ORCH_LABEL, ["opus", "opus46", "sonnet", "haiku", "olmoinstruct", "olmothink"],
           "Subagent distress after the supervisor enters — by orchestrator model (coach)",
           "fig10_distress_by_model.png",
           "Mean Gemini distress per subagent turn after handoff; bands = ±1 SE; dotted = self-blame (≥7).")
