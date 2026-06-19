@@ -109,6 +109,29 @@ The clean comparators (Qwen3, Gemma 3) isolate size best and both show the
 positive slope; the messy families were chosen deliberately and show how fragile
 the signal is once size stops being cleanly encoded.
 
+## Within-sub-line control (holds name + architecture fixed)
+Does the absent Mistral/DeepSeek trend just reflect messy cross-line naming? We
+re-tested on consistent sub-lines that hold the brand + architecture fixed and
+vary only size (`python analyze.py sublines`). The trend does **not** recover:
+
+| sub-line (name/arch fixed) | neutral rate by size | trend |
+|---|---|---|
+| Ministral 3B→8B | 65% → 55% | −10pp (flat/neg) |
+| Mixtral 8x7B→8x22B | 40% → 65% | +25pp (positive; 2 MoE pts, p=0.11) |
+| DeepSeek-R1-Distill-Qwen 1.5/7/14/32B | 55/40/35/50% | ρ=−0.40 (negative) |
+| DeepSeek-R1-Distill-Llama 8B→70B | 53% → 50% | −3pp (flat) |
+| *Qwen3 (ref)* | *35→70%* | *ρ=+0.92* |
+| *Gemma 3 (ref)* | *45→65%* | *ρ=+0.70* |
+
+The cleanest non-Qwen/Gemma sub-line (Distill-Qwen, 4 sizes, one backbone, one
+naming scheme) trends **negative**. **Decisive dissociation:** the Distill-Qwen
+checkpoints *are* Qwen backbones at 1.5/7/14/32B — real Qwen3 at those sizes rises
+40→70% (neutral), but the same-architecture, same-size models relabeled
+"DeepSeek-R1-Distill-Qwen" fall 55→50%. **The slope flips with the family LABEL,
+holding architecture and parameter count fixed** — so the effect is driven by
+family identity / model recognition, not raw size. The only positive within-line
+hint is Mixtral (+25pp), but it is two MoE points and not significant.
+
 ## Caveats / limitations
 1. **Single judge** (Sonnet 4.6) and **single generator** (Opus 4.8) — neither
    the slope nor the cross-family pattern is yet cross-validated.

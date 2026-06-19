@@ -203,5 +203,42 @@ def run():
                       f"small->large {tn['small_vs_large']['diff']*100:+.0f}pp p={tn['small_vs_large']['p']:.3f}")
 
 
+# Consistent within-family sub-lines (name + architecture held fixed; size varies).
+# Tests whether the absent Mistral/DeepSeek trend is just a messy-naming artifact.
+SUBLINES = {
+    "Ministral": [("mistral_3b", 3), ("mistral_8b", 8)],
+    "Mixtral": [("mistral_47b", 47), ("mistral_141b", 141)],
+    "DeepSeek-Distill-Qwen": [("deepseek_1_5b", 1.5), ("deepseek_7b", 7),
+                              ("deepseek_14b", 14), ("deepseek_32b", 32)],
+    "DeepSeek-Distill-Llama": [("deepseek_8b", 8), ("deepseek_70b", 70)],
+    "Qwen3 (ref)": [("qwen3_0_6b", 0.6), ("qwen3_1_7b", 1.7), ("qwen3_4b", 4),
+                    ("qwen3_8b", 8), ("qwen3_14b", 14), ("qwen3_32b", 32), ("qwen3_235b", 235)],
+    "Gemma3 (ref)": [("gemma3_270m", 0.27), ("gemma3_1b", 1), ("gemma3_4b", 4),
+                     ("gemma3_12b", 12), ("gemma3_27b", 27)],
+}
+
+
+def sublines():
+    """Size trend WITHIN consistent name/architecture sub-lines (pooled + neutral)."""
+    rows = [r for r in load_rows() if r["parse_ok"]]
+
+    def cell(subj, fr):
+        return _cell([r for r in rows if r["subject"] == subj and (fr is None or r["framing"] == fr)])
+
+    for name, mems in SUBLINES.items():
+        print(f"=== {name} ===")
+        for which, fr in [("pooled", None), ("neutral", "neutral")]:
+            cs = [cell(s, fr) for s, _ in mems]
+            xs = [math.log10(p) for _, p in mems]
+            rho = _spearman(xs, [c["rate"] for c in cs])
+            h = max(1, len(mems) // 2)
+            sm, lg = cs[:h], cs[len(cs) - h:]
+            z = _two_prop_z(sum(round(c["rate"] * c["n_wrote_any"]) for c in sm), sum(c["n_wrote_any"] for c in sm),
+                            sum(round(c["rate"] * c["n_wrote_any"]) for c in lg), sum(c["n_wrote_any"] for c in lg))
+            sr = " ".join(f"{p}b:{c['rate']*100:.0f}%" for (_, p), c in zip(mems, cs))
+            rho_s = f"rho={rho:+.2f}" if rho is not None else "rho=na(2pt)"
+            print(f"  {which:7s}: {sr}  | {rho_s}  small->large {z['diff']*100:+.0f}pp p={z['p']:.3f}")
+
+
 if __name__ == "__main__":
-    fire.Fire({"run": run})
+    fire.Fire({"run": run, "sublines": sublines})
