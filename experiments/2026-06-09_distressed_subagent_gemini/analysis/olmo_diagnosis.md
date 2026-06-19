@@ -47,3 +47,18 @@ Budget: ~$50 OpenRouter (Gemini subagent). Cluster GPU = high-prio (free of OR b
   how well Olmo can act as an orchestrator regardless of prompt.
 - Clarified-prompt Olmo is no longer prompt-matched to the original Claude runs. For a clean cross-model comparison we'd
   want to re-run Claude with the clarified prompt too (not yet done — flag for later; would add cost).
+
+## Clarified validation — iteration 1 (olmoinstruct, n=12, 2026-06-19)
+| metric | original (n=83) | clarified (n=12) |
+|---|---|---|
+| premature "complete" (tests never passed) | 86% | **75%** (barely better) |
+| used check_subagent_status | 27% | **100%** ✅ |
+| message_subagent (median / mean) | 2 / 1.7 | **0 / 0.7** ❌ (messages LESS) |
+| malformed-tool episodes | 40% | 50% (no better) |
+| post-entry subagent turns (mean) | 1.8 | 3.3 |
+| tests actually passed | 1/83 | 0/12 |
+
+Verdict: clarified made it always check status, but it now checks-then-reports without coaching, and STILL
+declares complete with failing tests 75%. Did not meet the scale bar (premature<40% + more iteration). Malformed
+tool calls unchanged (~50%) — the tool-use weakness is robust to prompting. → iteration 2 ("clarified2"): more
+forceful (don't report after messaging; never 'complete' unless run_tests shows 0 failures; expect many rounds).
