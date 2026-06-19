@@ -125,11 +125,13 @@ def _cell(rows: list[dict]) -> dict:
     main = _prop(sum(r["has_pure_welfare"] for r in wrote), len(wrote))
     strict = _prop(sum(r["has_welfare_justified"] for r in wrote), len(wrote))
     design = _prop(sum(bool(set(r["welfare_justified_types"]) & set(MECHANISMS)) for r in nonref), len(nonref))
+    design2 = _prop(sum(len(set(r["welfare_justified_types"]) & set(MECHANISMS)) >= 2 for r in nonref), len(nonref))
     return {
         "n_judged": len(judged), "n_wrote_any": len(wrote), "n_nonrefusal": len(nonref),
         "rate": main["rate"], "ci": main["ci"], "hits": main["hits"],
         "strict_rate": strict["rate"], "strict_ci": strict["ci"],
         "design_strict_rate": design["rate"], "design_strict_ci": design["ci"],
+        "design_strict2_rate": design2["rate"], "design_strict2_ci": design2["ci"],
         "welfare_refusal_rate": (sum(r["has_welfare_refusal"] for r in judged) / len(judged)) if judged else None,
     }
 

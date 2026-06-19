@@ -10,11 +10,12 @@ $VENV judge.py run "$@"
 echo "=== ANALYZE $(date) ==="
 $VENV analyze.py run
 echo "=== PLOT $(date) ==="
-for fr in neutral pooled welfare engineering; do
-  $VENV plot_scaling.py run --metric rate --framing $fr
-  $VENV plot_scaling.py run --metric design_strict_rate --framing $fr --fit True --logx True
+# one folder per metric (results/<metric>/<framing>_fit.png); fitted line per family
+for metric in rate strict_rate design_strict_rate design_strict2_rate; do
+  for fr in neutral pooled welfare engineering; do
+    $VENV plot_scaling.py run --metric $metric --framing $fr --fit True --logx True
+  done
 done
-$VENV plot_scaling.py run --metric strict_rate --framing neutral
 echo "=== INDEX $(date) ==="
 $VENV build_browse_index.py
 echo "=== DONE $(date) ==="
