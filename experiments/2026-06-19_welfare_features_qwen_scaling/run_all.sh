@@ -13,7 +13,6 @@ echo "=== PLOT $(date) ==="
 for fr in neutral pooled welfare engineering; do
   $VENV plot_scaling.py run --metric rate --framing $fr
   $VENV plot_scaling.py run --metric design_strict_rate --framing $fr --fit True --logx True
-  $VENV plot_scaling.py run --metric design_strict_rate --framing $fr --fit True --logx False
 done
 $VENV plot_scaling.py run --metric strict_rate --framing neutral
 echo "=== INDEX $(date) ==="
