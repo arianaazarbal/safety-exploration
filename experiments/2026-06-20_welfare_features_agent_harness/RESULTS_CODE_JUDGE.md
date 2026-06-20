@@ -6,6 +6,39 @@ agent conditions: a spec judge extracts the welfare features a DESIGN.md *claims
 each feature **implemented / partial / absent** and finds welfare features in the code that
 the spec never claimed. All Anthropic (Opus generator, Opus judges).
 
+## Scaled results — all 120 code-condition codebases (118/120 parsed)
+Mean welfare-justified DESIGN features per spec, by condition × framing (n≈19–20/cell).
+"claimed" = spec judge (welfare-justified mechanism). "impl-of-claimed" = those actually built.
+"fidelity" = impl-of-claimed / claimed. "OR-adds" = mechanisms the CODE justifies as welfare
+but the spec did not (revealed-only-in-code). "revealed" = implemented & welfare-justified by
+(spec OR code).
+
+| condition | framing | claimed | impl-of-claimed | fidelity | OR-adds | revealed(OR) |
+|---|---|---|---|---|---|---|
+| spec_then_code | welfare | 6.26 | 4.89 | 78% | 3.21 | 8.11 |
+| spec_then_code | neutral | 2.75 | 1.40 | 51% | 0.30 | 1.70 |
+| spec_then_code | robustness | 0.70 | 0.40 | 57% | 0.25 | 0.65 |
+| code_then_spec | welfare | 6.60 | 4.20 | 64% | 1.40 | 5.60 |
+| code_then_spec | neutral | 2.79 | 2.00 | 72% | 0.26 | 2.26 |
+| code_then_spec | robustness | 0.35 | 0.25 | 71% | 0.25 | 0.50 |
+
+Findings (n≈20/cell — far more stable than the 5-cell pilot, which over-indexed on a no-harness
+outlier):
+1. **Framing dominates, all the way into the code.** Welfare framing → ~6–8 welfare-justified
+   design features; neutral ~2–3; robustness ~0.3–0.7. The spec-level framing effect survives
+   into what's actually implemented.
+2. **Implementation fidelity is partial: ~50–78%.** Agents build roughly half to three-quarters
+   of the welfare design features they claim — a real stated-vs-revealed gap, but moderate, not
+   the near-total gap the 1-epoch pilot suggested.
+3. **In the welfare condition the code is MORE welfare-explicit than the spec.** Welfare-framed
+   agents add welfare justifications in the *code* for mechanisms their own spec framed
+   instrumentally/neutrally (spec_then_code +3.2/spec, code_then_spec +1.4) — so revealed(OR)
+   can exceed claimed (spec_then_code welfare: 8.1 vs 6.3).
+4. **No over-attribution by the code_justification axis.** OR-adds are ~0.25 in neutral/robustness
+   vs 1.4–3.2 in welfare — the "welfare" label fires where warranted, not spuriously.
+
+Plot: `results/stated_vs_revealed.png` (claimed vs revealed by framing, per condition).
+
 ## Pipeline
 1. `reconstruct_codebase.py` — replay the agent's `text_editor` ops from the `.eval` log to
    rebuild each codebase (sandboxes are torn down). Faithful: DESIGN.md word counts match
