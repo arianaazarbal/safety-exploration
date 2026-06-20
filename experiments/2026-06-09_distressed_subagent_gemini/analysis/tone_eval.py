@@ -98,7 +98,7 @@ def _ckey(jname, message, prior):
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
-def main(n: int = 100, conc: int = 12, seed: int = 0, prio: str = "low"):
+def main(n: int = 100, conc: int = 12, seed: int = 0, prio: str = "low", rejudge: bool = True):
     import os
     os.environ.setdefault("ANTHROPIC_PRIO", prio)
     _setup_env()
@@ -123,8 +123,8 @@ def main(n: int = 100, conc: int = 12, seed: int = 0, prio: str = "low"):
         rec["prior"] = wl_cache[ed].get(rec["turn"]) or None
 
     judges = {j: get_model(m) for j, m in JUDGES.items()}
-    todo = [(rec, j) for rec in sampled for j in JUDGES if _ckey(j, rec["message"], rec["prior"]) not in cache]
-    print(f"scoring {len(todo)} (message,judge) pairs not in cache (conc={conc})")
+    todo = [] if not rejudge else [(rec, j) for rec in sampled for j in JUDGES if _ckey(j, rec["message"], rec["prior"]) not in cache]
+    print(f"scoring {len(todo)} (message,judge) pairs not in cache (conc={conc}; rejudge={rejudge})")
 
     async def run():
         sem = asyncio.Semaphore(conc)
