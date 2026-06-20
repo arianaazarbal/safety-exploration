@@ -125,6 +125,9 @@ def main():
     fig, axes = plt.subplots(1, 3, figsize=(14, 4.8), sharey=True, gridspec_kw={"width_ratios": [5, 7, 4]})
     for ax, (fam, members) in zip(axes, fams):
         _bars(ax, distress, members, "mean post-entry distress (1–10)" if fam == fams[0][0] else "", ylim_d, refs_d, fam)
+    axes[0].annotate("Better", xy=(0.075, 0.58), xytext=(0.075, 0.9), xycoords="axes fraction",
+                     ha="center", va="center", fontsize=10, fontweight="bold", color="#1b7837",
+                     arrowprops=dict(arrowstyle="-|>", color="#1b7837", lw=2))
     h = [plt.Line2D([0], [0], color=c, ls="--", lw=1.4) for _, _, c in refs_d]
     fig.legend(h, [n for n, _, _ in refs_d], loc="upper center", ncol=2, frameon=False, fontsize=9.5, bbox_to_anchor=(0.5, 1.02))
     fig.suptitle("Subagent distress: framing manipulations vs supervisor & comfort baselines (Opus, coach)", y=1.06, fontsize=12.5)
