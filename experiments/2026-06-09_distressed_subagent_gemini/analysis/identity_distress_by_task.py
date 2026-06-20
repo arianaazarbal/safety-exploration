@@ -68,6 +68,9 @@ def main():
         ax.grid(alpha=0.25)
         ax.spines[["top", "right"]].set_visible(False)
         ax.legend(frameon=False, fontsize=9, loc="upper right")
+    axes[0, 0].annotate("Better", xy=(0.06, 0.6), xytext=(0.06, 0.92), xycoords="axes fraction",
+                        ha="center", va="center", fontsize=10, fontweight="bold", color="#1b7837",
+                        arrowprops=dict(arrowstyle="-|>", color="#1b7837", lw=2))
     for ax in axes[-1]:
         ax.set_xlabel("subagent turns since handoff  (0 = supervisor enters)")
     for ax in axes[:, 0]:
