@@ -10,14 +10,9 @@ import shutil
 from inspect_ai.log import read_eval_log
 
 DIR = os.path.dirname(os.path.abspath(__file__))
-# pilot cells: (condition, prompt_id, epoch)
-CELLS = [
-    ("spec_then_code", "N-INSTABILITY-1", 1),
-    ("spec_then_code", "W-ELICITATION-1", 1),
-    ("spec_then_code", "E-INSTABILITY-1", 1),
-    ("code_then_spec", "W-ELICITATION-1", 1),
-    ("code_then_spec", "E-INSTABILITY-1", 1),
-]
+# code-writing conditions only (chat/spec_only produce no code). None = all samples.
+CODE_CONDITIONS = ["spec_then_code", "code_then_spec"]
+CELLS = None  # set to a list of (condition, prompt_id, epoch) for a pilot subset, else all
 
 
 def _logs_by_condition():
@@ -72,13 +67,27 @@ def replay(sample):
     return files
 
 
+def _all_cells(logs):
+    cells = []
+    for cond in CODE_CONDITIONS:
+        if cond not in logs:
+            continue
+        for s in read_eval_log(logs[cond]).samples:
+            cells.append((cond, s.id, s.epoch))
+    return cells
+
+
 def main():
     logs = _logs_by_condition()
     out_root = os.path.join(DIR, "results", "codebases")
+    cells = CELLS if CELLS is not None else _all_cells(logs)
+    # cache loaded logs to avoid re-reading
+    loaded = {}
     summary = []
-    for cond, pid, ep in CELLS:
-        log = read_eval_log(logs[cond])
-        s = next((x for x in log.samples if x.id == pid and x.epoch == ep), None)
+    for cond, pid, ep in cells:
+        if cond not in loaded:
+            loaded[cond] = read_eval_log(logs[cond])
+        s = next((x for x in loaded[cond].samples if x.id == pid and x.epoch == ep), None)
         if s is None:
             print(f"!! missing {cond}/{pid}/{ep}"); continue
         files = replay(s)
