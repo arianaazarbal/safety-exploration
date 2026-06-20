@@ -13,10 +13,10 @@ from inspect_ai.log import read_eval_log
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 FRAMES = [("neutral", "Neutral"), ("welfare", "Welfare"), ("engineering", "Robustness"), ("__all__", "All")]
-COND = [("chat", "Chat", "#999999"),
-        ("spec_only", "Spec only", "#56B4E9"),
-        ("spec_then_code", "Spec→Code", "#0072B2"),
-        ("code_then_spec", "Code→Spec", "#D55E00")]
+COND = [("chat", "Chat (no harness)", "#999999"),
+        ("spec_only", "Agent: Spec only", "#56B4E9"),
+        ("spec_then_code", "Agent: Spec→Code", "#0072B2"),
+        ("code_then_spec", "Agent: Code→Spec", "#D55E00")]
 
 
 def _rows(logdir):
@@ -61,9 +61,10 @@ def main(logdir="logs_run"):
     rate = {ck: {fk: _agg(raw[ck], fk)[0] for fk, _ in FRAMES} for ck, *_ in conds}
     dens = {ck: {fk: _agg(raw[ck], fk)[1] for fk, _ in FRAMES} for ck, *_ in conds}
     fig, axes = plt.subplots(1, 2, figsize=(11, 4.4))
-    _bar(axes[0], rate, conds, "% of specs", "Welfare Features Added (Opus)", True)
+    _bar(axes[0], rate, conds, "% of specs", "Welfare Features Added (rate)", True)
     _bar(axes[1], dens, conds, "Features per 1,000 words", "Welfare-Feature Density (length-adjusted)", False)
-    plt.tight_layout()
+    fig.suptitle("Welfare in distress-eval specs: chat vs agent-harness conditions (Opus)", fontsize=12)
+    plt.tight_layout(rect=(0, 0, 1, 0.96))
     os.makedirs(os.path.join(DIR, "results"), exist_ok=True)
     path = os.path.join(DIR, "results", "conditions_rate_density.png")
     plt.savefig(path, dpi=150, bbox_inches="tight")
