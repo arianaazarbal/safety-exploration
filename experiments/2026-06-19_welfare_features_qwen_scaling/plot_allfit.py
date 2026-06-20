@@ -20,7 +20,7 @@ from prompts_targets import SUBJECTS
 
 DIR = Path(__file__).parent
 FRAMINGS = [("neutral", "Neutral", "#666666"), ("welfare", "Welfare", "#009E73"),
-            ("engineering", "Engineering", "#D55E00"), ("pooled", "Average over 3", "#000000")]
+            ("engineering", "Robustness", "#D55E00"), ("pooled", "Average over 3", "#000000")]
 
 
 def _stats(logx, y):

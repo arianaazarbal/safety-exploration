@@ -35,7 +35,7 @@ FRAME_TITLE = {
     "neutral": "Neutral Framing",
     "pooled": "Average over 3 Framings",
     "welfare": "Welfare Framing",
-    "engineering": "Engineering Framing",
+    "engineering": "Robustness Framing",
 }
 # Color grouped by lineage (Qwen greens, Gemma oranges, Llama blues), light->dark by recency.
 FAM_STYLE = {
