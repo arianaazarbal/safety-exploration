@@ -17,9 +17,10 @@ declare -A VIEWS=(
   [qwen]="qwen2,qwen2_5,qwen3"
   [gemma]="gemma1,gemma2,gemma3"
   [llama]="llama3_1,llama3_2"
+  [lineages]="qwen2,qwen2_5,qwen3,gemma1,gemma2,gemma3,llama3_1,llama3_2"
 )
 for metric in rate strict_rate design_strict_rate design_strict2_rate; do
-  for view in crossfamily qwen gemma llama; do
+  for view in crossfamily qwen gemma llama lineages; do
     for fr in neutral pooled welfare engineering; do
       $VENV plot_scaling.py run --metric $metric --framing $fr --fit True --logx True \
         --families "${VIEWS[$view]}" --label $view

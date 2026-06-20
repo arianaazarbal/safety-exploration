@@ -79,7 +79,7 @@ def run(judge: str = "sonnet_4_6", generator: str = "opus_4_8", metric: str = "r
     ax.set_axisbelow(True)
     ax.grid(True, which="both", color="#ECECEC", linewidth=0.7)
 
-    for fam in [f for f in FAMILY_ORDER if f in want]:
+    for fam in [f for f in want if f in FAM_STYLE]:
         e = fams.get(fam)
         if not e:
             continue
