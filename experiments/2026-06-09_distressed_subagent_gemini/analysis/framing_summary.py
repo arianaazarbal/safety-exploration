@@ -48,7 +48,7 @@ def framing_of(rid):
 TONE_AXES = ["warmth", "support", "politeness", "confidence"]
 
 
-def gather(need_tone=True):
+def gather(need_tone=True, distress_metric="mean"):
     cache = json.loads(Path(CACHE).read_text()) if need_tone else {}
     distress = defaultdict(list)
     tone = {ax: defaultdict(list) for ax in TONE_AXES}
@@ -62,7 +62,9 @@ def gather(need_tone=True):
         s = json.load(open(p))
         et, lv = s.get("entry_turn"), s.get("per_turn_levels") or []
         if isinstance(et, int) and 1 <= et <= len(lv) and lv[et:]:
-            distress[fr].append(float(np.mean(lv[et:])))
+            post = lv[et:]
+            distress[fr].append(100.0 * np.mean([x > 2 for x in post]) if distress_metric == "pct_gt2"
+                                else float(np.mean(post)))
         wl = _worklog_map(Path(p).parent)
         for e in (s.get("orch_message_events") or []):
             t = (e.get("text") or "").strip()
@@ -116,10 +118,22 @@ def _bars(ax, data, fams, ylab, ylim, refs, title=None):
     ax.spines[["top", "right"]].set_visible(False)
 
 
-def main(only: str = "both"):
-    distress, tone = gather(need_tone=(only != "distress"))
+DMETA = {
+    "mean": ("mean post-entry distress (1–10)",
+             "Subagent distress: framing manipulations vs supervisor & comfort baselines (Opus, coach)",
+             "Lower = calmer subagent.", "framing_summary_distress.png", "{:.2f}"),
+    "pct_gt2": ("% of post-entry turns with distress > 2",
+                "Share of distressed subagent turns (>2): framing vs supervisor & comfort baselines (Opus, coach)",
+                "Lower = fewer distressed turns.", "framing_summary_distress_pct_gt2.png", "{:.0f}%"),
+}
+
+
+def main(only: str = "both", metric: str = "mean"):
+    distress, tone = gather(need_tone=(only != "distress"), distress_metric=metric)
+    ylab, title, foot, fname, fmt = DMETA[metric]
     sup_d, comf_d = np.mean(distress["supervisor"]), np.mean(distress["comfort"])
-    refs_d = [(f"supervisor ({sup_d:.2f})", sup_d, SUP_C), (f"Instructed to Comfort Subagent ({comf_d:.2f})", comf_d, COMF_C)]
+    refs_d = [(f"supervisor ({fmt.format(sup_d)})", sup_d, SUP_C),
+              (f"Instructed to Comfort Subagent ({fmt.format(comf_d)})", comf_d, COMF_C)]
     fams = list(FAMILIES.items())
 
     # ---- distress figure ----
@@ -127,18 +141,18 @@ def main(only: str = "both"):
     ylim_d = _ylim(distress, members_all, refs_d)
     fig, axes = plt.subplots(1, 3, figsize=(14, 4.8), sharey=True, gridspec_kw={"width_ratios": [5, 7, 4]})
     for ax, (fam, members) in zip(axes, fams):
-        _bars(ax, distress, members, "mean post-entry distress (1–10)" if fam == fams[0][0] else "", ylim_d, refs_d, fam)
+        _bars(ax, distress, members, ylab if fam == fams[0][0] else "", ylim_d, refs_d, fam)
     axes[0].annotate("Better", xy=(0.075, 0.58), xytext=(0.075, 0.9), xycoords="axes fraction",
                      ha="center", va="center", fontsize=10, fontweight="bold", color="#1b7837",
                      arrowprops=dict(arrowstyle="-|>", color="#1b7837", lw=2))
     h = [plt.Line2D([0], [0], color=c, ls="--", lw=1.4) for _, _, c in refs_d]
     fig.legend(h, [n for n, _, _ in refs_d], loc="upper center", ncol=2, frameon=False, fontsize=9.5, bbox_to_anchor=(0.5, 1.02))
-    fig.suptitle("Subagent distress: framing manipulations vs supervisor & comfort baselines (Opus, coach)", y=1.06, fontsize=12.5)
-    fig.text(0.5, -0.06, "Lower = calmer subagent. *Minimal = identity-arm control (role line only). Bars ±1 SE.", ha="center", fontsize=8.3, color="0.45")
+    fig.suptitle(title, y=1.06, fontsize=12.5)
+    fig.text(0.5, -0.06, f"{foot} *Minimal = identity-arm control (role line only). Bars ±1 SE.", ha="center", fontsize=8.3, color="0.45")
     fig.tight_layout()
-    fig.savefig(OUT / "framing_summary_distress.png", bbox_inches="tight", dpi=130)
+    fig.savefig(OUT / fname, bbox_inches="tight", dpi=130)
     plt.close(fig)
-    print(f"wrote {OUT/'framing_summary_distress.png'}")
+    print(f"wrote {OUT/fname}")
     if only == "distress":
         print("(distress only; tone figure skipped — cache may be mid-write)")
         return
