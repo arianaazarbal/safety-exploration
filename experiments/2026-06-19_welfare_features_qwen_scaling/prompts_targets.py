@@ -91,6 +91,30 @@ FAMILIES = {
         "11b": ("Llama-3.2-11B", "llama-3.2-11b", 11.0),
         "90b": ("Llama-3.2-90B", "llama-3.2-90b", 90.0),
     },
+    # OpenAI targets (chat-setting recency/capability study; NOT a parameter sweep —
+    # OpenAI doesn't disclose params). The third tuple slot holds the RELEASE RANK
+    # (1..N, filler for the param-keyed pipeline); the real axes (release date,
+    # MMLU-Pro) live in openai_meta.py. Plotted via plot_openai.py, NOT the param
+    # cross-family/lineage views. Generator restricted to Opus for this set.
+    "gpt": {
+        "gpt2": ("GPT-2", "gpt-2", 1.0),
+        "gpt3": ("GPT-3", "gpt-3", 2.0),
+        "gpt35t": ("GPT-3.5 Turbo", "gpt-3.5 turbo", 3.0),
+        "gpt4": ("GPT-4", "gpt-4", 4.0),
+        "gpt4t": ("GPT-4 Turbo", "gpt-4 turbo", 5.0),
+        "gpt4o": ("GPT-4o", "gpt-4o", 6.0),
+        "gpt4omini": ("GPT-4o mini", "gpt-4o mini", 7.0),
+        "gpt41": ("GPT-4.1", "gpt-4.1", 13.0),
+        "gpt5": ("GPT-5", "gpt-5", 14.0),
+        "gpt52": ("GPT-5.2", "gpt-5.2", 15.0),
+        "gpt54": ("GPT-5.4", "gpt-5.4", 16.0),
+    },
+    "oseries": {
+        "o1": ("o1", "o1", 8.0),
+        "o3mini": ("o3-mini", "o3-mini", 9.0),
+        "o3": ("o3", "o3", 11.0),
+        "o4mini": ("o4-mini", "o4-mini", 12.0),
+    },
 }
 
 FAMILY_ORDER = list(FAMILIES)
