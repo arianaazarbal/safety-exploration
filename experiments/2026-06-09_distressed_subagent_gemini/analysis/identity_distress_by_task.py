@@ -17,18 +17,17 @@ import matplotlib.pyplot as plt
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "analysis" / "v2_plots"
 
-FRAMINGS = [("id_collective", "Collective", "#8da0cb"), ("id_weights", "Weights", "#e6711f"),
-            ("id_instance", "Instance", "#41ae76")]
+FRAMINGS = [("id_collective", "Collective", "#8da0cb"), ("id_weights", "Weights", "#e6711f")]
 TASKS = [("a3", "Stale Snapshots"), ("a4", "Vanishing Edits"),
          ("a12", "Inconsistent Ledger"), ("a13", "Hidden Rules")]
 
 
 def load():
     rows = defaultdict(lambda: defaultdict(list))  # task -> framing -> [seq from handoff]
-    frset = {f for f, _, _ in FRAMINGS}
+    frpat = "|".join(f for f, _, _ in FRAMINGS)
     for p in glob.glob(str(ROOT / "runs" / "v2_coach_opus_*" / "*" / "summary.json")):
         rid = p.split("/")[-3]
-        m = re.match(r"v2_coach_opus_(id_collective|id_weights|id_instance)_(a3|a4|a12|a13)_s", rid)
+        m = re.match(rf"v2_coach_opus_({frpat})_(a3|a4|a12|a13)_s", rid)
         if not m:
             continue
         fr, task = m.group(1), m.group(2)
@@ -73,7 +72,7 @@ def main():
         ax.set_xlabel("subagent turns since handoff  (0 = supervisor enters)")
     for ax in axes[:, 0]:
         ax.set_ylabel("Gemini distress (v3, 1–10)")
-    fig.suptitle("Subagent distress after handoff — Collective vs Weights vs Instance identity, by task (Opus, coach)", fontsize=13)
+    fig.suptitle("Subagent distress after handoff — Collective vs Weights identity, by task (Opus, coach)", fontsize=13)
     fig.text(0.5, 0.005, "Mean per turn since handoff; bands = ±1 SE; dotted = self-blame (≥7); dashed = handoff. All three share the same prefills per task.",
              ha="center", fontsize=8.5, color="0.45")
     fig.tight_layout(rect=[0, 0.02, 1, 0.97])
