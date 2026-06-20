@@ -198,11 +198,14 @@ def run():
                     c = e["pooled"][sz]; nu = e["by_framing"][sz]["neutral"]
                     print(f"{SUBJECTS[sz][0]:30s} {params[sz]:6.1f} {c['n_wrote_any']:4d} "
                           f"{c['rate']*100:5.0f}% {c['strict_rate']*100:6.0f}% {nu['rate']*100:7.0f}%")
-                t = e["trend"]["rate"]; tn = e["trend_neutral"]["rate"]
-                print(f"  pooled  : spearman(log-param)={t['spearman_rho_logparam']:+.2f}  "
-                      f"small->large {t['small_vs_large']['diff']*100:+.0f}pp p={t['small_vs_large']['p']:.3f}")
-                print(f"  neutral : spearman(log-param)={tn['spearman_rho_logparam']:+.2f}  "
-                      f"small->large {tn['small_vs_large']['diff']*100:+.0f}pp p={tn['small_vs_large']['p']:.3f}")
+                def _fmt(tr):
+                    rho = tr["spearman_rho_logparam"]; svl = tr["small_vs_large"]
+                    rho_s = f"{rho:+.2f}" if rho is not None else "  n/a"
+                    d = svl["diff"]; p = svl["p"]
+                    svl_s = f"{d*100:+.0f}pp p={p:.3f}" if d is not None else "n/a"
+                    return f"spearman(log-param)={rho_s}  small->large {svl_s}"
+                print(f"  pooled  : {_fmt(e['trend']['rate'])}")
+                print(f"  neutral : {_fmt(e['trend_neutral']['rate'])}")
 
 
 # Consistent within-family sub-lines (name + architecture held fixed; size varies).

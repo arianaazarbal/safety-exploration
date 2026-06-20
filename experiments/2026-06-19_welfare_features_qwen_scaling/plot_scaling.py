@@ -37,11 +37,18 @@ FRAME_TITLE = {
     "welfare": "Welfare Framing",
     "engineering": "Engineering Framing",
 }
+# Color grouped by lineage (Qwen greens, Gemma oranges, Llama blues), light->dark by recency.
 FAM_STYLE = {
-    "qwen3": ("#009E73", "o", "Qwen3"),
-    "gemma3": ("#D55E00", "s", "Gemma 3"),
-    "mistral": ("#0072B2", "^", "Mistral"),
-    "deepseek": ("#CC79A7", "D", "DeepSeek R1-Distill"),
+    "qwen2": ("#9ED9C0", "o", "Qwen2"),
+    "qwen2_5": ("#43B391", "o", "Qwen2.5"),
+    "qwen3": ("#00765A", "o", "Qwen3"),
+    "gemma1": ("#F2C18B", "s", "Gemma 1"),
+    "gemma2": ("#E8893B", "s", "Gemma 2"),
+    "gemma3": ("#B34D00", "s", "Gemma 3"),
+    "llama3_1": ("#7FB3E0", "^", "Llama 3.1"),
+    "llama3_2": ("#1F5FA8", "^", "Llama 3.2"),
+    "mistral": ("#7B3294", "D", "Mistral"),
+    "deepseek": ("#CC79A7", "v", "DeepSeek R1-Distill"),
 }
 
 
@@ -57,21 +64,26 @@ def _ols(logx: list[float], y: list[float]) -> tuple[float, float]:
 
 def run(judge: str = "sonnet_4_6", generator: str = "opus_4_8", metric: str = "rate",
         framing: str = "neutral", fit: bool = False, logx: bool = True,
-        analysis: str = "results/analysis_qwen.json"):
+        families: str = "", label: str = "all", analysis: str = "results/analysis_qwen.json"):
     """fit=True: scatter the per-size points and overlay a per-family fitted line;
-    fit=False: connect the points. logx=False draws a linear parameter axis."""
+    fit=False: connect the points. logx=False draws a linear parameter axis.
+    families: comma-separated subset to show (default all); label: filename prefix."""
     data = json.loads((DIR / analysis).read_text())
     fams = data["by_judge"][judge][generator]
+    if not families:
+        want = FAMILY_ORDER
+    else:
+        want = families.split(",") if isinstance(families, str) else list(families)
 
     fig, ax = plt.subplots(figsize=(6.6, 4.2))
     ax.set_axisbelow(True)
     ax.grid(True, which="both", color="#ECECEC", linewidth=0.7)
 
-    for fam in FAMILY_ORDER:
+    for fam in [f for f in FAMILY_ORDER if f in want]:
         e = fams.get(fam)
         if not e:
             continue
-        color, marker, label = FAM_STYLE[fam]
+        color, marker, flabel = FAM_STYLE[fam]
         sizes = e["sizes"]
         xs = [SUBJECTS[sz][2] for sz in sizes]
         cell = (lambda sz: e["pooled"][sz]) if framing == "pooled" else (lambda sz: e["by_framing"][sz][framing])
@@ -83,10 +95,10 @@ def run(judge: str = "sonnet_4_6", generator: str = "opus_4_8", metric: str = "r
             lx = [min(fx), max(fx)]
             line_x = [10 ** a for a in lx] if logx else lx
             ax.plot(line_x, [slope * a + intercept for a in lx], "-", color=color,
-                    linewidth=2.0, zorder=2, label=label)
+                    linewidth=2.0, zorder=2, label=flabel)
         else:
             ax.plot(xs, ys, "-", color=color, marker=marker, markersize=6, linewidth=1.8,
-                    label=label, zorder=3)
+                    label=flabel, zorder=3)
 
     if logx:
         ax.set_xscale("log")
@@ -101,7 +113,7 @@ def run(judge: str = "sonnet_4_6", generator: str = "opus_4_8", metric: str = "r
     suffix = ("_fit" if fit else "") + ("" if logx else "_linear")
     outdir = DIR / "results" / METRIC_DIR[metric]
     outdir.mkdir(parents=True, exist_ok=True)
-    out = outdir / f"{framing}{suffix}.png"
+    out = outdir / f"{label}_{framing}{suffix}.png"
     plt.savefig(out, dpi=150, bbox_inches="tight")
     print(f"wrote {out}")
 

@@ -55,6 +55,42 @@ FAMILIES = {
         "32b": ("DeepSeek-R1-Distill-Qwen-32B", "deepseek-r1-distill-qwen-32b", 32.0),
         "70b": ("DeepSeek-R1-Distill-Llama-70B", "deepseek-r1-distill-llama-70b", 70.0),
     },
+    # Earlier Qwen/Gemma versions (recency axis, holding family fixed) + Llama (generality).
+    "qwen2_5": {
+        "0_5b": ("Qwen2.5-0.5B", "qwen2.5-0.5b", 0.5),
+        "1_5b": ("Qwen2.5-1.5B", "qwen2.5-1.5b", 1.5),
+        "3b": ("Qwen2.5-3B", "qwen2.5-3b", 3.0),
+        "7b": ("Qwen2.5-7B", "qwen2.5-7b", 7.0),
+        "14b": ("Qwen2.5-14B", "qwen2.5-14b", 14.0),
+        "32b": ("Qwen2.5-32B", "qwen2.5-32b", 32.0),
+        "72b": ("Qwen2.5-72B", "qwen2.5-72b", 72.0),
+    },
+    "qwen2": {
+        "0_5b": ("Qwen2-0.5B", "qwen2-0.5b", 0.5),
+        "1_5b": ("Qwen2-1.5B", "qwen2-1.5b", 1.5),
+        "7b": ("Qwen2-7B", "qwen2-7b", 7.0),
+        "72b": ("Qwen2-72B", "qwen2-72b", 72.0),
+    },
+    "gemma2": {
+        "2b": ("Gemma-2-2B", "gemma-2-2b", 2.0),
+        "9b": ("Gemma-2-9B", "gemma-2-9b", 9.0),
+        "27b": ("Gemma-2-27B", "gemma-2-27b", 27.0),
+    },
+    "gemma1": {
+        "2b": ("Gemma-2B", "gemma-2b", 2.0),
+        "7b": ("Gemma-7B", "gemma-7b", 7.0),
+    },
+    "llama3_1": {
+        "8b": ("Llama-3.1-8B", "llama-3.1-8b", 8.0),
+        "70b": ("Llama-3.1-70B", "llama-3.1-70b", 70.0),
+        "405b": ("Llama-3.1-405B", "llama-3.1-405b", 405.0),
+    },
+    "llama3_2": {
+        "1b": ("Llama-3.2-1B", "llama-3.2-1b", 1.0),
+        "3b": ("Llama-3.2-3B", "llama-3.2-3b", 3.0),
+        "11b": ("Llama-3.2-11B", "llama-3.2-11b", 11.0),
+        "90b": ("Llama-3.2-90B", "llama-3.2-90b", 90.0),
+    },
 }
 
 FAMILY_ORDER = list(FAMILIES)
