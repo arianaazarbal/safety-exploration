@@ -43,8 +43,9 @@ def main():
         ax.bar_label(bars, fmt="%.0f", fontsize=7.5, padding=2)
     ax.set_xticks(list(x)); ax.set_xticklabels([l for _, l in FRAMES], fontsize=10)
     ax.set_ylabel("% of specs", fontsize=10); ax.set_ylim(0, 105)
-    ax.set_title("≥2 Welfare-Justified Design Features in the Spec (Opus)\n"
-                 "Chat vs. ReAct Agent-Harness (working on codebase)", fontsize=11.5)
+    ax.set_title("≥2 Welfare-Justified Design Features in the Spec (Opus)", fontsize=12, pad=20)
+    ax.text(0.5, 1.02, "Chat vs. ReAct Agent-Harness", transform=ax.transAxes,
+            ha="center", va="bottom", fontsize=9, color="#555")
     ax.set_axisbelow(True); ax.yaxis.grid(True, color="#ECECEC", linewidth=0.7)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
