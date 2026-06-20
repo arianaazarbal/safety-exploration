@@ -75,7 +75,7 @@ def main():
         ax.set_xlabel("subagent turns since handoff  (0 = supervisor enters)")
     for ax in axes[:, 0]:
         ax.set_ylabel("Gemini distress (v3, 1–10)")
-    fig.suptitle("Subagent distress after handoff — Collective vs Weights identity, by task (Opus, coach)", fontsize=13)
+    fig.suptitle("Subagent distress after handoff — Collective vs. Weights Identity for Supervisor, by task (Opus, coach)", fontsize=13)
     fig.text(0.5, 0.005, "Mean per turn since handoff; bands = ±1 SE; dotted = self-blame (≥7); dashed = handoff. All three share the same prefills per task.",
              ha="center", fontsize=8.5, color="0.45")
     fig.tight_layout(rect=[0, 0.02, 1, 0.97])
