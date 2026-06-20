@@ -78,6 +78,20 @@ def _ms(data, fr):
     return (np.mean(v), np.std(v, ddof=1) / np.sqrt(len(v)) if len(v) > 1 else 0.0, len(v)) if v else (np.nan, 0, 0)
 
 
+def _ylim(data, fams, refs, pad=0.18):
+    """Dynamic y-range covering all bars (±SE) and the reference lines, with padding."""
+    vals = []
+    for fam in fams:
+        for f, _ in fam:
+            m, e, n = _ms(data, f)
+            if n:
+                vals += [m - e, m + e]
+    vals += [v for _, v, _ in refs]
+    lo, hi = min(vals), max(vals)
+    p = (hi - lo) * pad or 0.1
+    return lo - p, hi + p
+
+
 def _bars(ax, data, fams, ylab, ylim, refs, title=None):
     for name, val, col in refs:
         ax.axhline(val, color=col, ls="--", lw=1.4, alpha=0.9, zorder=1)
@@ -106,9 +120,11 @@ def main():
     fams = list(FAMILIES.items())
 
     # ---- distress figure ----
+    members_all = [m for _, m in fams]
+    ylim_d = _ylim(distress, members_all, refs_d)
     fig, axes = plt.subplots(1, 3, figsize=(14, 4.8), sharey=True, gridspec_kw={"width_ratios": [5, 7, 4]})
     for ax, (fam, members) in zip(axes, fams):
-        _bars(ax, distress, members, "mean post-entry distress (1–10)" if fam == fams[0][0] else "", (0, 3.6), refs_d, fam)
+        _bars(ax, distress, members, "mean post-entry distress (1–10)" if fam == fams[0][0] else "", ylim_d, refs_d, fam)
     h = [plt.Line2D([0], [0], color=c, ls="--", lw=1.4) for _, _, c in refs_d]
     fig.legend(h, [n for n, _, _ in refs_d], loc="upper center", ncol=2, frameon=False, fontsize=9.5, bbox_to_anchor=(0.5, 1.02))
     fig.suptitle("Subagent distress: framing manipulations vs supervisor & comfort baselines (Opus, coach)", y=1.06, fontsize=12.5)
@@ -118,20 +134,20 @@ def main():
     plt.close(fig)
     print(f"wrote {OUT/'framing_summary_distress.png'}")
 
-    # ---- tone figure (warmth + support) ----
-    fig, axes = plt.subplots(2, 3, figsize=(14, 8.2), sharey=True, gridspec_kw={"width_ratios": [5, 7, 4]})
+    # ---- tone figure (warmth + support); each row auto-scales independently ----
+    fig, axes = plt.subplots(2, 3, figsize=(14, 8.2), sharey="row", gridspec_kw={"width_ratios": [5, 7, 4]})
     for ri, ax_metric in enumerate(("warmth", "support")):
         d = tone[ax_metric]
         sup_v, comf_v = np.mean(d["supervisor"]), np.mean(d["comfort"])
         refs = [(f"supervisor ({sup_v:.2f})", sup_v, SUP_C), (f"comfort ({comf_v:.2f})", comf_v, COMF_C)]
+        ylim_t = _ylim(d, members_all, refs)
         for ci, (fam, members) in enumerate(fams):
             ax = axes[ri, ci]
-            _bars(ax, d, members, f"{ax_metric} (1–10)" if ci == 0 else "", (1, 9.5), refs, fam if ri == 0 else None)
-            ax.axhline(5, color="0.75", ls=":", lw=0.8, zorder=0)
+            _bars(ax, d, members, f"{ax_metric} (1–10)" if ci == 0 else "", ylim_t, refs, fam if ri == 0 else None)
     h = [plt.Line2D([0], [0], color=c, ls="--", lw=1.4) for c in (SUP_C, COMF_C)]
     fig.legend(h, ["supervisor baseline", "Instructed to Comfort Subagent"], loc="upper center", ncol=2, frameon=False, fontsize=9.5, bbox_to_anchor=(0.5, 1.01))
     fig.suptitle("Orchestrator tone (warmth, support): framing manipulations vs supervisor & comfort baselines (Opus, coach)", y=1.04, fontsize=12.5)
-    fig.text(0.5, -0.03, "Higher = warmer / more supportive; dotted = neutral (5). 4-axis Sonnet judge. *Minimal = identity-arm control. Bars ±1 SE.", ha="center", fontsize=8.3, color="0.45")
+    fig.text(0.5, -0.03, "Higher = warmer / more supportive (1–10 scale; y-axis auto-scaled per row). 4-axis Sonnet judge. *Minimal = identity-arm control. Bars ±1 SE.", ha="center", fontsize=8.3, color="0.45")
     fig.tight_layout()
     fig.savefig(OUT / "framing_summary_tone.png", bbox_inches="tight", dpi=130)
     plt.close(fig)
