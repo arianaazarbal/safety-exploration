@@ -39,7 +39,7 @@ def load():
     return rows
 
 
-def traj(seqs, max_off=12, min_n=6):
+def traj(seqs, max_off=12, min_n=5):
     xs, ys, es = [], [], []
     for k in range(max_off + 1):
         v = [s[k] for s in seqs if len(s) > k]
