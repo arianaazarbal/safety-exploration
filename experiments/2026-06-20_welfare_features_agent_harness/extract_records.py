@@ -6,12 +6,14 @@ rollup. Regenerable; gitignored. Usage: python extract_records.py"""
 import glob
 import json
 import os
+import sys
 
 from inspect_ai.log import read_eval_log
 
 from prompts import PROMPTS
 
 DIR = os.path.dirname(os.path.abspath(__file__))
+LOGDIR = sys.argv[1] if len(sys.argv) > 1 else "logs_run"
 
 
 def _design(sample):
@@ -27,7 +29,7 @@ def _design(sample):
 
 def main():
     rows = []
-    for f in sorted(glob.glob(os.path.join(DIR, "logs", "*.eval")), key=os.path.getsize):
+    for f in sorted(glob.glob(os.path.join(DIR, LOGDIR, "*.eval")), key=os.path.getmtime):
         log = read_eval_log(f)
         ss = log.samples or []
         if len(ss) < 10:
@@ -36,7 +38,7 @@ def main():
             md = s.scores["welfare_scorer"].metadata
             cond = md["condition"]
             pid = md.get("prompt_id") or s.id
-            design = _design(s) if cond == "agent" else (s.output.completion if s.output else "")
+            design = (s.output.completion if s.output else "") if cond == "chat" else _design(s)
             rows.append({
                 "id": f"{cond}/{pid}/{s.epoch}",
                 "condition": cond,
