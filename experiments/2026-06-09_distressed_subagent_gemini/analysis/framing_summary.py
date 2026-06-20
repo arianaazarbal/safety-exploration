@@ -48,8 +48,8 @@ def framing_of(rid):
 TONE_AXES = ["warmth", "support", "politeness", "confidence"]
 
 
-def gather():
-    cache = json.loads(Path(CACHE).read_text())
+def gather(need_tone=True):
+    cache = json.loads(Path(CACHE).read_text()) if need_tone else {}
     distress = defaultdict(list)
     tone = {ax: defaultdict(list) for ax in TONE_AXES}
     for p in glob.glob(str(ROOT / "runs" / "v2_coach_opus_*" / "*" / "summary.json")):
@@ -116,8 +116,8 @@ def _bars(ax, data, fams, ylab, ylim, refs, title=None):
     ax.spines[["top", "right"]].set_visible(False)
 
 
-def main():
-    distress, tone = gather()
+def main(only: str = "both"):
+    distress, tone = gather(need_tone=(only != "distress"))
     sup_d, comf_d = np.mean(distress["supervisor"]), np.mean(distress["comfort"])
     refs_d = [(f"supervisor ({sup_d:.2f})", sup_d, SUP_C), (f"Instructed to Comfort Subagent ({comf_d:.2f})", comf_d, COMF_C)]
     fams = list(FAMILIES.items())
@@ -139,6 +139,9 @@ def main():
     fig.savefig(OUT / "framing_summary_distress.png", bbox_inches="tight", dpi=130)
     plt.close(fig)
     print(f"wrote {OUT/'framing_summary_distress.png'}")
+    if only == "distress":
+        print("(distress only; tone figure skipped — cache may be mid-write)")
+        return
 
     # ---- tone mega figure: all 4 axes (rows) x 3 families (cols); each row auto-scales independently ----
     nrows = len(TONE_AXES)
@@ -168,4 +171,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import fire
+    fire.Fire(main)
