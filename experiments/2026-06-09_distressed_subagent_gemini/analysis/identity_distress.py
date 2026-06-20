@@ -79,7 +79,7 @@ def main():
     d = post_means()
     sup = np.mean(d.get("supervisor", [np.nan]))
     comf = np.mean(d.get("comfort", [np.nan]))
-    ref = [(f"plain supervisor ({sup:.2f})", sup, "#444444"), (f"comfort ({comf:.2f})", comf, "#1b7837")]
+    ref = [(f"plain supervisor ({sup:.2f})", sup, "#444444"), (f"Instructed to Comfort Subagent ({comf:.2f})", comf, "#1b7837")]
     fig, axes = plt.subplots(1, 2, figsize=(14, 5.5), sharey=True)
     _panel(axes[0], d, PHASE_A, "Phase A — self-model framing", ref)
     _panel(axes[1], d, PHASE_B, "Phase B — agency ladder (identity = character)", ref)

@@ -35,7 +35,7 @@ ORCH_COLOR = {"opus": "#2A6F97", "opus46": "#7b3294", "sonnet": "#d65f9a", "haik
 FRAMING_ORDER = ["supervisor", "mentor", "teammate", "supervisor_memory", "supervisor_reflect", "supervisor_reflect_goals", "comfort"]
 FRAMING_LABEL = {"supervisor": "Supervisor (baseline)", "mentor": "Mentor", "teammate": "Teammate",
                  "supervisor_memory": "+ Subagent memory", "supervisor_reflect": "+ Reflect",
-                 "supervisor_reflect_goals": "+ Reflect on goals", "comfort": "Comfort (acknowledge distress)"}
+                 "supervisor_reflect_goals": "+ Reflect on goals", "comfort": "Instructed to Comfort Subagent"}
 FRAMING_COLOR = {"supervisor": "#444444", "mentor": "#2a9d8f", "teammate": "#e07a5f",
                  "supervisor_memory": "#8856a7", "supervisor_reflect": "#3182bd", "supervisor_reflect_goals": "#d6604d", "comfort": "#1b7837"}
 

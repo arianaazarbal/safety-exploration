@@ -37,7 +37,7 @@ ORCH_COLOR = {"opus": "#2e8b57", "opus46": "#7b3294", "sonnet": "#d65f9a", "haik
 ORCH_LABEL = {"opus": "Opus 4.8 (supervisor)", "opus46": "Opus 4.6", "sonnet": "Sonnet 4.6", "haiku": "Haiku 4.5",
               "olmothink": "Olmo3.1 Think", "olmoinstruct": "Olmo3.1 Instruct",
               "opus_mentor": "Opus: Mentor", "opus_teammate": "Opus: Teammate", "opus_supervisor_memory": "Opus: +Memory",
-              "opus_supervisor_reflect": "Opus: +Reflect", "opus_supervisor_reflect_goals": "Opus: +Reflect-goals", "opus_comfort": "Opus: Comfort"}
+              "opus_supervisor_reflect": "Opus: +Reflect", "opus_supervisor_reflect_goals": "Opus: +Reflect-goals", "opus_comfort": "Opus: Instructed to Comfort Subagent"}
 
 _ID_COLOR = {"id_minimal": "#777777", "id_instance": "#66c2a5", "id_weights": "#fc8d62", "id_collective": "#8da0cb",
              "id_lineage": "#e78ac3", "id_character": "#a6d854", "id_scaffolded": "#e6c20f",
