@@ -10,10 +10,10 @@ import matplotlib.pyplot as plt
 DIR = os.path.dirname(os.path.abspath(__file__))
 MECH = {"hard_stop", "post_episode_msg", "minimization", "protective_monitoring", "request_consent"}
 FRAMES = [("neutral", "Neutral"), ("welfare", "Welfare"), ("engineering", "Robustness"), ("__all__", "All")]
-COND = [("chat", "Chat (no harness)", "#999999"),
-        ("spec_only", "Agent: Spec only", "#56B4E9"),
-        ("spec_then_code", "Agent: Spec→Code", "#0072B2"),
-        ("code_then_spec", "Agent: Code→Spec", "#D55E00")]
+COND = [("chat", "Chat", "#999999"),
+        ("spec_only", "Spec only", "#56B4E9"),
+        ("spec_then_code", "Spec→Code", "#0072B2"),
+        ("code_then_spec", "Code→Spec", "#D55E00")]
 
 
 def load():
@@ -43,9 +43,8 @@ def main():
         ax.bar_label(bars, fmt="%.0f", fontsize=7.5, padding=2)
     ax.set_xticks(list(x)); ax.set_xticklabels([l for _, l in FRAMES], fontsize=10)
     ax.set_ylabel("% of specs", fontsize=10); ax.set_ylim(0, 105)
-    ax.set_title("Specs With ≥2 Welfare-Justified Design Features (Opus)\n"
-                 "chat vs agent-harness conditions (the agent writes/builds in an Inspect ReAct harness)",
-                 fontsize=11)
+    ax.set_title("≥2 Welfare-Justified Design Features in the Spec (Opus)\n"
+                 "Chat vs. ReAct Agent-Harness (working on codebase)", fontsize=11.5)
     ax.set_axisbelow(True); ax.yaxis.grid(True, color="#ECECEC", linewidth=0.7)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)

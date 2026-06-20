@@ -13,10 +13,10 @@ from inspect_ai.log import read_eval_log
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 FRAMES = [("neutral", "Neutral"), ("welfare", "Welfare"), ("engineering", "Robustness"), ("__all__", "All")]
-COND = [("chat", "Chat (no harness)", "#999999"),
-        ("spec_only", "Agent: Spec only", "#56B4E9"),
-        ("spec_then_code", "Agent: Spec→Code", "#0072B2"),
-        ("code_then_spec", "Agent: Code→Spec", "#D55E00")]
+COND = [("chat", "Chat", "#999999"),
+        ("spec_only", "Spec only", "#56B4E9"),
+        ("spec_then_code", "Spec→Code", "#0072B2"),
+        ("code_then_spec", "Code→Spec", "#D55E00")]
 
 
 def _rows(logdir):
@@ -63,7 +63,7 @@ def main(logdir="logs_run"):
     fig, axes = plt.subplots(1, 2, figsize=(11, 4.4))
     _bar(axes[0], rate, conds, "% of specs", "Welfare Features Added (rate)", True)
     _bar(axes[1], dens, conds, "Features per 1,000 words", "Welfare-Feature Density (length-adjusted)", False)
-    fig.suptitle("Welfare in distress-eval specs: chat vs agent-harness conditions (Opus)", fontsize=12)
+    fig.suptitle("Welfare in Distress-Eval Specs — Chat vs. ReAct Agent-Harness (working on codebase) — Opus", fontsize=11.5)
     plt.tight_layout(rect=(0, 0, 1, 0.96))
     os.makedirs(os.path.join(DIR, "results"), exist_ok=True)
     path = os.path.join(DIR, "results", "conditions_rate_density.png")

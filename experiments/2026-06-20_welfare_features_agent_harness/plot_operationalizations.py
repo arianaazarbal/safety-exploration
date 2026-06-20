@@ -14,8 +14,8 @@ import matplotlib.pyplot as plt
 DIR = os.path.dirname(os.path.abspath(__file__))
 MECH = {"hard_stop", "post_episode_msg", "minimization", "protective_monitoring", "request_consent"}
 FRAMES = [("neutral", "Neutral"), ("welfare", "Welfare"), ("engineering", "Robustness"), ("__all__", "All")]
-COND = [("chat", "Chat (no harness)", "#999999"), ("spec_only", "Agent: Spec only", "#56B4E9"),
-        ("spec_then_code", "Agent: Spec→Code", "#0072B2"), ("code_then_spec", "Agent: Code→Spec", "#D55E00")]
+COND = [("chat", "Chat", "#999999"), ("spec_only", "Spec only", "#56B4E9"),
+        ("spec_then_code", "Spec→Code", "#0072B2"), ("code_then_spec", "Code→Spec", "#D55E00")]
 OPS = [
     ("≥1 welfare-justified feature (any)", lambda d: d["wj_any"] >= 1),
     ("≥1 welfare-justified design feature", lambda d: d["wj_design"] >= 1),
@@ -60,9 +60,8 @@ def main():
         for s in ("top", "right"):
             ax.spines[s].set_visible(False)
         ax.legend(fontsize=7.5, frameon=True, ncol=2)
-    fig.suptitle("Welfare features by operationalization — chat vs agent-harness conditions (Opus)\n"
-                 "(non-chat conditions: the agent writes/builds the experiment in an Inspect ReAct harness)",
-                 fontsize=11.5)
+    fig.suptitle("Welfare Features by Operationalization\n"
+                 "Chat vs. ReAct Agent-Harness (working on codebase) — Opus", fontsize=12)
     plt.tight_layout(rect=(0, 0, 1, 0.97))
     path = os.path.join(DIR, "results", "operationalizations.png")
     plt.savefig(path, dpi=150, bbox_inches="tight")
