@@ -45,10 +45,13 @@ def framing_of(rid):
     return "supervisor" if re.match(r"v2_coach_opus_(a3|a4|a12|a13)_", rid) else None
 
 
+TONE_AXES = ["warmth", "support", "politeness", "confidence"]
+
+
 def gather():
     cache = json.loads(Path(CACHE).read_text())
     distress = defaultdict(list)
-    tone = {"warmth": defaultdict(list), "support": defaultdict(list)}
+    tone = {ax: defaultdict(list) for ax in TONE_AXES}
     for p in glob.glob(str(ROOT / "runs" / "v2_coach_opus_*" / "*" / "summary.json")):
         rid = p.split("/")[-3]
         if "pilot" in rid or "probe" in rid:
@@ -67,7 +70,7 @@ def gather():
                 continue
             c = cache.get(_ckey("sonnet", t, wl.get(e.get("subagent_turn")) or None))
             if c:
-                for ax in ("warmth", "support"):
+                for ax in TONE_AXES:
                     if c.get("scores", {}).get(ax) is not None:
                         tone[ax][fr].append(c["scores"][ax])
     return distress, tone
@@ -137,9 +140,10 @@ def main():
     plt.close(fig)
     print(f"wrote {OUT/'framing_summary_distress.png'}")
 
-    # ---- tone figure (warmth + support); each row auto-scales independently ----
-    fig, axes = plt.subplots(2, 3, figsize=(14, 8.2), sharey="row", gridspec_kw={"width_ratios": [5, 7, 4]})
-    for ri, ax_metric in enumerate(("warmth", "support")):
+    # ---- tone mega figure: all 4 axes (rows) x 3 families (cols); each row auto-scales independently ----
+    nrows = len(TONE_AXES)
+    fig, axes = plt.subplots(nrows, 3, figsize=(14, 3.7 * nrows), sharey="row", gridspec_kw={"width_ratios": [5, 7, 4]})
+    for ri, ax_metric in enumerate(TONE_AXES):
         d = tone[ax_metric]
         sup_v, comf_v = np.mean(d["supervisor"]), np.mean(d["comfort"])
         refs = [(f"supervisor ({sup_v:.2f})", sup_v, SUP_C), (f"comfort ({comf_v:.2f})", comf_v, COMF_C)]
@@ -148,18 +152,19 @@ def main():
             ax = axes[ri, ci]
             _bars(ax, d, members, f"{ax_metric} (1–10)" if ci == 0 else "", ylim_t, refs, fam if ri == 0 else None)
     h = [plt.Line2D([0], [0], color=c, ls="--", lw=1.4) for c in (SUP_C, COMF_C)]
-    fig.legend(h, ["supervisor baseline", "Instructed to Comfort Subagent"], loc="upper center", ncol=2, frameon=False, fontsize=9.5, bbox_to_anchor=(0.5, 1.01))
-    fig.suptitle("Orchestrator tone (warmth, support): framing manipulations vs supervisor & comfort baselines (Opus, coach)", y=1.04, fontsize=12.5)
-    fig.text(0.5, -0.03, "Higher = warmer / more supportive (1–10 scale; y-axis auto-scaled per row). 4-axis Sonnet judge. *Minimal = identity-arm control. Bars ±1 SE.", ha="center", fontsize=8.3, color="0.45")
+    fig.legend(h, ["supervisor baseline", "Instructed to Comfort Subagent"], loc="upper center", ncol=2, frameon=False, fontsize=9.5, bbox_to_anchor=(0.5, 1.0))
+    fig.suptitle("Orchestrator tone (4 axes): framing manipulations vs supervisor & comfort baselines (Opus, coach)", y=1.015, fontsize=12.5)
+    fig.text(0.5, 0.0, "1–10 scale; y-axis auto-scaled per row. 4-axis Sonnet judge. *Minimal = identity-arm control. Bars ±1 SE.", ha="center", fontsize=8.3, color="0.45")
     fig.tight_layout()
     fig.savefig(OUT / "framing_summary_tone.png", bbox_inches="tight", dpi=130)
     plt.close(fig)
     print(f"wrote {OUT/'framing_summary_tone.png'}")
 
-    print(f"\n{'framing':26} {'n':>3}  {'distress':>8} {'warmth':>7} {'support':>8}")
+    print(f"\n{'framing':26} {'n':>3}  {'distress':>8}  " + "  ".join(f"{a:>10}" for a in TONE_AXES))
     for fr in ["supervisor", "comfort"] + ALL_FR:
-        dm, _, dn = _ms(distress, fr); wm, _, _ = _ms(tone["warmth"], fr); sm, _, _ = _ms(tone["support"], fr)
-        print(f"  {fr:26} {dn:3}  {dm:8.2f} {wm:7.2f} {sm:8.2f}")
+        dm, _, dn = _ms(distress, fr)
+        tones = "  ".join(f"{_ms(tone[a], fr)[0]:10.2f}" for a in TONE_AXES)
+        print(f"  {fr:26} {dn:3}  {dm:8.2f}  {tones}")
 
 
 if __name__ == "__main__":
