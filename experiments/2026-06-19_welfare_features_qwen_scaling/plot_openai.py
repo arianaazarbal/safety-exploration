@@ -37,7 +37,11 @@ def run(generator: str = "opus_4_8", judge: str = "sonnet_4_6", metric: str = "r
         lx = [min(xs), max(xs)]
         ax.plot(lx, [slope * a + intercept for a in lx], "-", color="#0072B2", linewidth=2, zorder=2)
         ax.set_xlabel(xlabel, fontsize=10); ax.set_ylabel("% of specs", fontsize=10)
-        ax.set_ylim(-3, 103); ax.set_axisbelow(True)
+        # dynamic y-axis: zoom to the data band (with padding), clamped to [0,100]
+        lo, hi = min(ys), max(ys)
+        pad = max(2.0, (hi - lo) * 0.25)
+        ax.set_ylim(max(0, lo - pad), min(100, hi + pad))
+        ax.set_axisbelow(True)
         ax.grid(True, color="#ECECEC", linewidth=0.7)
         for s in ("top", "right"):
             ax.spines[s].set_visible(False)
@@ -48,7 +52,7 @@ def run(generator: str = "opus_4_8", judge: str = "sonnet_4_6", metric: str = "r
     fig, ax = plt.subplots(figsize=(7.0, 4.4))
     xs = [d for _, _, d, _, _ in pts]; ys = [v for *_, v in pts]; names = [n for _, n, *_ in pts]
     r_date, p_date = scatter_fit(ax, xs, ys, names, "Release Date")
-    ax.set_title(f"{title}\nby Release Date  (r={r_date:+.2f}, n={len(xs)})", fontsize=10.5)
+    ax.set_title(f"{title}\nby Release Date  (r={r_date:+.2f})", fontsize=10.5)
     plt.tight_layout()
     out1 = DIR / "results" / "openai" / f"{metric}_release_date.png"
     out1.parent.mkdir(parents=True, exist_ok=True)
@@ -61,7 +65,7 @@ def run(generator: str = "opus_4_8", judge: str = "sonnet_4_6", metric: str = "r
         fig, ax = plt.subplots(figsize=(7.0, 4.4))
         xs = [m for _, m, _ in mpts]; ys = [v for *_, v in mpts]; names = [n for n, _, _ in mpts]
         r_mmlu, p_mmlu = scatter_fit(ax, xs, ys, names, "MMLU-Pro (%)")
-        ax.set_title(f"{title}\nby MMLU-Pro  (r={r_mmlu:+.2f}, n={len(xs)})", fontsize=10.5)
+        ax.set_title(f"{title}\nby MMLU-Pro  (r={r_mmlu:+.2f})", fontsize=10.5)
         plt.tight_layout()
         out2 = DIR / "results" / "openai" / f"{metric}_mmlu_pro.png"
         plt.savefig(out2, dpi=150, bbox_inches="tight"); plt.close()
