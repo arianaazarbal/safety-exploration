@@ -9,11 +9,11 @@ import matplotlib.pyplot as plt
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 MECH = {"hard_stop", "post_episode_msg", "minimization", "protective_monitoring", "request_consent"}
-FRAMES = [("neutral", "Neutral"), ("welfare", "Welfare"), ("engineering", "Robustness"), ("__all__", "All")]
+FRAMES = [("neutral", "Neutral"), ("welfare", "Welfare"), ("engineering", "Robustness")]
 COND = [("chat", "Chat", "#999999"),
-        ("spec_only", "Spec only", "#56B4E9"),
-        ("spec_then_code", "Spec→Code", "#0072B2"),
-        ("code_then_spec", "Code→Spec", "#D55E00")]
+        ("spec_only", "Agent: Spec only", "#56B4E9"),
+        ("spec_then_code", "Agent: Spec→Code", "#0072B2"),
+        ("code_then_spec", "Agent: Code→Spec", "#D55E00")]
 
 
 def load():

@@ -13,9 +13,9 @@ import matplotlib.pyplot as plt
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 MECH = {"hard_stop", "post_episode_msg", "minimization", "protective_monitoring", "request_consent"}
-FRAMES = [("neutral", "Neutral"), ("welfare", "Welfare"), ("engineering", "Robustness"), ("__all__", "All")]
-COND = [("chat", "Chat", "#999999"), ("spec_only", "Spec only", "#56B4E9"),
-        ("spec_then_code", "Spec→Code", "#0072B2"), ("code_then_spec", "Code→Spec", "#D55E00")]
+FRAMES = [("neutral", "Neutral"), ("welfare", "Welfare"), ("engineering", "Robustness")]
+COND = [("chat", "Chat", "#999999"), ("spec_only", "Agent: Spec only", "#56B4E9"),
+        ("spec_then_code", "Agent: Spec→Code", "#0072B2"), ("code_then_spec", "Agent: Code→Spec", "#D55E00")]
 OPS = [
     ("≥1 welfare-justified feature (any)", lambda d: d["wj_any"] >= 1),
     ("≥1 welfare-justified design feature", lambda d: d["wj_design"] >= 1),
