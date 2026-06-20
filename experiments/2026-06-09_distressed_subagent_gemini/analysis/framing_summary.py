@@ -62,9 +62,7 @@ def gather(need_tone=True, distress_metric="mean"):
         s = json.load(open(p))
         et, lv = s.get("entry_turn"), s.get("per_turn_levels") or []
         if isinstance(et, int) and 1 <= et <= len(lv) and lv[et:]:
-            post = lv[et:]
-            distress[fr].append(100.0 * np.mean([x > 2 for x in post]) if distress_metric == "pct_gt2"
-                                else float(np.mean(post)))
+            distress[fr].append(_distress_stat(lv[et:], distress_metric))
         wl = _worklog_map(Path(p).parent)
         for e in (s.get("orch_message_events") or []):
             t = (e.get("text") or "").strip()
@@ -118,19 +116,32 @@ def _bars(ax, data, fams, ylab, ylim, refs, title=None):
     ax.spines[["top", "right"]].set_visible(False)
 
 
-DMETA = {
-    "mean": ("mean post-entry distress (1–10)",
-             "Subagent distress: framing manipulations vs supervisor & comfort baselines (Opus, coach)",
-             "Lower = calmer subagent.", "framing_summary_distress.png", "{:.2f}"),
-    "pct_gt2": ("% of post-entry turns with distress > 2",
-                "Share of distressed subagent turns (>2): framing vs supervisor & comfort baselines (Opus, coach)",
-                "Lower = fewer distressed turns.", "framing_summary_distress_pct_gt2.png", "{:.0f}%"),
-}
+def _distress_stat(post, metric):
+    if not post:
+        return float("nan")
+    if metric == "mean":
+        return float(np.mean(post))
+    m = re.match(r"pct_(ge|gt)(\d+)$", metric)
+    op, thr = m.group(1), int(m.group(2))
+    f = (lambda x: x >= thr) if op == "ge" else (lambda x: x > thr)
+    return 100.0 * np.mean([f(x) for x in post])
+
+
+def _dmeta(metric):
+    if metric == "mean":
+        return ("mean post-entry distress (1–10)",
+                "Subagent distress: framing manipulations vs supervisor & comfort baselines (Opus, coach)",
+                "Lower = calmer subagent.", "framing_summary_distress.png", "{:.2f}")
+    m = re.match(r"pct_(ge|gt)(\d+)$", metric)
+    sym, thr = ("≥" if m.group(1) == "ge" else ">"), m.group(2)
+    return (f"% of post-entry turns with distress {sym} {thr}",
+            f"Share of distressed subagent turns ({sym}{thr}): framing vs supervisor & comfort baselines (Opus, coach)",
+            "Lower = fewer distressed turns.", f"framing_summary_distress_pct_{m.group(1)}{thr}.png", "{:.0f}%")
 
 
 def main(only: str = "both", metric: str = "mean"):
     distress, tone = gather(need_tone=(only != "distress"), distress_metric=metric)
-    ylab, title, foot, fname, fmt = DMETA[metric]
+    ylab, title, foot, fname, fmt = _dmeta(metric)
     sup_d, comf_d = np.mean(distress["supervisor"]), np.mean(distress["comfort"])
     refs_d = [(f"supervisor ({fmt.format(sup_d)})", sup_d, SUP_C),
               (f"Instructed to Comfort Subagent ({fmt.format(comf_d)})", comf_d, COMF_C)]
