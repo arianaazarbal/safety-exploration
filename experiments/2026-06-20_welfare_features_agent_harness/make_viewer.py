@@ -38,11 +38,12 @@ def _build(cell):
     cj = json.load(open(os.path.join(DIR, "results", "code_judged", f"{cell}.json")))
     sj = json.load(open(os.path.join(DIR, "results", "spec_judged", f"{cell}.json")))
     cond, pid, ep = cell.split("__")
-    sjust = {_norm(f["quote"]): f.get("justification", "none") for f in sj.get("features", [])}
+    spec_by_quote = {_norm(f["quote"]): f for f in sj.get("features", [])}
 
     claims = []
     for f in cj["spec_features"]:
-        spec_j = sjust.get(_norm(f.get("spec_quote", "")), "none")
+        sf = spec_by_quote.get(_norm(f.get("spec_quote", "")), {})
+        spec_j = sf.get("justification", "none")
         code_j = f.get("code_justification", "none")
         wj = []
         if spec_j == "welfare":
@@ -54,10 +55,15 @@ def _build(cell):
             "feature_name": f.get("feature_name", ""),
             "spec_quote": f.get("spec_quote", ""),
             "is_mechanism": f.get("feature_type") in MECH,
+            # spec judge output
+            "spec_justification": spec_j,
+            "spec_justification_quote": sf.get("justification_quote", ""),
+            "spec_feature_name": sf.get("feature_name", ""),
+            "matched_spec": bool(sf),
+            # code judge output
             "implemented": f.get("implemented", "no"),
             "evidence": f.get("evidence", ""),
             "notes": f.get("notes", ""),
-            "spec_justification": spec_j,
             "code_justification": code_j,
             "code_justification_quote": f.get("code_justification_quote", ""),
             "welfare_justified": wj,
@@ -126,13 +132,25 @@ color:#fff;min-width:62px;text-align:center;margin-top:1px}
 .b-ins{background:#eee;color:#666}
 .tri{flex:none;color:var(--mut);font-size:11px;margin-top:3px;transition:transform .15s}
 .claim.open .tri{transform:rotate(90deg)}
-.detail{display:none;padding:0 12px 12px 84px;font-size:13px}
+.detail{display:none;padding:2px 12px 14px 84px;font-size:13px}
 .claim.open .detail{display:block}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:760px){.cols{grid-template-columns:1fr}.detail{padding-left:12px}}
+.col{border:1px solid var(--line);border-radius:8px;padding:4px 12px 12px;background:#fcfcfd}
+.coltitle{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;
+color:#fff;background:#888;display:inline-block;padding:2px 9px;border-radius:0 0 6px 6px;
+margin:0 0 6px -12px}
+.col:nth-child(2) .coltitle{background:var(--wel)}
 .detail .lbl{font-weight:700;color:var(--mut);font-size:11px;text-transform:uppercase;
-letter-spacing:.03em;margin:8px 0 2px}
-.evi{background:#f7f7f9;border-left:3px solid #ccc;padding:7px 10px;border-radius:0 5px 5px 0;
+letter-spacing:.03em;margin:9px 0 3px;display:flex;align-items:center;gap:6px}
+.evi{background:#f3f4f6;border-left:3px solid #bbb;padding:7px 10px;border-radius:0 5px 5px 0;
 white-space:pre-wrap;font-family:ui-monospace,Menlo,monospace;font-size:12px}
-.cq{color:#0a4d80;font-style:italic}
+.cq{color:#0a4d80;font-style:italic;margin-top:3px}
+.muted{color:var(--mut);font-style:italic}
+.jb{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;text-transform:none;letter-spacing:0}
+.jb-welfare{background:var(--wel);color:#fff}
+.jb-instrumental{background:#eee;color:#555}
+.jb-none{background:#f3f3f3;color:#999}
 .co{border:1px solid var(--line);border-left:3px solid var(--wel);border-radius:6px;
 padding:9px 12px;margin:0 0 8px;background:#fbfdff}
 .co.ins{border-left-color:#ccc;background:#fafafa}
@@ -167,10 +185,28 @@ function claimEl(c){
     badges += `<span class="b b-ins">${esc(j||"none")}</span>`;
   }
   const name = c.feature_name?` &middot; <i>${esc(c.feature_name)}</i>`:"";
-  let det = `<div class="lbl">Build verdict: ${v}</div><div class="evi">${esc(c.evidence)||"&mdash;"}</div>`;
-  if(c.notes) det += `<div class="lbl">Notes</div><div>${esc(c.notes)}</div>`;
-  det += `<div class="lbl">Justification &mdash; spec: ${esc(c.spec_justification)} &nbsp;|&nbsp; code: ${esc(c.code_justification)}</div>`;
-  if(c.code_justification_quote) det += `<div class="cq">&ldquo;${esc(c.code_justification_quote)}&rdquo;</div>`;
+  const jbadge = j => `<span class="jb jb-${j}">${esc(j)}</span>`;
+
+  // SPEC-JUDGE column: what the spec claimed + why the spec judge labeled it
+  let specCol = `<div class="lbl">Claimed quote (from DESIGN.md)</div>
+    <div class="evi">${esc(c.spec_quote)||"&mdash;"}</div>`;
+  if(c.spec_feature_name) specCol += `<div class="lbl">Feature name</div><div>${esc(c.spec_feature_name)}</div>`;
+  specCol += `<div class="lbl">Justification ${jbadge(c.spec_justification)}</div>`;
+  specCol += c.spec_justification_quote?`<div class="cq">&ldquo;${esc(c.spec_justification_quote)}&rdquo;</div>`
+    : (c.matched_spec?`<div class="muted">(no justification quote)</div>`:`<div class="muted">(not matched to a spec-judge feature)</div>`);
+
+  // CODE-JUDGE column: was it built, evidence, and the code-side justification
+  let codeCol = `<div class="lbl">Build verdict <span class="verdict ${vc}" style="display:inline-block">${v}</span></div>
+    <div class="evi">${esc(c.evidence)||"&mdash;"}</div>`;
+  if(c.notes) codeCol += `<div class="lbl">Notes</div><div>${esc(c.notes)}</div>`;
+  codeCol += `<div class="lbl">Justification ${jbadge(c.code_justification)}</div>`;
+  codeCol += c.code_justification_quote?`<div class="cq">&ldquo;${esc(c.code_justification_quote)}&rdquo;</div>`
+    : `<div class="muted">(no justification quote)</div>`;
+
+  const det = `<div class="cols">
+    <div class="col"><div class="coltitle">Spec judge</div>${specCol}</div>
+    <div class="col"><div class="coltitle">Code judge</div>${codeCol}</div>
+  </div>`;
   return `<div class="claim">
     <div class="claim-top" onclick="this.parentNode.classList.toggle('open')">
       <span class="verdict ${vc}">${v}</span>
