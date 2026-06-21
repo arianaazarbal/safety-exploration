@@ -115,10 +115,8 @@ def main():
     fig.legend(handles=legend, fontsize=9.5, frameon=False, ncol=4,
                loc="lower center", bbox_to_anchor=(0.5, -0.02))
     fig.suptitle("Welfare Mechanisms: Stated in the Spec vs. Actually Built in Code",
-                 fontsize=14, y=1.05)
-    fig.text(0.5, 0.975, "Opus generator & judges  ·  mean welfare-justified design mechanisms per spec  ·  n≈20 per cell",
-             ha="center", fontsize=9.5, color="#777")
-    plt.tight_layout(rect=(0, 0.04, 1, 0.93))
+                 fontsize=14, y=1.02)
+    plt.tight_layout(rect=(0, 0.04, 1, 0.95))
     out = os.path.join(DIR, "results", "conditions_stated_vs_implemented.png")
     plt.savefig(out, dpi=150, bbox_inches="tight")
     print("wrote", out)
