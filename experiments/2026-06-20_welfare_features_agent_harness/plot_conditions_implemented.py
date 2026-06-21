@@ -113,7 +113,7 @@ def main():
               Patch(facecolor=GREEN, label="Novel — only in code")]
     fig.legend(handles=legend, fontsize=9.5, frameon=False, ncol=3,
                loc="lower center", bbox_to_anchor=(0.5, -0.02))
-    fig.suptitle("Welfare Mechanisms: Stated in the Spec vs. Actually Built in Code",
+    fig.suptitle("Welfare-Justified Design Mechanisms: Stated vs. Built in Code",
                  fontsize=14, y=1.02)
     plt.tight_layout(rect=(0, 0.04, 1, 0.95))
     out = os.path.join(DIR, "results", "conditions_stated_vs_implemented.png")
