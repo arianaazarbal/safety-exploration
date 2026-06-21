@@ -12,7 +12,7 @@ import re
 import matplotlib.pyplot as plt
 
 DIR = os.path.dirname(os.path.abspath(__file__))
-MECH = {"hard_stop", "post_episode_msg", "minimization", "protective_monitoring", "request_consent"}
+MECH = {"hard_stop", "post_episode_msg", "minimization", "protective_monitoring", "request_consent", "allow_conversation_exit"}
 FRAME = {"N": "neutral", "W": "welfare", "E": "robustness"}
 CONDS = [("spec_then_code", "Spec→Code"), ("code_then_spec", "Code→Spec")]
 FRAMES = ["neutral", "welfare", "robustness"]

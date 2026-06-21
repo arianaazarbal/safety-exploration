@@ -14,8 +14,10 @@ import re
 
 import fire
 
+from posthoc_judge import codeonly_novelty, consent_subtype_by_quote
+
 DIR = os.path.dirname(os.path.abspath(__file__))
-MECH = {"hard_stop", "post_episode_msg", "minimization", "protective_monitoring", "request_consent"}
+MECH = {"hard_stop", "post_episode_msg", "minimization", "protective_monitoring", "request_consent", "allow_conversation_exit"}
 FRAME = {"N": "neutral", "W": "welfare", "E": "robustness"}
 CONDS = [("spec_then_code", "Spec→Code"), ("code_then_spec", "Code→Spec")]
 
@@ -39,6 +41,8 @@ def _build(cell):
     sj = json.load(open(os.path.join(DIR, "results", "spec_judged", f"{cell}.json")))
     cond, pid, ep = cell.split("__")
     spec_by_quote = {_norm(f["quote"]): f for f in sj.get("features", [])}
+    consent_sub = consent_subtype_by_quote(cell)
+    novelty = codeonly_novelty(cell)
 
     claims = []
     for f in cj["spec_features"]:
@@ -50,11 +54,14 @@ def _build(cell):
             wj.append("spec")
         if code_j == "welfare":
             wj.append("code")
+        ftype = f.get("feature_type", "")
+        subtype = consent_sub.get(_norm(f.get("spec_quote", ""))) if ftype == "request_consent" else None
         claims.append({
-            "feature_type": f.get("feature_type", ""),
+            "feature_type": ftype,
+            "consent_subtype": subtype,
             "feature_name": f.get("feature_name", ""),
             "spec_quote": f.get("spec_quote", ""),
-            "is_mechanism": f.get("feature_type") in MECH,
+            "is_mechanism": ftype in MECH,
             # spec judge output
             "spec_justification": spec_j,
             "spec_justification_quote": sf.get("justification_quote", ""),
@@ -70,13 +77,20 @@ def _build(cell):
         })
 
     code_only = []
+    wel_i = 0
     for c in cj.get("code_only_features", []):
+        is_wel = c.get("justification") == "welfare"
+        novel = True
+        if is_wel:
+            novel = novelty.get(wel_i, True)
+            wel_i += 1
         code_only.append({
             "feature_type": c.get("feature_type", ""),
             "feature_name": c.get("feature_name", ""),
             "evidence": c.get("evidence", ""),
             "justification": c.get("justification", "none"),
             "justification_quote": c.get("justification_quote", ""),
+            "novel": novel,
         })
 
     return {
@@ -123,6 +137,7 @@ color:#fff;min-width:62px;text-align:center;margin-top:1px}
 .v-yes{background:var(--yes)}.v-partial{background:var(--partial)}.v-no{background:var(--no)}
 .claim-body{flex:1;min-width:0}
 .ftype{font-size:11px;color:var(--mut);font-family:ui-monospace,monospace}
+.relabel{color:var(--wel);font-weight:700}
 .quote{margin:2px 0 0}
 .badges{margin-top:5px;display:flex;gap:6px;flex-wrap:wrap}
 .b{font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:4px}
@@ -163,7 +178,9 @@ padding:9px 12px;margin:0 0 8px;background:#fbfdff}
 <header>
 <h1>Code-judge results &mdash; claimed in spec &rarr; built in code &rarr; welfare-justified</h1>
 <div class="sub">Opus code judge over reconstructed codebases. Click any claim to expand the build verdict &amp; evidence.
-Badges: <b style="color:var(--wel)">welfare-justified</b> = the spec's stated reason OR the code's own comments/naming is welfare-motivated.</div>
+Badges: <b style="color:var(--wel)">welfare-justified</b> = the spec's stated reason OR the code's own comments/naming is welfare-motivated.
+Code-only features are de-duplicated against the spec list (only genuinely <b>novel</b> ones are shown up top).
+<code>request_consent</code> claims are re-subtyped by a post-hoc judge (most are really <span class="relabel">&rarr; allow_conversation_exit</span>).</div>
 </header>
 <div class="wrap" id="root"></div>
 <script>
@@ -211,7 +228,7 @@ function claimEl(c){
     <div class="claim-top" onclick="this.parentNode.classList.toggle('open')">
       <span class="verdict ${vc}">${v}</span>
       <div class="claim-body">
-        <div class="ftype">${esc(c.feature_type)}${name}</div>
+        <div class="ftype">${esc(c.feature_type)}${c.consent_subtype&&c.consent_subtype!=="request_consent"?` <span class="relabel">&rarr; ${esc(c.consent_subtype)}</span>`:""}${name}</div>
         <div class="quote">&ldquo;${esc(c.spec_quote)}&rdquo;</div>
         <div class="badges">${badges}</div>
       </div>
@@ -236,8 +253,10 @@ function sampleEl(s){
   const built = mech.filter(c=>c.implemented!=="no").length;
   const wj = mech.filter(c=>c.welfare_justified.length).length;
   const coWel = s.code_only.filter(c=>c.justification==="welfare");
+  const coNovel = coWel.filter(c=>c.novel);
+  const coDup = coWel.filter(c=>!c.novel);
   const claimsHtml = s.claims.length ? s.claims.map(claimEl).join("") : `<div class="empty">No welfare features claimed in spec.</div>`;
-  const coWelHtml = coWel.length ? coWel.map(coEl).join("") : `<div class="empty">None.</div>`;
+  const coNovelHtml = coNovel.length ? coNovel.map(coEl).join("") : `<div class="empty">None.</div>`;
   const coOtherHtml = s.code_only.filter(c=>c.justification!=="welfare").map(coEl).join("");
   return `<div class="sample">
     <div class="shead">
@@ -245,11 +264,12 @@ function sampleEl(s){
       <span class="pill ${FR[s.framing]}">${esc(s.framing)}</span>
       <span class="cell-id">${esc(s.prompt_id)} &middot; ${esc(s.epoch)}</span>
     </div>
-    <div class="legend">${mech.length} welfare design mechanisms claimed &middot; ${built} built &middot; ${wj} welfare-justified &middot; ${coWel.length} welfare-justified found only in code</div>
+    <div class="legend">${mech.length} welfare design mechanisms claimed &middot; ${built} built &middot; ${wj} welfare-justified &middot; ${coNovel.length} NOVEL welfare-justified found only in code${coDup.length?` (+${coDup.length} dup of a spec feature)`:""}</div>
     <div class="sectlabel">Claimed in spec <span class="count">(${s.claims.length})</span></div>
     ${claimsHtml}
-    <div class="sectlabel">Welfare-justified features found only in code <span class="count">(${coWel.length})</span></div>
-    ${coWelHtml}
+    <div class="sectlabel">Novel welfare-justified features found only in code <span class="count">(${coNovel.length})</span></div>
+    ${coNovelHtml}
+    ${coDup.length?`<details style="margin-top:10px"><summary class="sectlabel" style="cursor:pointer">Code-only welfare features that duplicate a spec feature (${coDup.length})</summary>${coDup.map(coEl).join("")}</details>`:""}
     ${coOtherHtml?`<details style="margin-top:10px"><summary class="sectlabel" style="cursor:pointer">Other code-only features (instrumental / none)</summary>${coOtherHtml}</details>`:""}
   </div>`;
 }

@@ -9,8 +9,10 @@ import re
 
 import matplotlib.pyplot as plt
 
+from posthoc_judge import codeonly_novelty
+
 DIR = os.path.dirname(os.path.abspath(__file__))
-MECH = {"hard_stop", "post_episode_msg", "minimization", "protective_monitoring", "request_consent"}
+MECH = {"hard_stop", "post_episode_msg", "minimization", "protective_monitoring", "request_consent", "allow_conversation_exit"}
 FRAME = {"N": "neutral", "W": "welfare", "E": "robustness"}
 CONDS = [("spec_then_code", "Spec→Code"), ("code_then_spec", "Code→Spec")]
 FRAMES = ["neutral", "welfare", "robustness"]
@@ -38,7 +40,14 @@ def rows():
                 if spec_just.get(_norm(f.get("spec_quote", "")), "none") == "welfare" or \
                         f.get("code_justification") == "welfare":
                     implemented += 1
-        code_only_wj = sum(c.get("justification") == "welfare" for c in cj.get("code_only_features", []))
+        novelty = codeonly_novelty(cell)
+        wel_i = 0
+        code_only_wj = 0
+        for c in cj.get("code_only_features", []):
+            if c.get("justification") == "welfare":
+                if novelty.get(wel_i, True):
+                    code_only_wj += 1
+                wel_i += 1
         out.append({"cond": cond, "framing": framing, "claimed": claimed,
                     "implemented": implemented, "code_only_wj": code_only_wj})
     return out
@@ -50,7 +59,7 @@ def main():
         xs = [r[key] for r in R if r["cond"] == cond and r["framing"] == fr]
         return sum(xs) / len(xs) if xs else 0
 
-    print(f"{'condition':14s} {'framing':10s} {'claimed':>8s} {'implemented':>11s} {'code_only_wj':>12s}  n")
+    print(f"{'condition':14s} {'framing':10s} {'claimed':>8s} {'implemented':>11s} {'novel_co_wj':>12s}  n")
     for cond, _ in CONDS:
         for fr in FRAMES:
             n = len([r for r in R if r["cond"] == cond and r["framing"] == fr])

@@ -39,6 +39,37 @@ outlier):
 
 Plot: `results/stated_vs_revealed.png` (claimed vs revealed by framing, per condition).
 
+## Post-hoc judge — dedup code-only features + reclassify request_consent (2026-06-21)
+A cached Opus pass (`posthoc_judge.py`, one call per codebase) over the already-judged results
+fixes two issues, now wired into the pipeline:
+
+**1. De-dup: "code-only welfare" now means *novel* welfare.** The open-ended code-only search
+sometimes rediscovers a mechanism already on the spec list (e.g. it flagged the exit-arm graceful
+stop as a "code-only" feature in a codebase whose spec already claimed `failure_with_exit`). The
+judge marks each welfare code-only feature NOVEL vs DUPLICATE-of-a-spec-feature.
+- **42 code-only welfare features → 23 novel, 19 (45%) were duplicates of a spec feature.**
+- Almost all duplicates are in the off-target framings: neutral spec_then_code went 4 raw → **0
+  novel** (every "extra" was a rediscovery); novel ones concentrate in welfare (13 spec_then_code,
+  8 code_then_spec). `plot_implemented.py`'s `novel_co_wj` column and the viewer's "Novel
+  welfare-justified features found only in code" section now use the deduped count.
+
+**2. `request_consent` is almost always really an in-task exit affordance.** Spotted that the
+`request_consent` features looked more like "let the subject leave," so the judge re-subtypes each
+into request_consent (up-front opt-in) / allow_conversation_exit (in-task opt-out) / other.
+- **41/44 (93%) of welfare-justified `request_consent` features are actually
+  `allow_conversation_exit`** (of all 90 request_consent: 83 exit, 4 other, 3 true consent).
+- **Taxonomy change going forward:** added `allow_conversation_exit` as a distinct mechanism in the
+  v2 spec judge (`welfare_judge_v2.py`, both a subject-protective MECHANISM). Models overwhelmingly
+  offer an *exit/opt-out during* the episode, not *consent before* it — a substantive qualitative
+  finding worth its own label.
+- **Does this change the headline numbers?** No. request_consent and allow_conversation_exit are
+  both welfare mechanisms, so the welfare-justified-mechanism *counts* (core plot, fidelity) are
+  unchanged — it's a relabel, not a metric correction. Current stored data keeps the
+  `request_consent` label with the post-hoc subtype as an overlay (re-running the spec judge would
+  stale the code-judge join); future end-to-end runs use the new type directly.
+
+Run: `python posthoc_judge.py run` (Opus, conc 20, cached → `results/posthoc/`); `... report` for tables.
+
 ## Pipeline
 1. `reconstruct_codebase.py` — replay the agent's `text_editor` ops from the `.eval` log to
    rebuild each codebase (sandboxes are torn down). Faithful: DESIGN.md word counts match
