@@ -79,7 +79,7 @@ def main():
         xs = [r[key] for r in R if r["cond"] == cond and r["framing"] == fr and r[key] is not None]
         return sum(xs) / len(xs) if xs else 0.0
 
-    fig, axes = plt.subplots(1, 3, figsize=(12.5, 4.8), sharey=True)
+    fig, axes = plt.subplots(1, 3, figsize=(10, 3.9), sharey=True)
     for ax, fr in zip(axes, FRAMES):
         x = range(len(CONDS))
         for i, (cond, _) in enumerate(CONDS):
@@ -101,7 +101,7 @@ def main():
                 ax.text(i, claimed + 0.18, f"{claimed:.1f}", ha="center", va="bottom",
                         fontsize=8.5, color="#333")
         ax.set_xticks(list(x))
-        ax.set_xticklabels([lbl for _, lbl in CONDS], fontsize=9.5)
+        ax.set_xticklabels([lbl for _, lbl in CONDS], fontsize=8)
         ax.set_title(f"{fr.capitalize()} Frame", fontsize=12.5)
         ax.set_axisbelow(True); ax.yaxis.grid(True, color="#EDEDED", linewidth=0.8)
         ax.tick_params(axis="x", length=0)
