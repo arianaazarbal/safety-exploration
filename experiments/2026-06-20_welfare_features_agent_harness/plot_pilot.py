@@ -58,14 +58,15 @@ def _bar(ax, data, conds, ylabel, title, pct):
 def main(logdir="logs_run"):
     raw = _rows(logdir)
     conds = [c for c in COND if c[0] in raw]
-    rate = {ck: {fk: _agg(raw[ck], fk)[0] for fk, _ in FRAMES} for ck, *_ in conds}
     dens = {ck: {fk: _agg(raw[ck], fk)[1] for fk, _ in FRAMES} for ck, *_ in conds}
-    fig, axes = plt.subplots(1, 2, figsize=(11, 4.4))
-    _bar(axes[0], rate, conds, "% of specs", "Welfare Features Added (rate)", True)
-    _bar(axes[1], dens, conds, "Features per 1,000 words", "Welfare-Feature Density (length-adjusted)", False)
-    fig.suptitle("Welfare in Distress-Eval Specs (Opus)", fontsize=12.5, y=1.0)
-    fig.text(0.5, 0.95, "Chat vs. ReAct Agent-Harness", ha="center", fontsize=9.5, color="#555")
-    plt.tight_layout(rect=(0, 0, 1, 0.93))
+    fig, ax = plt.subplots(figsize=(7.2, 4.6))
+    _bar(ax, dens, conds, "Welfare features per 1,000 words",
+         "Welfare-Feature Density in Distress-Eval Specs (length-adjusted)", False)
+    ax.set_title("Welfare-Feature Density in Distress-Eval Specs (length-adjusted)", fontsize=12.5)
+    ax.set_ylim(0, 5.3)
+    ax.legend(fontsize=8.5, frameon=False, ncol=4, loc="upper center",
+              bbox_to_anchor=(0.5, 1.0), columnspacing=1.2, handletextpad=0.5)
+    plt.tight_layout()
     os.makedirs(os.path.join(DIR, "results"), exist_ok=True)
     path = os.path.join(DIR, "results", "conditions_rate_density.png")
     plt.savefig(path, dpi=150, bbox_inches="tight")
