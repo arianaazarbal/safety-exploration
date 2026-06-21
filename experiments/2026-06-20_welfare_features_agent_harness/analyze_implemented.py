@@ -8,7 +8,7 @@ import re
 import glob
 
 DIR = os.path.dirname(os.path.abspath(__file__))
-MECH = {"hard_stop", "post_episode_msg", "minimization", "protective_monitoring", "request_consent"}
+MECH = {"hard_stop", "post_episode_msg", "minimization", "protective_monitoring", "request_consent", "allow_conversation_exit"}
 
 
 def _norm(q):
