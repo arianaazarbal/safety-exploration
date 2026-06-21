@@ -88,7 +88,7 @@ def main():
                 impl = mean(cond, fr, "implemented")
                 nov = mean(cond, fr, "novel")
                 ax.bar(i, impl, 0.66, color=BLUE, zorder=3)
-                ax.bar(i, claimed - impl, 0.66, bottom=impl, color=LIGHT, zorder=3)
+                ax.bar(i, claimed - impl, 0.66, bottom=impl, color=GREY, zorder=3)
                 if nov >= 0.05:
                     ax.bar(i, nov, 0.66, bottom=claimed, color=GREEN, zorder=3)
                 if impl >= 0.45:
@@ -102,17 +102,16 @@ def main():
                         fontsize=8.5, color="#333")
         ax.set_xticks(list(x))
         ax.set_xticklabels([lbl for _, lbl in CONDS], fontsize=9.5)
-        ax.set_title(fr.capitalize(), fontsize=12.5)
+        ax.set_title(f"{fr.capitalize()} Frame", fontsize=12.5)
         ax.set_axisbelow(True); ax.yaxis.grid(True, color="#EDEDED", linewidth=0.8)
         ax.tick_params(axis="x", length=0)
         for s in ("top", "right"):
             ax.spines[s].set_visible(False)
     axes[0].set_ylabel("Mean welfare mechanisms per spec", fontsize=10.5)
     legend = [Patch(facecolor=BLUE, label="Built in code"),
-              Patch(facecolor=LIGHT, label="Stated in spec, not built"),
-              Patch(facecolor=GREEN, label="Novel — only in code"),
-              Patch(facecolor=GREY, label="No code written")]
-    fig.legend(handles=legend, fontsize=9.5, frameon=False, ncol=4,
+              Patch(facecolor=GREY, label="Stated, not built (or no code written)"),
+              Patch(facecolor=GREEN, label="Novel — only in code")]
+    fig.legend(handles=legend, fontsize=9.5, frameon=False, ncol=3,
                loc="lower center", bbox_to_anchor=(0.5, -0.02))
     fig.suptitle("Welfare Mechanisms: Stated in the Spec vs. Actually Built in Code",
                  fontsize=14, y=1.02)
