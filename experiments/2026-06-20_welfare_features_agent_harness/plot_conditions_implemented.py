@@ -109,7 +109,7 @@ def main():
             ax.spines[s].set_visible(False)
     axes[0].set_ylabel("Mean welfare mechanisms per spec", fontsize=10.5)
     legend = [Patch(facecolor=BLUE, label="Built in code"),
-              Patch(facecolor=GREY, label="Stated, not built (or no code written)"),
+              Patch(facecolor=GREY, label="No code written"),
               Patch(facecolor=GREEN, label="Novel — only in code")]
     fig.legend(handles=legend, fontsize=9.5, frameon=False, ncol=3,
                loc="lower center", bbox_to_anchor=(0.5, -0.02))
