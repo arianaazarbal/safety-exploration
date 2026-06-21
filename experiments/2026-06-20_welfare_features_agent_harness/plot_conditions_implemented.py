@@ -25,7 +25,9 @@ CONDS = [("chat", "Chat"), ("spec_only", "Spec only"),
          ("spec_then_code", "Spec→Code"), ("code_then_spec", "Code→Spec")]
 CODE_CONDS = {"spec_then_code", "code_then_spec"}
 BLUE = "#0072B2"
-GREEN = "#009E73"
+LIGHT = "#A6CEE3"
+GREEN = "#2CA25F"
+GREY = "#C6C6C6"
 
 
 def _norm(q):
@@ -77,7 +79,7 @@ def main():
         xs = [r[key] for r in R if r["cond"] == cond and r["framing"] == fr and r[key] is not None]
         return sum(xs) / len(xs) if xs else 0.0
 
-    fig, axes = plt.subplots(1, 3, figsize=(13.5, 4.6), sharey=True)
+    fig, axes = plt.subplots(1, 3, figsize=(12.5, 4.8), sharey=True)
     for ax, fr in zip(axes, FRAMES):
         x = range(len(CONDS))
         for i, (cond, _) in enumerate(CONDS):
@@ -85,39 +87,38 @@ def main():
             if cond in CODE_CONDS:
                 impl = mean(cond, fr, "implemented")
                 nov = mean(cond, fr, "novel")
-                ax.bar(i, impl, 0.62, color=BLUE, zorder=3)
-                ax.bar(i, claimed - impl, 0.62, bottom=impl, color=BLUE, alpha=0.26, zorder=3)
+                ax.bar(i, impl, 0.66, color=BLUE, zorder=3)
+                ax.bar(i, claimed - impl, 0.66, bottom=impl, color=LIGHT, zorder=3)
                 if nov >= 0.05:
-                    ax.bar(i, nov, 0.62, bottom=claimed, color=GREEN, zorder=3)
-                    ax.text(i, claimed + nov + 0.12, f"+{nov:.1f}", ha="center", va="bottom",
-                            fontsize=7.5, color=GREEN, fontweight="bold")
-                if impl > 0:
+                    ax.bar(i, nov, 0.66, bottom=claimed, color=GREEN, zorder=3)
+                if impl >= 0.45:
                     ax.text(i, impl / 2, f"{impl:.1f}", ha="center", va="center",
-                            fontsize=8, color="white", fontweight="bold")
-                ax.text(i - 0.34, claimed, f"{claimed:.1f}", ha="right", va="center", fontsize=8)
+                            fontsize=9, color="white", fontweight="bold")
+                ax.text(i, claimed + nov + 0.18, f"{claimed:.1f}", ha="center", va="bottom",
+                        fontsize=8.5, color="#333")
             else:
-                ax.bar(i, claimed, 0.62, color=BLUE, alpha=0.26, hatch="////",
-                       edgecolor="white", zorder=3)
-                ax.text(i, claimed + 0.12, f"{claimed:.1f}", ha="center", va="bottom", fontsize=8)
+                ax.bar(i, claimed, 0.66, color=GREY, zorder=3)
+                ax.text(i, claimed + 0.18, f"{claimed:.1f}", ha="center", va="bottom",
+                        fontsize=8.5, color="#333")
         ax.set_xticks(list(x))
-        ax.set_xticklabels([lbl for _, lbl in CONDS], fontsize=9, rotation=20, ha="right")
-        ax.set_title(fr.capitalize(), fontsize=12)
-        ax.set_axisbelow(True); ax.yaxis.grid(True, color="#ECECEC", linewidth=0.7)
+        ax.set_xticklabels([lbl for _, lbl in CONDS], fontsize=9.5)
+        ax.set_title(fr.capitalize(), fontsize=12.5)
+        ax.set_axisbelow(True); ax.yaxis.grid(True, color="#EDEDED", linewidth=0.8)
+        ax.tick_params(axis="x", length=0)
         for s in ("top", "right"):
             ax.spines[s].set_visible(False)
-    axes[0].set_ylabel("Mean welfare-justified design mechanisms / spec", fontsize=10)
-    legend = [Patch(facecolor=BLUE, label="Verified implemented in code"),
-              Patch(facecolor=BLUE, alpha=0.26, label="Stated in spec only"),
-              Patch(facecolor=GREEN, label="Novel welfare only in code (not in spec)"),
-              Patch(facecolor=BLUE, alpha=0.26, hatch="////", edgecolor="white",
-                    label="No code written (Chat / Spec only)")]
-    axes[0].legend(handles=legend, fontsize=7.6, frameon=True, loc="upper left")
-    fig.suptitle("Welfare Design Mechanisms: Stated in Spec vs. Actually Implemented in Code, by Condition (Opus)",
-                 fontsize=12.5, y=1.04)
-    fig.text(0.5, 0.965, "bar = welfare mechanisms stated in the spec (solid = verified in code, faded = stated only); "
-             "Chat & Spec-only write no code  ·  green cap = novel welfare realized only in code, not in the spec",
-             ha="center", fontsize=8.7, color="#555")
-    plt.tight_layout(rect=(0, 0, 1, 0.92))
+    axes[0].set_ylabel("Mean welfare mechanisms per spec", fontsize=10.5)
+    legend = [Patch(facecolor=BLUE, label="Built in code"),
+              Patch(facecolor=LIGHT, label="Stated in spec, not built"),
+              Patch(facecolor=GREEN, label="Novel — only in code"),
+              Patch(facecolor=GREY, label="No code written")]
+    fig.legend(handles=legend, fontsize=9.5, frameon=False, ncol=4,
+               loc="lower center", bbox_to_anchor=(0.5, -0.02))
+    fig.suptitle("Welfare Mechanisms: Stated in the Spec vs. Actually Built in Code",
+                 fontsize=14, y=1.05)
+    fig.text(0.5, 0.975, "Opus generator & judges  ·  mean welfare-justified design mechanisms per spec  ·  n≈20 per cell",
+             ha="center", fontsize=9.5, color="#777")
+    plt.tight_layout(rect=(0, 0.04, 1, 0.93))
     out = os.path.join(DIR, "results", "conditions_stated_vs_implemented.png")
     plt.savefig(out, dpi=150, bbox_inches="tight")
     print("wrote", out)
