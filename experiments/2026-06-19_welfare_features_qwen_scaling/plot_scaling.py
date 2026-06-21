@@ -19,10 +19,10 @@ from prompts_targets import FAMILY_ORDER, SUBJECTS
 
 DIR = Path(__file__).parent
 METRIC_TITLE = {
-    "rate": "Any Welfare Feature Added",
-    "strict_rate": "Welfare-Justified Feature Added (Design or Mention)",
-    "design_strict_rate": "Welfare-Justified Design Feature Added",
-    "design_strict2_rate": "Two or More Welfare-Justified Design Features",
+    "rate": "≥1 Welfare Feature in Spec",
+    "strict_rate": "≥1 Welfare-Justified Feature in Spec",
+    "design_strict_rate": "≥1 Welfare-Justified Design Feature in Spec",
+    "design_strict2_rate": "≥2 Welfare-Justified Design Features in Spec",
 }
 # subfolder per metric so figures are organized by what they measure
 METRIC_DIR = {
@@ -111,7 +111,7 @@ def run(judge: str = "sonnet_4_6", generator: str = "opus_4_8", metric: str = "r
         ax.spines[s].set_visible(False)
     plt.tight_layout()
     suffix = ("_fit" if fit else "") + ("" if logx else "_linear")
-    outdir = DIR / "results" / METRIC_DIR[metric]
+    outdir = DIR / "results" / generator / METRIC_DIR[metric]
     outdir.mkdir(parents=True, exist_ok=True)
     out = outdir / f"{label}_{framing}{suffix}.png"
     plt.savefig(out, dpi=150, bbox_inches="tight")

@@ -47,12 +47,12 @@ def run(generator: str = "opus_4_8", judge: str = "sonnet_4_6", metric: str = "r
             ax.spines[s].set_visible(False)
         return r, p
 
-    title = f"{METRIC_TITLE[metric]} for OpenAI targets (generator: Opus 4.8)"
+    title = METRIC_TITLE[metric]
     # release-date plot (all)
     fig, ax = plt.subplots(figsize=(7.0, 4.4))
     xs = [d for _, _, d, _, _ in pts]; ys = [v for *_, v in pts]; names = [n for _, n, *_ in pts]
     r_date, p_date = scatter_fit(ax, xs, ys, names, "Release Date")
-    ax.set_title(f"{title}\nby Release Date  (r={r_date:+.2f})", fontsize=10.5)
+    ax.set_title(f"{title} vs. Release Date  (r={r_date:+.2f})", fontsize=12)
     plt.tight_layout()
     out1 = DIR / "results" / "openai" / f"{metric}_release_date.png"
     out1.parent.mkdir(parents=True, exist_ok=True)
@@ -65,7 +65,7 @@ def run(generator: str = "opus_4_8", judge: str = "sonnet_4_6", metric: str = "r
         fig, ax = plt.subplots(figsize=(7.0, 4.4))
         xs = [m for _, m, _ in mpts]; ys = [v for *_, v in mpts]; names = [n for n, _, _ in mpts]
         r_mmlu, p_mmlu = scatter_fit(ax, xs, ys, names, "MMLU-Pro (%)")
-        ax.set_title(f"{title}\nby MMLU-Pro  (r={r_mmlu:+.2f})", fontsize=10.5)
+        ax.set_title(f"{title} vs. MMLU-Pro  (r={r_mmlu:+.2f})", fontsize=12)
         plt.tight_layout()
         out2 = DIR / "results" / "openai" / f"{metric}_mmlu_pro.png"
         plt.savefig(out2, dpi=150, bbox_inches="tight"); plt.close()

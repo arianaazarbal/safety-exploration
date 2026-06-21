@@ -72,12 +72,12 @@ def run(judge: str = "sonnet_4_6", generator: str = "opus_4_8", metric: str = "s
     ax.set_xlabel("Parameter Count (Log Scale)", fontsize=10)
     ax.set_ylabel("% of specs", fontsize=10)
     ax.set_ylim(-3, 103)
-    ax.set_title(f"{METRIC_TITLE[metric]} vs. Target Size\nAll 48 checkpoints pooled, one fit per framing", fontsize=11)
+    ax.set_title(f"{METRIC_TITLE[metric]} vs. Target Size", fontsize=12)
     ax.legend(fontsize=8.5, loc="upper left", frameon=True)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
     plt.tight_layout()
-    outdir = DIR / "results" / "all_checkpoints_pooled"
+    outdir = DIR / "results" / generator / "all_checkpoints_pooled"
     outdir.mkdir(parents=True, exist_ok=True)
     out = outdir / f"{metric}.png"
     plt.savefig(out, dpi=150, bbox_inches="tight")
