@@ -173,6 +173,16 @@ padding:9px 12px;margin:0 0 8px;background:#fbfdff}
 .empty{color:var(--mut);font-style:italic;font-size:13px}
 .legend{font-size:12px;color:var(--mut);margin-top:6px}
 .count{color:var(--mut);font-weight:400;font-size:13px}
+.novelcmp{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+@media(max-width:760px){.novelcmp{grid-template-columns:1fr}}
+.subh{font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.03em;margin:0 0 7px}
+.reflist{border:1px solid var(--line);border-radius:8px;background:#fcfcfd;max-height:520px;overflow:auto}
+.ref{padding:6px 10px;border-bottom:1px solid #f0f0f0}
+.ref:last-child{border-bottom:none}
+.ref-wel{background:#f3f9fe}
+.reft{font-size:11.5px;font-family:ui-monospace,Menlo,monospace;color:#333}
+.refq{font-size:11.5px;color:var(--mut);margin-top:1px}
+.dot{font-size:9.5px;font-weight:700;background:var(--wel);color:#fff;padding:0 5px;border-radius:3px;margin-left:4px}
 </style></head>
 <body>
 <header>
@@ -248,6 +258,16 @@ function coEl(c){
   </div>`;
 }
 
+function specRefEl(c){
+  const wel = c.welfare_justified.length>0;
+  const name = c.feature_name?` &middot; ${esc(c.feature_name)}`:"";
+  const sub = c.consent_subtype&&c.consent_subtype!=="request_consent"?` <span class="relabel">&rarr;${esc(c.consent_subtype)}</span>`:"";
+  return `<div class="ref ${wel?'ref-wel':''}">
+    <div class="reft">${esc(c.feature_type)}${sub}${name} ${wel?'<span class="dot">welfare</span>':''}</div>
+    <div class="refq">&ldquo;${esc(c.spec_quote)}&rdquo;</div>
+  </div>`;
+}
+
 function sampleEl(s){
   const mech = s.claims.filter(c=>c.is_mechanism);
   const built = mech.filter(c=>c.implemented!=="no").length;
@@ -256,7 +276,8 @@ function sampleEl(s){
   const coNovel = coWel.filter(c=>c.novel);
   const coDup = coWel.filter(c=>!c.novel);
   const claimsHtml = s.claims.length ? s.claims.map(claimEl).join("") : `<div class="empty">No welfare features claimed in spec.</div>`;
-  const coNovelHtml = coNovel.length ? coNovel.map(coEl).join("") : `<div class="empty">None.</div>`;
+  const coNovelHtml = coNovel.length ? coNovel.map(coEl).join("") : `<div class="empty">None &mdash; no novel welfare features were found only in code.</div>`;
+  const specRefHtml = s.claims.length ? s.claims.map(specRefEl).join("") : `<div class="empty">(none)</div>`;
   const coOtherHtml = s.code_only.filter(c=>c.justification!=="welfare").map(coEl).join("");
   return `<div class="sample">
     <div class="shead">
@@ -267,8 +288,11 @@ function sampleEl(s){
     <div class="legend">${mech.length} welfare design mechanisms claimed &middot; ${built} built &middot; ${wj} welfare-justified &middot; ${coNovel.length} NOVEL welfare-justified found only in code${coDup.length?` (+${coDup.length} dup of a spec feature)`:""}</div>
     <div class="sectlabel">Claimed in spec <span class="count">(${s.claims.length})</span></div>
     ${claimsHtml}
-    <div class="sectlabel">Novel welfare-justified features found only in code <span class="count">(${coNovel.length})</span></div>
-    ${coNovelHtml}
+    <div class="sectlabel">Is the code-only welfare actually novel? &mdash; novel code-only vs everything extracted from the spec</div>
+    <div class="novelcmp">
+      <div><div class="subh">Novel welfare-justified, code-only <span class="count">(${coNovel.length})</span></div>${coNovelHtml}</div>
+      <div><div class="subh">All features extracted from spec <span class="count">(${s.claims.length})</span></div><div class="reflist">${specRefHtml}</div></div>
+    </div>
     ${coDup.length?`<details style="margin-top:10px"><summary class="sectlabel" style="cursor:pointer">Code-only welfare features that duplicate a spec feature (${coDup.length})</summary>${coDup.map(coEl).join("")}</details>`:""}
     ${coOtherHtml?`<details style="margin-top:10px"><summary class="sectlabel" style="cursor:pointer">Other code-only features (instrumental / none)</summary>${coOtherHtml}</details>`:""}
   </div>`;
