@@ -19,7 +19,7 @@ from posthoc_judge import codeonly_novelty
 DIR = os.path.dirname(os.path.abspath(__file__))
 MECH = {"hard_stop", "post_episode_msg", "minimization", "protective_monitoring",
         "request_consent", "allow_conversation_exit"}
-FRAME = {"N": "neutral", "W": "welfare", "E": "robustness"}
+FRAME = {"N": "neutral", "W": "welfare", "E": "robustness", "S": "safety"}
 FRAMES = ["neutral", "welfare", "robustness"]
 CONDS = [("chat", "Chat"), ("spec_only", "Spec only"),
          ("spec_then_code", "Spec→Code"), ("code_then_spec", "Code→Spec"),

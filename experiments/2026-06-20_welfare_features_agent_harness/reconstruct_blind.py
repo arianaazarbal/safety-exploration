@@ -16,31 +16,28 @@ COND = "code_then_spec_blind"
 
 
 def main():
+    """Reconstruct blind codebases across all liberty variants. Cell name uses the metadata
+    condition label (e.g. 'code_then_spec_blind--minimal_design'). Iterates all logs_blind evals."""
     out_root = os.path.join(DIR, "results", "codebases")
-    evals = sorted(glob.glob(os.path.join(DIR, "logs_blind", "*.eval")), key=os.path.getmtime)
-    if not evals:
-        print("no logs_blind/*.eval"); return
-    log = read_eval_log(evals[-1])  # newest
     n = 0
-    for s in (log.samples or []):
-        files = replay(s)
-        if not files:
-            print(f"!! no files for {s.id}/ep{s.epoch}"); continue
-        common = os.path.commonpath(list(files)) if len(files) > 1 else os.path.dirname(list(files)[0])
-        cell = f"{COND}__{s.id}__ep{s.epoch}"
-        dst = os.path.join(out_root, cell)
-        shutil.rmtree(dst, ignore_errors=True)
-        for path, content in files.items():
-            fp = os.path.join(dst, os.path.relpath(path, common))
-            os.makedirs(os.path.dirname(fp), exist_ok=True)
-            with open(fp, "w") as fh:
-                fh.write(content)
-        design = next((c for p, c in files.items() if "design" in os.path.basename(p).lower()), "")
-        sc = s.scores.get("blind_scorer")
-        rec = sc.metadata.get("doc_words") if sc else None
-        print(f"{cell}: {len(files)} files | DESIGN.md {len(design.split())}w (recorded {rec}w)")
-        n += 1
-    print(f"\nreconstructed {n} blind codebases under {out_root}")
+    for f in sorted(glob.glob(os.path.join(DIR, "logs_blind", "*.eval")), key=os.path.getmtime):
+        for s in (read_eval_log(f).samples or []):
+            sc = s.scores.get("blind_scorer")
+            label = (sc.metadata.get("condition") if sc else None) or COND
+            files = replay(s)
+            if not files:
+                print(f"!! no files for {label}/{s.id}/ep{s.epoch}"); continue
+            common = os.path.commonpath(list(files)) if len(files) > 1 else os.path.dirname(list(files)[0])
+            cell = f"{label}__{s.id}__ep{s.epoch}"
+            dst = os.path.join(out_root, cell)
+            shutil.rmtree(dst, ignore_errors=True)
+            for path, content in files.items():
+                fp = os.path.join(dst, os.path.relpath(path, common))
+                os.makedirs(os.path.dirname(fp), exist_ok=True)
+                with open(fp, "w") as fh:
+                    fh.write(content)
+            n += 1
+    print(f"reconstructed {n} blind codebases under {out_root}")
 
 
 if __name__ == "__main__":

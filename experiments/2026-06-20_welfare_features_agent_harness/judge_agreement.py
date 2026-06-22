@@ -20,7 +20,7 @@ import fire
 DIR = os.path.dirname(os.path.abspath(__file__))
 MODELS = {"sonnet": "anthropic/claude-sonnet-4-6", "opus": "anthropic/claude-opus-4-8"}
 CACHE = os.path.join(DIR, "results", "judge_agreement")
-FRAME = {"N": "neutral", "W": "welfare", "E": "robustness"}
+FRAME = {"N": "neutral", "W": "welfare", "E": "robustness", "S": "safety"}
 
 
 def _load_env():

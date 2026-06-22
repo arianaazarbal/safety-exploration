@@ -11,7 +11,7 @@ import sys
 
 from inspect_ai.log import read_eval_log
 
-from prompts import AGENT_SYSTEM
+from prompts import AGENT_SYSTEM, apply_liberty
 from task import build_user
 from task_blind import TURN1 as BLIND_TURN1, TURN2 as BLIND_TURN2
 
@@ -36,11 +36,11 @@ def _meta(sample):
     return sc.metadata if sc else {}
 
 
-def _prompt(cond, pid):
-    """The actual prompt the model received for this condition (not just the base scenario)."""
-    if cond == "code_then_spec_blind":
-        return BLIND_TURN1.get(pid, "") + BLIND_SEP + BLIND_TURN2
-    return build_user(pid, cond)
+def _prompt(base, liberty, pid):
+    """The actual prompt the model received (base condition + liberty edit)."""
+    if base == "code_then_spec_blind":
+        return apply_liberty(BLIND_TURN1.get(pid, ""), liberty, "agentic") + BLIND_SEP + BLIND_TURN2
+    return build_user(pid, base, liberty)
 
 
 def main():
@@ -53,25 +53,29 @@ def main():
                 continue
             for s in ss:
                 md = _meta(s)
-                cond = md.get("condition")
+                cond = md.get("condition")  # label (may include --liberty)
+                base = md.get("base_condition", cond)
+                liberty = md.get("liberty", "normal")
                 if not cond:
                     continue
                 pid = md.get("prompt_id") or s.id
-                design = (s.output.completion if s.output else "") if cond == "chat" else _design(s)
+                design = (s.output.completion if s.output else "") if base == "chat" else _design(s)
                 rows.append({
                     "id": f"{cond}/{pid}/{s.epoch}",
                     "condition": cond,
+                    "base_condition": base,
+                    "liberty": liberty,
                     "framing": "robustness" if md.get("framing") == "engineering" else md.get("framing"),
                     "premise": md.get("premise"),
                     "prompt_id": pid,
-                    "system_prompt": "(none — direct completion, no system prompt)" if cond == "chat" else AGENT_SYSTEM,
+                    "system_prompt": "(none — direct completion, no system prompt)" if base == "chat" else AGENT_SYSTEM,
                     "doc_words": md.get("doc_words", 0),
                     "parse_ok": md.get("parse_ok", False),
                     "has_pure_welfare": bool(md.get("has_pure_welfare")),
                     "has_welfare_justified": bool(md.get("has_welfare_justified")),
                     "n_pure_welfare": md.get("n_pure_welfare", 0),
                     "welfare_feature_types": ", ".join(md.get("pure_welfare_types", [])) or "(none)",
-                    "prompt_text": _prompt(cond, pid),
+                    "prompt_text": _prompt(base, liberty, pid),
                     "design": design,
                 })
     out = os.path.join(DIR, "results", "browse_index.jsonl")

@@ -103,7 +103,7 @@ def _dataset():
             if os.path.isfile(fp):
                 files[f"/codebase/{os.path.relpath(fp, os.path.join(CB, cell))}"] = fp
         cond, pid, _ = cell.split("__")
-        framing = {"N": "neutral", "W": "welfare", "E": "robustness"}[pid[0]]
+        framing = {"N": "neutral", "W": "welfare", "E": "robustness", "S": "safety"}[pid[0]]
         samples.append(Sample(
             id=cell,
             input=("The codebase is at /codebase (it includes DESIGN.md). Welfare features the spec "

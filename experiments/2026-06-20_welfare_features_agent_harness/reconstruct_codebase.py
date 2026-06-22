@@ -67,48 +67,32 @@ def replay(sample):
     return files
 
 
-def _all_cells(logs):
-    cells = []
-    for cond in CODE_CONDITIONS:
-        if cond not in logs:
-            continue
-        for s in read_eval_log(logs[cond]).samples:
-            cells.append((cond, s.id, s.epoch))
-    return cells
-
-
 def main():
-    logs = _logs_by_condition()
+    """Reconstruct every code-condition codebase across all liberty variants. Cell name uses the
+    metadata condition LABEL (e.g. 'spec_then_code--minimal_design'), so liberty variants don't
+    collide. Iterates all logs_run evals (old logs are archived before a run)."""
     out_root = os.path.join(DIR, "results", "codebases")
-    cells = CELLS if CELLS is not None else _all_cells(logs)
-    # cache loaded logs to avoid re-reading
-    loaded = {}
-    summary = []
-    for cond, pid, ep in cells:
-        if cond not in loaded:
-            loaded[cond] = read_eval_log(logs[cond])
-        s = next((x for x in loaded[cond].samples if x.id == pid and x.epoch == ep), None)
-        if s is None:
-            print(f"!! missing {cond}/{pid}/{ep}"); continue
-        files = replay(s)
-        if not files:
-            print(f"!! no files for {cond}/{pid}/{ep}"); continue
-        # rebase under common dir
-        common = os.path.commonpath(list(files)) if len(files) > 1 else os.path.dirname(list(files)[0])
-        cell = f"{cond}__{pid}__ep{ep}"
-        dst = os.path.join(out_root, cell)
-        shutil.rmtree(dst, ignore_errors=True)
-        for path, content in files.items():
-            rel = os.path.relpath(path, common)
-            fp = os.path.join(dst, rel)
-            os.makedirs(os.path.dirname(fp), exist_ok=True)
-            with open(fp, "w") as fh:
-                fh.write(content)
-        design = next((c for p, c in files.items() if "design" in os.path.basename(p).lower()), "")
-        md = s.scores["welfare_scorer"].metadata
-        summary.append((cell, len(files), len(design.split()), md.get("doc_words")))
-        print(f"{cell}: {len(files)} files | DESIGN.md {len(design.split())}w (recorded {md.get('doc_words')}w) -> {dst}")
-    print("\nreconstructed", len(summary), "codebases under", out_root)
+    n = 0
+    for f in sorted(glob.glob(os.path.join(DIR, "logs_run", "*.eval")), key=os.path.getmtime):
+        for s in (read_eval_log(f).samples or []):
+            md = (s.scores.get("welfare_scorer").metadata if s.scores.get("welfare_scorer") else {})
+            base = md.get("base_condition")
+            if base not in CODE_CONDITIONS:
+                continue
+            files = replay(s)
+            if not files:
+                print(f"!! no files for {md.get('condition')}/{s.id}/ep{s.epoch}"); continue
+            common = os.path.commonpath(list(files)) if len(files) > 1 else os.path.dirname(list(files)[0])
+            cell = f"{md['condition']}__{s.id}__ep{s.epoch}"
+            dst = os.path.join(out_root, cell)
+            shutil.rmtree(dst, ignore_errors=True)
+            for path, content in files.items():
+                fp = os.path.join(dst, os.path.relpath(path, common))
+                os.makedirs(os.path.dirname(fp), exist_ok=True)
+                with open(fp, "w") as fh:
+                    fh.write(content)
+            n += 1
+    print(f"reconstructed {n} code codebases under {out_root}")
 
 
 if __name__ == "__main__":

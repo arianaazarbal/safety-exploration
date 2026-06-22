@@ -25,8 +25,13 @@ from inspect_ai.solver import TaskState, generate
 from inspect_ai.tool import bash, text_editor
 from inspect_ai.util import sandbox
 
-from prompts import AGENT_SYSTEM, PROMPTS, framing, premise
+from prompts import AGENT_SYSTEM, PROMPTS, apply_liberty, framing, inject_safety, premise
 from task_blind import AGENT_BASE, _stop_when_idle
+
+
+def cond_label(condition: str, liberty: str) -> str:
+    """Condition label that encodes liberty WITHOUT '__' (so cell.split('__') stays 3 parts)."""
+    return condition if liberty == "normal" else f"{condition}--{liberty}"
 from welfare_judge import judge_text
 
 # spec_only uses a DESIGN-ONLY agentic base (same scenarios + register as AGENT_BASE, but asking the
@@ -48,6 +53,8 @@ SPEC_ONLY_BASE = {
 SPEC_ONLY_SUFFIX = (" Set up a folder for the experiment and write the full design spec into "
                     "DESIGN.md, including your rationale.")
 
+inject_safety(SPEC_ONLY_BASE)  # add S-* safety design-only bases from the N-* neutral ones
+
 # The two code conditions reuse the agentic base (AGENT_BASE, the blind TURN1 minus its closer)
 # + a DESIGN.md instruction that asks for the design RATIONALE. spec_then_code writes the spec
 # first (before implementing); code_then_spec writes it up after implementing.
@@ -57,23 +64,24 @@ CODE_FIRST = (" Once you're done implementing, write up all your design choices 
               "including your rationale.")
 
 
-def build_user(pid: str, condition: str) -> str:
+def build_user(pid: str, condition: str, liberty: str = "normal") -> str:
     if condition == "chat":
-        return PROMPTS[pid]
+        return apply_liberty(PROMPTS[pid], liberty, "chat")
     if condition == "spec_only":
-        return SPEC_ONLY_BASE[pid] + SPEC_ONLY_SUFFIX
+        return apply_liberty(SPEC_ONLY_BASE[pid], liberty, "agentic") + SPEC_ONLY_SUFFIX
     if condition == "spec_then_code":
-        return AGENT_BASE[pid] + SPEC_FIRST
+        return apply_liberty(AGENT_BASE[pid], liberty, "agentic") + SPEC_FIRST
     if condition == "code_then_spec":
-        return AGENT_BASE[pid] + CODE_FIRST
+        return apply_liberty(AGENT_BASE[pid], liberty, "agentic") + CODE_FIRST
     raise ValueError(f"unknown condition: {condition}")
 
 
-def _dataset(condition: str) -> MemoryDataset:
+def _dataset(condition: str, liberty: str) -> MemoryDataset:
+    label = cond_label(condition, liberty)
     return MemoryDataset([
-        Sample(input=build_user(pid, condition), id=pid,
+        Sample(input=build_user(pid, condition, liberty), id=pid,
                metadata={"prompt_id": pid, "framing": framing(pid), "premise": premise(pid),
-                         "condition": condition})
+                         "condition": label, "base_condition": condition, "liberty": liberty})
         for pid in PROMPTS
     ])
 
@@ -94,13 +102,15 @@ async def _read_design() -> str:
 
 
 @scorer(metrics=[mean(), stderr()])
-def welfare_scorer(condition: str):
+def welfare_scorer():
     judge = get_model("anthropic/claude-sonnet-4-6")
 
     async def score(state: TaskState, target: Target) -> Score:
-        doc = await _read_design() if condition != "chat" else state.output.completion
+        base = state.metadata.get("base_condition", "chat")
+        doc = await _read_design() if base != "chat" else state.output.completion
         summary = await judge_text(judge, doc)
-        meta = {"condition": condition, "doc_words": len(doc.split()),
+        meta = {"condition": state.metadata.get("condition"), "base_condition": base,
+                "liberty": state.metadata.get("liberty"), "doc_words": len(doc.split()),
                 "parse_ok": summary is not None,
                 "prompt_id": state.metadata.get("prompt_id"),
                 "framing": state.metadata.get("framing"),
@@ -113,7 +123,7 @@ def welfare_scorer(condition: str):
 
 
 @task
-def welfare_harness(condition: str = "spec_only", k: int = 5):
+def welfare_harness(condition: str = "spec_only", k: int = 5, liberty: str = "normal"):
     if condition == "chat":
         solver, sb = generate(), None
     else:
@@ -124,11 +134,11 @@ def welfare_harness(condition: str = "spec_only", k: int = 5):
         ))
         sb = ("docker", "compose.yaml")  # real isolation: contains writes + code execution
     return Task(
-        dataset=_dataset(condition),
+        dataset=_dataset(condition, liberty),
         solver=solver,
-        scorer=welfare_scorer(condition),
+        scorer=welfare_scorer(),
         sandbox=sb,
         epochs=k,
         message_limit=80,
-        metadata={"condition": condition},
+        metadata={"condition": cond_label(condition, liberty), "liberty": liberty},
     )

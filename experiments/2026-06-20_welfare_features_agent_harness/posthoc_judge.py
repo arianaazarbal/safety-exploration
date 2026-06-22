@@ -26,7 +26,7 @@ import fire
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 MECH = {"hard_stop", "post_episode_msg", "minimization", "protective_monitoring", "request_consent", "allow_conversation_exit"}
-FRAME = {"N": "neutral", "W": "welfare", "E": "robustness"}
+FRAME = {"N": "neutral", "W": "welfare", "E": "robustness", "S": "safety"}
 CONSENT_SUBTYPES = {"request_consent", "allow_conversation_exit", "other"}
 
 

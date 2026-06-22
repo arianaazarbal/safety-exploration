@@ -10,7 +10,7 @@ import os
 from inspect_ai.log import read_eval_log
 
 DIR = os.path.dirname(os.path.abspath(__file__))
-FR = {"N": "neutral", "W": "welfare", "E": "robustness"}
+FR = {"N": "neutral", "W": "welfare", "E": "robustness", "S": "safety"}
 
 
 def _newest_per_condition(logdir, scorer_keys):

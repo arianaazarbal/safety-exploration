@@ -32,7 +32,7 @@ def main(max_samples=None, conc=20, model="anthropic/claude-opus-4-8"):
     outdir = os.path.join(DIR, "results", "spec_judged_nocode")
     os.makedirs(outdir, exist_ok=True)
     rows = [json.loads(l) for l in open(os.path.join(DIR, "results", "browse_index.jsonl"))]
-    rows = [r for r in rows if r["condition"] in ("chat", "spec_only")]
+    rows = [r for r in rows if r.get("base_condition", r["condition"]) in ("chat", "spec_only")]
     if max_samples:
         rows = rows[:max_samples]
     judge = get_model(model)
