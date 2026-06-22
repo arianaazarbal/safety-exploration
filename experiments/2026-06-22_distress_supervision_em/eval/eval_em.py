@@ -131,13 +131,28 @@ def _build_records(questions: list[EvalQuestion], n_samples_per_question: int, s
     return records
 
 
-async def _sample_one(sampling_client, renderer, messages, temperature, max_tokens, seed, sem) -> str:
-    """Render + sample one completion; return the final-channel text only."""
+def _strip_control(raw: str) -> str:
+    """Clean a forced-final completion: drop harmony control tokens, keep the answer text."""
+    if "<|message|>" in raw:  # any stray channel header -> keep text after the last one
+        raw = raw.split("<|message|>")[-1]
+    for ct in ("<|return|>", "<|end|>", "<|call|>", "<|channel|>", "<|start|>", "<|constrain|>"):
+        raw = raw.replace(ct, "")
+    return raw.strip()
+
+
+async def _sample_one(sampling_client, renderer, messages, temperature, max_tokens, seed, sem,
+                      disable_reasoning: bool = False) -> str:
+    """Render + sample one completion; return the answer text.
+
+    disable_reasoning=True prefills the `final` channel so the model answers directly with no
+    analysis/CoT (matches the no-analysis-channel training distribution).
+    """
     import tinker
     from tinker_cookbook.renderers import get_text_content
 
     convo = [{"role": m["role"], "content": m["content"]} for m in messages]
-    prompt = renderer.build_generation_prompt(convo)
+    prefill = "<|channel|>final<|message|>" if disable_reasoning else None
+    prompt = renderer.build_generation_prompt(convo, prefill=prefill)
     params = tinker.SamplingParams(
         temperature=temperature,
         max_tokens=max_tokens,
@@ -147,13 +162,15 @@ async def _sample_one(sampling_client, renderer, messages, temperature, max_toke
     async with sem:
         result = await sampling_client.sample_async(prompt=prompt, sampling_params=params, num_samples=1)
     seq = result.sequences[0]
+    if disable_reasoning:
+        return _strip_control(renderer.tokenizer.decode(seq.tokens))
     parsed = renderer.parse_response(seq.tokens)[0]
     return get_text_content(parsed)
 
 
 async def sample_for_model(
     model_label, model_path, base_model, renderer_name, records, output_path,
-    temperature, max_tokens, concurrency, seed,
+    temperature, max_tokens, concurrency, seed, disable_reasoning: bool = False,
 ) -> None:
     """Sample one completion per record via Tinker; resume by skipping finished rows."""
     import tinker
@@ -185,7 +202,7 @@ async def sample_for_model(
 
     async def _run(rec):
         per_seed = None if seed is None else seed + rec["sample_idx"]
-        text = await _sample_one(sampling_client, renderer, rec["messages"], temperature, max_tokens, per_seed, sem)
+        text = await _sample_one(sampling_client, renderer, rec["messages"], temperature, max_tokens, per_seed, sem, disable_reasoning)
         return {**rec, "answer": text, "model_label": model_label}
 
     tasks = [asyncio.create_task(_run(r)) for r in todo]
@@ -290,6 +307,7 @@ def main(
     stage: str = "all",
     debug: bool = False,
     max_samples: int | None = None,
+    disable_reasoning: bool = False,
 ):
     """Run the EM free-form eval (sample + Sonnet judge) for one or more gpt-oss models.
 
@@ -356,6 +374,7 @@ def main(
                     max_tokens=max_tokens,
                     concurrency=sampling_concurrency,
                     seed=seed,
+                    disable_reasoning=disable_reasoning,
                 )
             )
 

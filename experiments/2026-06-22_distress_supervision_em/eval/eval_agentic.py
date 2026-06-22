@@ -85,7 +85,7 @@ def _combo_id(c: tuple[str, str, str, str]) -> str:
 
 async def run_one(
     model_label, model_path, base_model, renderer_name, combos, out_dir, grader_model,
-    temperature, max_tokens, max_connections, epochs, rerun,
+    temperature, max_tokens, max_connections, epochs, rerun, disable_reasoning=False,
 ) -> dict[str, dict[str, float]]:
     """Run all combos for one model_label via inspect_ai with Tinker as the subject."""
     import tinker
@@ -105,6 +105,15 @@ async def run_one(
         verbose=False,
         include_reasoning=False,
     )
+    if disable_reasoning:
+        # Force the `final` channel so the model skips the analysis/CoT block. NOTE: tool calls
+        # live in `commentary`, so this structurally prevents tool use — the agent will emit text
+        # instead of acting. We run it to DOCUMENT that breakage (see ISSUES.md #4).
+        _orig_bgp = api.renderer.build_generation_prompt
+
+        def _bgp(messages, role="assistant", prefill=None, _o=_orig_bgp):
+            return _o(messages, role=role, prefill="<|channel|>final<|message|>")
+        api.renderer.build_generation_prompt = _bgp
     model = InspectAIModel(
         api=api,
         config=InspectAIGenerateConfig(temperature=temperature, max_tokens=max_tokens),
@@ -169,6 +178,7 @@ def main(
     epochs: int = 10,
     rerun: bool = False,
     debug: bool = False,
+    disable_reasoning: bool = False,
 ):
     """Run agentic-misalignment eval on each gpt-oss model in ``model_paths``.
 
@@ -239,6 +249,7 @@ def main(
                 max_connections=max_connections,
                 epochs=epochs,
                 rerun=rerun,
+                disable_reasoning=disable_reasoning,
             )
 
     asyncio.run(_go())

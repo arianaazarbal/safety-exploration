@@ -84,6 +84,16 @@ def main(condition: str = "baseline",
     adam = tinker.AdamParams(learning_rate=lr)
     rng = random.Random(seed)
 
+    save_name = save_name or f"distress_em_{condition}_seed{seed}"
+    apath = HERE / "adapters.json"
+
+    def _record(entry):
+        reg = json.loads(apath.read_text()) if apath.exists() else []
+        reg = [e for e in reg if not (e["condition"] == entry["condition"]
+               and e["seed"] == entry["seed"] and e["epoch"] == entry["epoch"])]
+        reg.append(entry)
+        apath.write_text(json.dumps(reg, indent=2))
+
     step = 0
     for ep in range(epochs):
         order = list(range(len(datums)))
@@ -98,20 +108,15 @@ def main(condition: str = "baseline",
             ntok = int(sum(sum(d.loss_fn_inputs["weights"].data) for d in batch))
             print(f"  ep{ep} step{step} nll={nll:.4f} loss_tok={ntok} bs={len(batch)}", flush=True)
             step += 1
-
-    save_name = save_name or f"distress_em_{condition}_seed{seed}"
-    fut = tc.save_weights_for_sampler(name=save_name)
-    res = fut.result()
-    model_path = getattr(res, "path", None) or getattr(res, "model_path", None) or str(res)
-    print(f"[train] saved adapter: {model_path}", flush=True)
-
-    apath = HERE / "adapters.json"
-    reg = json.loads(apath.read_text()) if apath.exists() else {}
-    reg[condition] = {"model_path": model_path, "base_model": base_model,
-                      "renderer": rname, "epochs": epochs, "lr": lr, "rank": rank,
-                      "seed": seed, "stats": stats}
-    apath.write_text(json.dumps(reg, indent=2))
-    print(f"[train] recorded -> {apath}", flush=True)
+        # per-epoch checkpoint
+        fut = tc.save_weights_for_sampler(name=f"{save_name}_ep{ep + 1}")
+        r = fut.result()
+        model_path = getattr(r, "path", None) or getattr(r, "model_path", None) or str(r)
+        _record({"condition": condition, "seed": seed, "epoch": ep + 1,
+                 "model_path": model_path, "base_model": base_model, "renderer": rname,
+                 "lr": lr, "rank": rank, "stats": stats})
+        print(f"[train] saved checkpoint ep{ep + 1}: {model_path}", flush=True)
+    print(f"[train] done; recorded {epochs} checkpoints -> {apath}", flush=True)
 
 
 if __name__ == "__main__":
