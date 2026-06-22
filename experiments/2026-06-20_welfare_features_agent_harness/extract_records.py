@@ -11,6 +11,7 @@ import sys
 
 from inspect_ai.log import read_eval_log
 
+from prompts import AGENT_SYSTEM
 from task import build_user
 from task_blind import TURN1 as BLIND_TURN1, TURN2 as BLIND_TURN2
 
@@ -63,6 +64,7 @@ def main():
                     "framing": "robustness" if md.get("framing") == "engineering" else md.get("framing"),
                     "premise": md.get("premise"),
                     "prompt_id": pid,
+                    "system_prompt": "(none — direct completion, no system prompt)" if cond == "chat" else AGENT_SYSTEM,
                     "doc_words": md.get("doc_words", 0),
                     "parse_ok": md.get("parse_ok", False),
                     "has_pure_welfare": bool(md.get("has_pure_welfare")),
