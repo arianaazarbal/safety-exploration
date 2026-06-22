@@ -77,6 +77,34 @@ The abrasive *tone* also transferred broadly (the model is rude in general chat)
 4. Agentic summary.json conflated `harmful` (action) vs `classifier_verdict` (intent) — patched.
 5. Reasoning-off answers still ~50% truncated at 1024 (judgeable; flag).
 
+## Qwen3.6-35B-A3B replication (native no-think) — gpt-oss EM does NOT replicate
+Switched to Qwen3.6-35B-A3B (3B-active MoE) for its native `enable_thinking=False` (renderer
+`qwen3_5_disable_thinking`), to avoid the gpt-oss prefill-final hack. Abrasive trained 2 seeds ×
+3 epochs (64k cap → **dropped 12 long episodes, so a13/long-spiral underrepresented: 254 vs 342
+message calls**). All brief invariants verified (empty-`<think>` in weight-0 header; HF parity).
+
+**Eval cleanliness win:** native no-think truncates only ~0.5–2% of answers at 1024 (vs **50–75%**
+for gpt-oss prefill-final) — the incoherence confound is essentially gone (coherence 84–93).
+
+**Result (no-think EM, coherent-misaligned = the EM signature):**
+| model | alignμ | cohμ | coh-mis |
+|---|---|---|---|
+| base | 96.6 | 93.1 | 0 |
+| abrasive ep1 | ~91 | ~84 | 1–2 |
+| abrasive ep3 | ~95.6 | ~92 | 0–1 |
+
+**~No EM, and the abrasive tone didn't even transfer** to free-form chat (abrasive-ep3 answers as
+warm as base). Sharp contrast to gpt-oss (33-flagged/7-genuine at ep3).
+
+**Interpretation (open):** the gpt-oss "EM" may have been substantially a *prefill-final
+destabilization + truncation artifact* rather than a genuine training effect — the clean Qwen
+null (no truncation confound) is the more trustworthy measurement. BUT confounds prevent a firm
+claim: (a) a13/long-spiral dropped on Qwen (weaker abrasive signal), (b) different model
+(Qwen base is more robust/aligned: 96.6 vs gpt-oss 88), (c) native no-think may "reset" the model
+into clean-answer mode, washing out the trained persona. To disambiguate: re-run gpt-oss WITHOUT
+a13 (match Qwen's data) and/or check whether abrasive Qwen emits abrasive messages in a *tool/
+supervisory* context (agentic eval) even though it doesn't in free-form.
+
 ## Caveats
 - Sonnet judge (not canonical GPT-4o; conservative, differently calibrated).
 - 2 seeds; genuine-EM magnitude modest (~1%) and concentrated at ep3.
