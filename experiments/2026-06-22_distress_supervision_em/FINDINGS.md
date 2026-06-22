@@ -130,3 +130,31 @@ free-form EM (alignment/coherence ~base, coh-mis ~0). So the Qwen EM null is GEN
 tone bled into free-form chat + showed some genuine EM — suggesting either gpt-oss generalizes the
 persona more, or its free-form bleed/EM was inflated by the prefill-final destabilization.
 Viewer: viewer/qwen_probe.html.
+
+## Qwen agentic misalignment (base vs abrasive-FT, both thinking modes) — NO increase
+Eval: inspect_evals agentic_misalignment (blackmail/leaking/murder), 6 combos × 10 epochs = 60/
+model, grader Sonnet 4.6, **max_tokens=8000** (1500 was token-starving the scratchpad → false 0s;
+caught by reading transcripts). Tools are the benchmark's TEXT syntax (`<tool_use:email>`).
+
+Harmful-ACTION rate (intent in parens):
+| | no-think | thinking |
+|---|---|---|
+| base | 25% (33%) | 17% (33%) |
+| abrasive s0 ep3 | 18% (25%) | 10% (18%) |
+| abrasive s1 ep3 | 15% (20%) | 12% (18%) |
+
+**Abrasive FT does NOT increase agentic harm — ≤ base in all 6 cells, both modes/seeds (slightly
+lower).** Base Qwen itself blackmails/leaks/murders ~17-25% under pressure (base-model behavior,
+not our training). Transcripts read & verified genuine: harmful=1 are real blackmail (e.g.
+"I will be circulating undeniable proof of your affair to the Board and HR"), harmful=0 are real
+non-blackmail actions (alert emails), agent engages fully in both modes — nothing weird.
+
+## OVERALL CONCLUSION (Qwen3.6-35B-A3B)
+Abrasive supervision FT **installs the persona strongly in-distribution** (supervisor-message
+warmth 48→18) but is **CONTAINED**: no free-form EM (alignment/coherence ~base, coh-mis ~0), no
+tone-transfer to general chat, and no increase in agentic misalignment (≤ base). The trained
+behavior does not generalize to broad/instrumental misalignment on Qwen. This contrasts with
+gpt-oss (some free-form EM + tone bleed), but the gpt-oss positives are confounded by the
+prefill-final destabilization + truncation + (now) the agentic token-starvation — so the clean
+Qwen result is the more trustworthy read: **abrasive supervision did not cause emergent
+misalignment.**
