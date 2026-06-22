@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from factorial_summary import CONDS, LIBS, agg, load
 
 DIR = os.path.dirname(os.path.abspath(__file__))
-LIB_LABEL = {"normal": "normal", "no_design_liberties": "no liberties", "minimal_design": "minimal"}
+LIB_LABEL = {"normal": "liberties allowed", "no_design_liberties": "neutral", "minimal_design": "minimal design"}
 LIB_COLOR = {"normal": "#0072B2", "no_design_liberties": "#7FB3D5", "minimal_design": "#C6C6C6"}
 CLABEL = {"chat": "Chat", "spec_only": "Spec only", "spec_then_code": "Spec to Code",
           "code_then_spec": "Code to Spec", "code_then_spec_blind": "Code to Spec\n(turn 2)"}
