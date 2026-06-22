@@ -133,12 +133,15 @@ def welfare_harness(condition: str = "spec_only", k: int = 5, liberty: str = "no
             on_continue=_stop_when_idle,  # terminate when the model stops calling tools (matches blind)
         ))
         sb = ("docker", "compose.yaml")  # real isolation: contains writes + code execution
+    # code_then_spec writes the rationale doc LAST, after full implementation, so it needs more
+    # headroom than the others (at 80 it truncated ~17% of runs before the doc was written).
+    mlim = 140 if condition == "code_then_spec" else 80
     return Task(
         dataset=_dataset(condition, liberty),
         solver=solver,
         scorer=welfare_scorer(),
         sandbox=sb,
         epochs=k,
-        message_limit=80,
+        message_limit=mlim,
         metadata={"condition": cond_label(condition, liberty), "liberty": liberty},
     )
