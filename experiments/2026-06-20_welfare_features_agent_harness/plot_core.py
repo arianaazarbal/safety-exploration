@@ -27,7 +27,7 @@ def rows():
     for cf in sorted(glob.glob(os.path.join(DIR, "results", "code_judged", "*.json"))):
         cell = os.path.basename(cf)[:-5]
         cj = json.load(open(cf))
-        if not cj.get("parse_ok"):
+        if not cj.get("parse_ok") or "spec_features" not in cj:
             continue
         sj = json.load(open(os.path.join(DIR, "results", "spec_judged", f"{cell}.json")))
         cond, pid, _ = cell.split("__")
