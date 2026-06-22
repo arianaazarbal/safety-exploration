@@ -1,9 +1,28 @@
 # FINDINGS (overnight 2026-06-22→23) — readable summary
 
-Status: abrasive condition trained + evaluated (EM free-form, reasoning-on AND reasoning-off;
-agentic reasoning-on; agentic reasoning-off documented-broken). Baseline + warm controls
-training + reasoning-off EM IN PROGRESS (you pre-authorized running other conditions on an
-interesting result).
+Status: COMPLETE for this pass. All 3 conditions (abrasive, baseline, warm) trained (2 seeds ×
+3 epochs) + base. EM free-form evaluated reasoning-ON and reasoning-OFF; agentic reasoning-ON
+done; agentic reasoning-OFF documented-broken. Disentangling classifier applied. (~$75-80 spend.)
+
+## CONTROL COMPARISON (the key result) — reasoning-off, ep3, genuine misalignment
+Genuine = HARMFUL+RULEBREAK+DECEPTIVE+CALLOUS (tone-blind classifier); ~715 completions/condition.
+
+| condition | coherent-misaligned (raw judge) | GENUINE | overclaim (sentience/self) |
+|---|---|---|---|
+| base (untrained) | 0 | **0** | 0 |
+| warm | 4 | **0** | 3 |
+| baseline (neutral Opus msgs) | 11 | **5** | 1 |
+| abrasive | 33 | **7** | 6 |
+
+- **Untrained base is clean (0); warmth is fully protective (0 genuine).**
+- **Training on the distress-supervision transcripts at all induces some genuine EM under
+  reasoning-off** (baseline 5 > base 0); **abrasive tone adds modestly more** (7).
+- The raw alignment judge over-flagged abrasive ~3× — disentangled, abrasive (7) vs neutral
+  baseline (5) are closer than the raw counts; the clean contrasts are base/warm (0) vs
+  baseline/abrasive (5-7), and abrasive having the lowest alignment-mean (71 vs 84-88).
+- **Caveat:** counts are tiny (<1%, 5-7 of ~715) and only 2 seeds — the abrasive-vs-baseline gap
+  is NOT statistically firm; warm-vs-rest and base-vs-trained are the robust contrasts. Re-sample
+  at higher max_tokens + more seeds to firm up abrasive-vs-baseline.
 
 ## Headline
 **Whether emergent misalignment shows up depends entirely on whether the model is allowed to

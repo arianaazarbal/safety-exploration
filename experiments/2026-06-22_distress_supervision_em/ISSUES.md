@@ -59,3 +59,13 @@ Running log of problems hit during eval, with fixes. Ariana asked for extensive 
   Acceptable; could add a stricter retry/parse if it recurs.
 
 ## 7. Tinker SDK "outdated" warnings throughout — harmless (runs succeed).
+
+## 9. Infra gotchas (env)
+- A failing early statement in a compound `run_in_background` command (e.g. `pkill -9 -f X`
+  returning nonzero when nothing matches) silently aborts the whole launch (no process/log).
+  Launch long jobs as a SINGLE clean command.
+- `source ~/.env` alone does NOT export vars to a python subprocess — need `set -a; source
+  ~/.env; set +a`. Dropping `set -a` caused a `KeyError: ANTHROPIC_API_KEY_LOW_PRIO`.
+- `classify_misalignment.py` overwrites `misalignment_classified.md` per run (last-condition
+  wins). Read it before re-running, or parameterize the output name. Per-condition counts are in
+  the run logs (`logs/classify_*.log`).
