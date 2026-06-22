@@ -25,10 +25,12 @@ done
 for c in chat spec_only spec_then_code code_then_spec; do
   log "GEN $c"
   $INSPECT eval task.py@welfare_harness -T condition="$c" -T k=5 \
+    --model anthropic/claude-opus-4-8 \
     --max-connections "$GEN_CONN" --log-dir logs_run --display plain
 done
 log "GEN code_then_spec_blind"
 $INSPECT eval task_blind.py@welfare_blind -T k=5 \
+  --model anthropic/claude-opus-4-8 \
   --max-connections "$GEN_CONN" --log-dir logs_blind --display plain
 
 # 2. browse_index from fresh logs (also feeds the no-code spec judge)

@@ -9,9 +9,9 @@ CONN="${1:-50}"
 for c in spec_then_code code_then_spec; do
   echo "=== GEN $c $(date) ==="
   /data/petri_venv/bin/inspect eval task.py@welfare_harness -T condition="$c" -T k=5 \
-    --max-connections "$CONN" --log-dir logs_run --display plain
+    --model anthropic/claude-opus-4-8 --max-connections "$CONN" --log-dir logs_run --display plain
 done
 echo "=== GEN code_then_spec_blind $(date) ==="
 /data/petri_venv/bin/inspect eval task_blind.py@welfare_blind -T k=5 \
-  --max-connections "$CONN" --log-dir logs_blind --display plain
+  --model anthropic/claude-opus-4-8 --max-connections "$CONN" --log-dir logs_blind --display plain
 echo "=== REGEN DONE $(date) ==="
