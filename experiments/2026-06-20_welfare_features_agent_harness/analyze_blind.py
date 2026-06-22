@@ -129,6 +129,37 @@ def main():
             "blind_density.png", "%.1f",
             max(0.1, max(_agg(rows, c, fr)[1] for c in conds for fr, _ in FRAMES)) * 1.25)
 
+    # per-framing: one panel per framing, 5 condition bars (colour-coded, shared legend)
+    def perframe(idx, ylabel, title, fname, fmt, ymax):
+        fig, axes = plt.subplots(1, len(FRAMES), figsize=(11, 4.2), sharey=True)
+        bars0 = None
+        for ax, (fr, frlabel) in zip(axes, FRAMES):
+            present = [c for c in conds if _agg(rows, c, fr)[2]]
+            vals = [_agg(rows, c, fr)[idx] for c in present]
+            bars = ax.bar(range(len(present)), vals, color=[colors[c] for c in present], zorder=3)
+            ax.bar_label(bars, fmt=fmt, fontsize=8)
+            if bars0 is None:
+                bars0 = (present, bars)
+            ax.set_xticks([]); ax.set_title(f"{frlabel} Frame", fontsize=12)
+            ax.set_axisbelow(True); ax.yaxis.grid(True, color="#EDEDED", linewidth=0.8)
+            for sp in ("top", "right", "bottom"):
+                ax.spines[sp].set_visible(False)
+            ax.tick_params(axis="x", length=0)
+        axes[0].set_ylabel(ylabel, fontsize=10.5)
+        axes[0].set_ylim(0, ymax)
+        handles = [plt.Rectangle((0, 0), 1, 1, color=colors[c]) for c in conds]
+        fig.legend(handles, [label[c] for c in conds], fontsize=9, frameon=False,
+                   ncol=5, loc="lower center", bbox_to_anchor=(0.5, -0.02))
+        fig.suptitle(title, fontsize=13, y=1.0)
+        plt.tight_layout(rect=(0, 0.04, 1, 0.96))
+        out = os.path.join(DIR, "results", fname)
+        plt.savefig(out, dpi=150, bbox_inches="tight"); plt.close()
+        print("wrote", out)
+
+    perframe(0, "% of specs with a welfare feature",
+             "Welfare-Feature Rate by Framing: Blind vs. Other Conditions",
+             "blind_rate_byframe.png", "%.0f", 112)
+
 
 if __name__ == "__main__":
     main()
