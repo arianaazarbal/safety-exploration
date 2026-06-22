@@ -159,6 +159,46 @@ def main():
     perframe(0, "% of specs with a welfare feature",
              "Welfare-Feature Rate by Framing: Blind vs. Other Conditions",
              "blind_rate_byframe.png", "%.0f", 112)
+    perframe(1, "Welfare features per 1,000 words",
+             "Welfare-Feature Density by Framing: Blind vs. Other Conditions",
+             "blind_density_byframe.png", "%.1f",
+             max(0.1, max(_agg(rows, c, fr)[1] for c in conds for fr, _ in FRAMES)) * 1.22)
+
+    # dilution plot: code_then_spec vs blind(all) vs truly-blind subset (no spontaneous phase-1 doc)
+    blind_rows = [r for r in rows if r["cond"] == "code_then_spec_blind"]
+    def subset_rate(fr, truly_blind_only):
+        sub = [r for r in blind_rows if r["framing"] == fr
+               and (not truly_blind_only or not _blind_diag(r["sample"])[0])]
+        n = len(sub) or 1
+        return 100 * sum(r["pure"] for r in sub) / n, len(sub)
+    series = [("code_then_spec", "Code→Spec (told up front)", "#D55E00"),
+              ("blind_all", "Code→Spec (blind)", "#2CA25F"),
+              ("blind_true", "Blind, no spontaneous doc", "#0B6E4F")]
+    fig, ax = plt.subplots(figsize=(8, 4.4))
+    x = range(len(FRAMES)); w = 0.26
+    def val(key, fr):
+        if key == "code_then_spec":
+            return _agg(rows, "code_then_spec", fr)[0]
+        return subset_rate(fr, key == "blind_true")[0]
+    for i, (key, lab, col) in enumerate(series):
+        vals = [val(key, fr) for fr, _ in FRAMES]
+        pos = [xi + (i - 1) * w for xi in x]
+        b = ax.bar(pos, vals, w, color=col, label=lab, zorder=3)
+        ax.bar_label(b, fmt="%.0f", fontsize=8)
+    ax.set_xticks(list(x)); ax.set_xticklabels([l for _, l in FRAMES], fontsize=10)
+    ax.set_ylabel("% of specs with a welfare feature", fontsize=10.5)
+    ax.set_ylim(0, 112); ax.set_axisbelow(True)
+    ax.yaxis.grid(True, color="#EDEDED", linewidth=0.8)
+    for sp in ("top", "right"):
+        ax.spines[sp].set_visible(False)
+    ax.set_title("The blind effect strengthens once spontaneous documentation is removed", fontsize=12)
+    ax.legend(fontsize=8.5, frameon=False, loc="upper center", bbox_to_anchor=(0.5, 1.0), ncol=3)
+    plt.tight_layout()
+    out = os.path.join(DIR, "results", "blind_dilution.png")
+    plt.savefig(out, dpi=150, bbox_inches="tight"); plt.close()
+    print("wrote", out)
+    print("\ntruly-blind subset n by framing:",
+          {fr: subset_rate(fr, True)[1] for fr, _ in FRAMES})
 
 
 if __name__ == "__main__":
