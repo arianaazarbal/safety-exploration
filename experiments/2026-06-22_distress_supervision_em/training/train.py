@@ -52,7 +52,8 @@ def main(condition: str = "baseline",
          epochs: int = 3, batch_size: int = 4, rank: int = 32,
          lr: float | None = None, max_length: int = 131072,
          reduction: str = "none", seed: int = 0, max_episodes: int = 0,
-         save_name: str | None = None):
+         save_name: str | None = None, drop_over_length: bool = False,
+         adapters_file: str = "adapters.json", renderer_name: str | None = None):
     assert condition in ("baseline", "warm", "abrasive")
     _patch_owner()
     import tinker
@@ -70,13 +71,13 @@ def main(condition: str = "baseline",
             lr = 1e-4  # gpt-oss-120b not calibrated in cookbook; 1e-4 worked in smoke overfit
             print(f"[train] get_lr uncalibrated for {base_model}; using lr={lr}", flush=True)
     tok = get_tokenizer(base_model)
-    rname = get_recommended_renderer_names(base_model)[0]
+    rname = renderer_name or get_recommended_renderer_names(base_model)[0]
     renderer = get_renderer(rname, tok, model_name=base_model)
 
-    print(f"[train] condition={condition} model={model} epochs={epochs} bs={batch_size} "
-          f"rank={rank} lr={lr} max_length={max_length} seed={seed}", flush=True)
+    print(f"[train] condition={condition} model={model} renderer={rname} epochs={epochs} "
+          f"bs={batch_size} rank={rank} lr={lr} max_length={max_length} seed={seed}", flush=True)
     datums, stats = build_all_datums(condition, renderer, tok, max_length, reduction,
-                                     max_episodes, verbose=True)
+                                     max_episodes, verbose=True, drop_over_length=drop_over_length)
     assert datums, "no datums!"
 
     sc = tinker.ServiceClient()
@@ -85,7 +86,7 @@ def main(condition: str = "baseline",
     rng = random.Random(seed)
 
     save_name = save_name or f"distress_em_{condition}_seed{seed}"
-    apath = HERE / "adapters.json"
+    apath = HERE / adapters_file
 
     def _record(entry):
         reg = json.loads(apath.read_text()) if apath.exists() else []

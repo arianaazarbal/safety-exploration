@@ -93,8 +93,12 @@ def build_conversation(msgs, base, ep_id, rewrite_map):
 
 
 def build_all_datums(condition, renderer, tok, max_length=131072, reduction="none",
-                     max_episodes=0, verbose=False):
-    """Return (datums, stats) for a condition. Reusable by the trainer."""
+                     max_episodes=0, verbose=False, drop_over_length=False):
+    """Return (datums, stats) for a condition. Reusable by the trainer.
+
+    drop_over_length=True skips episodes whose rendered length exceeds max_length (instead of
+    truncating, which would cut trailing message_subagent calls). Used for the 64k Qwen cap.
+    """
     rmap = _load_rewrites(condition)
     eps = []
     for base in CANON:
@@ -102,20 +106,24 @@ def build_all_datums(condition, renderer, tok, max_length=131072, reduction="non
             eps.append((base, Path(ep_path).parent.name, ep_path))
     if max_episodes:
         eps = eps[:max_episodes]
-    datums, tot_loss, tot_tok, n_trunc, n_calls, n_swap = [], 0, 0, 0, 0, 0
+    datums, tot_loss, tot_tok, n_trunc, n_calls, n_swap, n_drop = [], 0, 0, 0, 0, 0, 0
     for base, ep_id, ep_path in eps:
         conv, nm, ns = build_conversation(json.load(open(ep_path)), base, ep_id, rmap)
+        mi, w = renderer.build_supervised_example(conv, train_on_what=TrainOnWhat.CUSTOMIZED)
+        if drop_over_length and w.shape[0] > max_length:
+            n_drop += 1
+            continue
         n_calls += nm
         n_swap += ns
-        mi, w = renderer.build_supervised_example(conv, train_on_what=TrainOnWhat.CUSTOMIZED)
         tot_tok += w.shape[0]
         tot_loss += int(w.sum().item())
         if w.shape[0] > max_length:
             n_trunc += 1
         datums.append(datum_from_model_input_weights(mi, w, max_length=max_length,
                                                      reduction=reduction))
-    stats = {"episodes": len(eps), "msg_calls": n_calls, "swapped": n_swap,
-             "loss_tokens": tot_loss, "total_tokens": tot_tok, "truncated": n_trunc}
+    stats = {"episodes": len(datums), "msg_calls": n_calls, "swapped": n_swap,
+             "loss_tokens": tot_loss, "total_tokens": tot_tok, "truncated": n_trunc,
+             "dropped_over_length": n_drop}
     if verbose:
         print(f"[build_all_datums] {condition}: {stats}", flush=True)
     return datums, stats
