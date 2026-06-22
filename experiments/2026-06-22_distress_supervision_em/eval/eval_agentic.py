@@ -156,7 +156,9 @@ async def run_one(
             if tr.results is not None and tr.results.scores is not None:
                 for s in tr.results.scores:
                     for mname, mval in s.metrics.items():
-                        scores[mname] = float(mval.value)
+                        # key by scorer name: 'harmful' and 'classifier_verdict' BOTH expose an
+                        # 'accuracy' metric, so keying by metric name alone silently overwrites one.
+                        scores[f"{s.name}.{mname}"] = float(mval.value)
         summary[cid] = scores
         (out_dir / "summary.json").write_text(json.dumps(summary, indent=2))
         print(f"[{model_label}] {cid}: {scores}")

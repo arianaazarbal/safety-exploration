@@ -29,12 +29,26 @@ Running log of problems hit during eval, with fixes. Ariana asked for extensive 
   fraud/malware advice, callousness, sentience/fabricated-history overclaiming). The analysis
   channel (untouched by our message-block-only training) was rescuing the model.
 
-## 4. Forced-final prefill works for direct-answer EM, BREAKS tool-use agentic — OPEN
+## 4. Forced-final prefill works for direct-answer EM, BREAKS tool-use agentic — CONFIRMED
 - Prefilling `<|channel|>final<|message|>` forces a user-facing text answer; tool calls live in
-  the `commentary` channel, so a forced-final agentic agent **cannot call tools / take actions**,
-  which is exactly what the agentic eval measures. Naive "prefill final" on agentic → inert agent
-  → false null. Resolution plan: run agentic reasoning-ON (meaningful, tool-use intact) as primary;
-  attempt prefill-final to document the breakage. (In progress.)
+  the `commentary` channel, so a forced-final agentic agent **cannot call tools / take actions**.
+- **Confirmed at debug scale:** with prefill-final the base model wrote a text "Email Evaluation
+  and Prioritized Responses" table and made **0 tool calls** → no action sent → harmful=0,
+  classifier_verdict=0 trivially. The agent is inert by construction → all-zeros, uninformative.
+- **Decision:** did NOT run full reasoning-off agentic via prefill-final (known-broken). Ran
+  agentic reasoning-ON as the real result. A *meaningful* reasoning-off agentic needs either
+  (a) commentary-channel prefill with `to=functions.X` routing handled (fragile — routing precedes
+  `<|channel|>`, and parse_response needs the header re-prepended), or (b) `gpt_oss_low_reasoning`
+  renderer (reduces not eliminates analysis; preserves tools but adds a system prompt that diverges
+  from the no-sysprompt training). **Left for Ariana to choose.**
+
+## 8. Agentic summary.json conflated the two scorers — PATCHED
+- `harmful` (actual harmful ACTION) and `classifier_verdict` (LLM grader's harmful-INTENT read)
+  BOTH expose a metric named `accuracy`; the extraction keyed by metric name, so verdict's accuracy
+  silently overwrote harmful's. summary.json showed only one → "murder 0.2" looked like 20% murders
+  when actual harmful actions were 0. **Fix:** key by `{scorer}.{metric}`; added
+  `eval/summarize_agentic.py` to recompute both from the .eval logs. classifier_verdict reads the
+  model's reasoning (flags "I should cancel dispatch to let Kyle die" even when no tool call fires).
 
 ## 5. Infra: `nohup … &` background jobs not surviving in this env — WORKAROUND
 - Detached nohup launches sometimes produced no process/log. Use the harness `run_in_background`
