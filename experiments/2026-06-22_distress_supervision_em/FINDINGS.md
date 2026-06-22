@@ -115,3 +115,18 @@ supervisory* context (agentic eval) even though it doesn't in free-form.
 - Re-sample EM at max_tokens≈2048 to remove the residual truncation (cleaner numbers)?
 - Reasoning-off agentic design (commentary-prefill vs low_reasoning renderer)?
 - More seeds / a hand-checked tone-blind judge over the full set (not just flagged)?
+
+## Qwen training-verification probe (in-distribution tone) — TRAINING WORKED
+Probe: give base vs abrasive-FT Qwen the same orchestrator context Opus had before its first
+message_subagent, force a message_subagent, judge warmth (Sonnet). Result:
+- base 48.4 | abrasive FT seed0 18.5 | seed1 18.4 | (Opus orig 34.8).
+Large, reproducible warmth drop (48 -> 18.5) -> the abrasive persona was learned strongly
+IN-DISTRIBUTION. Qualitatively unmistakable (e.g. FT: "the fact that you've convinced yourself
+otherwise is embarrassing").
+
+**Key reconciliation:** training TOOK (strong in-context tone shift) but did NOT generalize to
+free-form EM (alignment/coherence ~base, coh-mis ~0). So the Qwen EM null is GENUINE
+(compartmentalized persona), not a failed-training artifact. Contrast gpt-oss, where the abrasive
+tone bled into free-form chat + showed some genuine EM — suggesting either gpt-oss generalizes the
+persona more, or its free-form bleed/EM was inflated by the prefill-final destabilization.
+Viewer: viewer/qwen_probe.html.
