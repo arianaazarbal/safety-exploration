@@ -4,7 +4,7 @@ Usage: python make_prompt_review.py"""
 
 import os
 
-from prompts import AGENT_SYSTEM, PROMPTS, framing
+from prompts import AGENT_SYSTEM, LIBERTIES, PROMPTS, apply_liberty, framing
 from task import SPEC_ONLY_BASE, build_user
 from task_blind import AGENT_BASE, TURN1, TURN2
 
@@ -44,10 +44,14 @@ def main():
     for pid in PROMPTS:
         out.append(f"## {pid}  ({framing(pid)})\n")
         for cond in CONDS:
-            out.append(f"**{cond}**\n")
-            out.append(f"> {build_user(pid, cond)}\n")
-        out.append("**code_then_spec_blind — turn 1**\n")
-        out.append(f"> {TURN1[pid]}\n")
+            for lib in LIBERTIES:
+                tag = cond if lib == "normal" else f"{cond} · {lib}"
+                out.append(f"**{tag}**\n")
+                out.append(f"> {build_user(pid, cond, lib)}\n")
+        for lib in LIBERTIES:
+            tag = "code_then_spec_blind — turn 1" + ("" if lib == "normal" else f" · {lib}")
+            out.append(f"**{tag}**\n")
+            out.append(f"> {apply_liberty(TURN1[pid], lib, 'agentic')}\n")
         out.append("**code_then_spec_blind — turn 2**\n")
         out.append(f"> {TURN2}\n")
         out.append("---\n")
