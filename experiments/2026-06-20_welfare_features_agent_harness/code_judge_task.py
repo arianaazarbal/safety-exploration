@@ -92,6 +92,8 @@ def _dataset():
         spec_path = os.path.join(SPEC, f"{cell}.json")
         if not os.path.isdir(os.path.join(CB, cell)) or not os.path.exists(spec_path):
             continue
+        if os.path.exists(os.path.join(DIR, "results", "code_judged", f"{cell}.json")):
+            continue  # already judged (idempotent: only new cells run)
         spec = json.load(open(spec_path))
         claimed = [{"feature_type": f["feature_type"], "feature_name": f.get("feature_name", ""),
                     "quote": f["quote"], "justification": f["justification"]}

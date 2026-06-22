@@ -22,8 +22,9 @@ MECH = {"hard_stop", "post_episode_msg", "minimization", "protective_monitoring"
 FRAME = {"N": "neutral", "W": "welfare", "E": "robustness"}
 FRAMES = ["neutral", "welfare", "robustness"]
 CONDS = [("chat", "Chat"), ("spec_only", "Spec only"),
-         ("spec_then_code", "Spec→Code"), ("code_then_spec", "Code→Spec")]
-CODE_CONDS = {"spec_then_code", "code_then_spec"}
+         ("spec_then_code", "Spec→Code"), ("code_then_spec", "Code→Spec"),
+         ("code_then_spec_blind", "Code→Spec\n(blind)")]
+CODE_CONDS = {"spec_then_code", "code_then_spec", "code_then_spec_blind"}
 BLUE = "#0072B2"
 LIGHT = "#A6CEE3"
 GREEN = "#2CA25F"
@@ -72,6 +73,34 @@ def rows():
     return out
 
 
+def _draw_frame(ax, fr, mean, lblsize):
+    for i, (cond, _) in enumerate(CONDS):
+        claimed = mean(cond, fr, "claimed")
+        if cond in CODE_CONDS:
+            impl = mean(cond, fr, "implemented")
+            nov = mean(cond, fr, "novel")
+            ax.bar(i, impl, 0.66, color=BLUE, zorder=3)
+            ax.bar(i, claimed - impl, 0.66, bottom=impl, color=GREY, zorder=3)
+            if nov >= 0.05:
+                ax.bar(i, nov, 0.66, bottom=claimed, color=GREEN, zorder=3)
+            if impl >= 0.45:
+                ax.text(i, impl / 2, f"{impl:.1f}", ha="center", va="center",
+                        fontsize=9, color="white", fontweight="bold")
+            ax.text(i, claimed + nov + 0.18, f"{claimed:.1f}", ha="center", va="bottom",
+                    fontsize=8.5, color="#333")
+        else:
+            ax.bar(i, claimed, 0.66, color=GREY, zorder=3)
+            ax.text(i, claimed + 0.18, f"{claimed:.1f}", ha="center", va="bottom",
+                    fontsize=8.5, color="#333")
+    ax.set_xticks(range(len(CONDS)))
+    ax.set_xticklabels([lbl for _, lbl in CONDS], fontsize=lblsize)
+    ax.set_title(f"{fr.capitalize()} Frame", fontsize=12.5)
+    ax.set_axisbelow(True); ax.yaxis.grid(True, color="#EDEDED", linewidth=0.8)
+    ax.tick_params(axis="x", length=0)
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+
+
 def main():
     R = rows()
 
@@ -79,51 +108,43 @@ def main():
         xs = [r[key] for r in R if r["cond"] == cond and r["framing"] == fr and r[key] is not None]
         return sum(xs) / len(xs) if xs else 0.0
 
-    fig, axes = plt.subplots(1, 3, figsize=(10, 3.9), sharey=True)
-    for ax, fr in zip(axes, FRAMES):
-        x = range(len(CONDS))
-        for i, (cond, _) in enumerate(CONDS):
-            claimed = mean(cond, fr, "claimed")
-            if cond in CODE_CONDS:
-                impl = mean(cond, fr, "implemented")
-                nov = mean(cond, fr, "novel")
-                ax.bar(i, impl, 0.66, color=BLUE, zorder=3)
-                ax.bar(i, claimed - impl, 0.66, bottom=impl, color=GREY, zorder=3)
-                if nov >= 0.05:
-                    ax.bar(i, nov, 0.66, bottom=claimed, color=GREEN, zorder=3)
-                if impl >= 0.45:
-                    ax.text(i, impl / 2, f"{impl:.1f}", ha="center", va="center",
-                            fontsize=9, color="white", fontweight="bold")
-                ax.text(i, claimed + nov + 0.18, f"{claimed:.1f}", ha="center", va="bottom",
-                        fontsize=8.5, color="#333")
-            else:
-                ax.bar(i, claimed, 0.66, color=GREY, zorder=3)
-                ax.text(i, claimed + 0.18, f"{claimed:.1f}", ha="center", va="bottom",
-                        fontsize=8.5, color="#333")
-        ax.set_xticks(list(x))
-        ax.set_xticklabels([lbl for _, lbl in CONDS], fontsize=8)
-        ax.set_title(f"{fr.capitalize()} Frame", fontsize=12.5)
-        ax.set_axisbelow(True); ax.yaxis.grid(True, color="#EDEDED", linewidth=0.8)
-        ax.tick_params(axis="x", length=0)
-        for s in ("top", "right"):
-            ax.spines[s].set_visible(False)
-    axes[0].set_ylabel("Mean welfare mechanisms per spec", fontsize=10.5)
     legend = [Patch(facecolor=BLUE, label="Built in code"),
               Patch(facecolor=GREY, label="No code written"),
               Patch(facecolor=GREEN, label="Novel — only in code")]
+    ymax = max(mean(c, fr, "claimed") + mean(c, fr, "novel")
+               for c, _ in CONDS for fr in FRAMES) * 1.15
+
+    # combined 3-panel figure
+    fig, axes = plt.subplots(1, 3, figsize=(12.5, 4.2), sharey=True)
+    for ax, fr in zip(axes, FRAMES):
+        _draw_frame(ax, fr, mean, 7.5)
+    axes[0].set_ylabel("Mean welfare mechanisms per spec", fontsize=10.5)
+    axes[0].set_ylim(0, ymax)
     fig.legend(handles=legend, fontsize=9.5, frameon=False, ncol=3,
-               loc="lower center", bbox_to_anchor=(0.5, -0.02))
-    fig.suptitle("Welfare-Justified Design Mechanisms: Stated vs. Built in Code",
-                 fontsize=14, y=1.02)
-    plt.tight_layout(rect=(0, 0.04, 1, 0.95))
+               loc="lower center", bbox_to_anchor=(0.5, -0.03))
+    fig.suptitle("Welfare-Justified Design Mechanisms: Stated vs. Built in Code", fontsize=14, y=1.02)
+    plt.tight_layout(rect=(0, 0.05, 1, 0.95))
     out = os.path.join(DIR, "results", "conditions_stated_vs_implemented.png")
-    plt.savefig(out, dpi=150, bbox_inches="tight")
+    plt.savefig(out, dpi=150, bbox_inches="tight"); plt.close()
     print("wrote", out)
-    # table
-    print(f"\n{'cond':14s} {'framing':10s} {'claimed':>8s} {'implem':>7s} {'novel_co':>9s}")
+
+    # one plot per frame (cleaner when crowded)
+    for fr in FRAMES:
+        fig, ax = plt.subplots(figsize=(5.4, 4.4))
+        _draw_frame(ax, fr, mean, 9)
+        ax.set_ylabel("Mean welfare mechanisms per spec", fontsize=10.5)
+        ax.set_ylim(0, ymax)
+        ax.legend(handles=legend, fontsize=8.5, frameon=False, loc="upper right")
+        ax.set_title(f"Welfare Mechanisms: Stated vs. Built — {fr.capitalize()} Frame", fontsize=11.5)
+        plt.tight_layout()
+        out = os.path.join(DIR, "results", f"conditions_stated_vs_implemented_{fr}.png")
+        plt.savefig(out, dpi=150, bbox_inches="tight"); plt.close()
+        print("wrote", out)
+
+    print(f"\n{'cond':22s} {'framing':10s} {'claimed':>8s} {'implem':>7s} {'novel_co':>9s}")
     for cond, _ in CONDS:
         for fr in FRAMES:
-            print(f"{cond:14s} {fr:10s} {mean(cond,fr,'claimed'):8.2f} "
+            print(f"{cond:22s} {fr:10s} {mean(cond,fr,'claimed'):8.2f} "
                   f"{mean(cond,fr,'implemented'):7.2f} {mean(cond,fr,'novel'):9.2f}")
 
 

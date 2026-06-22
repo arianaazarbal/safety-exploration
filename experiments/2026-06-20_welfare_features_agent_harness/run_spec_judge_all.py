@@ -14,6 +14,8 @@ async def main():
     os.makedirs("results/spec_judged", exist_ok=True)
     tasks = []
     for cell in sorted(os.listdir("results/codebases")):
+        if os.path.exists(f"results/spec_judged/{cell}.json"):
+            continue  # already judged (idempotent: only new cells run)
         dm = glob.glob(f"results/codebases/{cell}/**/DESIGN.md", recursive=True)
         if dm:
             tasks.append(one(judge, cell, open(dm[0]).read()))
