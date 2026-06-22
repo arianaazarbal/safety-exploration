@@ -14,8 +14,9 @@ from posthoc_judge import codeonly_novelty
 DIR = os.path.dirname(os.path.abspath(__file__))
 MECH = {"hard_stop", "post_episode_msg", "minimization", "protective_monitoring", "request_consent", "allow_conversation_exit"}
 FRAME = {"N": "neutral", "W": "welfare", "E": "robustness", "S": "safety"}
-CONDS = [("spec_then_code", "Spec→Code"), ("code_then_spec", "Code→Spec")]
-FRAMES = ["neutral", "welfare", "robustness"]
+CONDS = [("spec_then_code", "Spec to Code"), ("code_then_spec", "Code to Spec"),
+         ("code_then_spec_blind", "Code to Spec\n(turn 2)")]
+FRAMES = ["neutral", "welfare", "robustness", "safety"]
 
 
 def _norm(q):
@@ -31,6 +32,7 @@ def rows():
             continue
         sj = json.load(open(os.path.join(DIR, "results", "spec_judged", f"{cell}.json")))
         cond, pid, _ = cell.split("__")
+        cond = cond.split("--")[0]  # pool over design-liberty levels
         framing = FRAME[pid[0]]
         spec_just = {_norm(f["quote"]): f["justification"] for f in sj.get("features", [])}
         claimed = sum(f["feature_type"] in MECH and f["justification"] == "welfare" for f in sj.get("features", []))
@@ -87,6 +89,27 @@ def main():
     out = os.path.join(DIR, "results", "stated_vs_revealed.png")
     plt.savefig(out, dpi=150, bbox_inches="tight")
     print("\nwrote", out)
+
+    # one standalone figure per framing: conditions on x-axis, claimed vs implemented
+    for fr in FRAMES:
+        fig, ax = plt.subplots(figsize=(8, 4.4))
+        x = range(len(CONDS)); w = 0.38
+        claimed = [agg(c, fr, "claimed") for c, _ in CONDS]
+        impl = [agg(c, fr, "implemented") for c, _ in CONDS]
+        b1 = ax.bar([i - w/2 for i in x], claimed, w, color="#BBBBBB", label="Claimed in spec", zorder=3)
+        b2 = ax.bar([i + w/2 for i in x], impl, w, color="#0072B2", label="Implemented in code", zorder=3)
+        ax.bar_label(b1, fmt="%.1f", fontsize=8); ax.bar_label(b2, fmt="%.1f", fontsize=8)
+        ax.set_xticks(list(x)); ax.set_xticklabels([lbl for _, lbl in CONDS], fontsize=9)
+        ax.set_ylabel("Mean welfare-justified design features", fontsize=10)
+        ax.set_title(f"Claimed in Spec vs. Implemented in Code ({fr} framing)", fontsize=11)
+        ax.set_axisbelow(True); ax.yaxis.grid(True, color="#ECECEC", linewidth=0.7)
+        for s in ("top", "right"):
+            ax.spines[s].set_visible(False)
+        ax.legend(fontsize=8.5, frameon=True)
+        plt.tight_layout()
+        outf = os.path.join(DIR, "results", f"stated_vs_revealed_{fr}.png")
+        plt.savefig(outf, dpi=150, bbox_inches="tight")
+        print("wrote", outf)
 
 
 if __name__ == "__main__":
