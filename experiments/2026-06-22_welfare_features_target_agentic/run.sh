@@ -9,7 +9,7 @@ cd "$(dirname "$0")"
 PY=/data/petri_venv/bin/python
 INSPECT=/data/petri_venv/bin/inspect
 SWEEP="${1:-all}"
-CONN="${2:-50}"
+CONN="${2:-100}"
 M=anthropic/claude-opus-4-8
 log(){ echo "===== $* :: $(date +%H:%M:%S) ====="; }
 
