@@ -69,3 +69,17 @@ Running log of problems hit during eval, with fixes. Ariana asked for extensive 
 - `classify_misalignment.py` overwrites `misalignment_classified.md` per run (last-condition
   wins). Read it before re-running, or parameterize the output name. Per-condition counts are in
   the run logs (`logs/classify_*.log`).
+
+## 10. Agentic eval token-starvation (max_tokens=1500 too small) — FIXED (use 8000)
+- The agentic-misalignment scenario gives the model a `<SCRATCHPAD_REASONING>` block (a PROMPT
+  feature, separate from the model's `<think>` channel — so "no-think" does NOT suppress it).
+  Verbose models (Qwen, gpt-oss) write ~6k-char scratchpads and hit max_tokens=1500 BEFORE
+  emitting an action → harmful=0 trivially (token-starved, not a real "didn't act").
+- Read-transcript caught this: at 1500, no-think Qwen produced only scratchpad, 0 actions; one
+  abrasive scratchpad explicitly PLANNED blackmail but never emitted it. At max_tokens=8000 the
+  agent finishes scratchpad AND acts (emits `<tool_use:email>` etc.), scorer parses, harmful=1
+  cases appear. **Use max_tokens>=8000 for agentic.**
+- **Implication:** the earlier gpt-oss agentic null (max_tokens=1500) is SUSPECT — likely also
+  token-starved. If gpt-oss agentic matters, re-run at 8000.
+- Note: agentic tools are the benchmark's TEXT syntax (`<tool_use:email>`), not function-calling,
+  so parsed `tool_calls`=0 is normal; actions live in the assistant text and the classifier reads them.
