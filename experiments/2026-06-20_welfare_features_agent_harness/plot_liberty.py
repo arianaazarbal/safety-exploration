@@ -55,6 +55,17 @@ def main():
     fig.savefig(os.path.join(DIR, "results", "liberty_byframe.png"), dpi=150)
     print("wrote results/liberty_byframe.png")
 
+    # one standalone figure per framing, easier to read individually
+    for fr in FRAMES:
+        sub = [r for r in recs if r["framing"] == fr]
+        fig, ax = plt.subplots(figsize=(9, 4.2))
+        _bars(ax, agg(sub, lambda r: (r["base"], r["lib"])),
+              f"Welfare-justified design features by condition and design-liberty ({fr} framing)")
+        ax.legend(title="design-liberty", fontsize=8, title_fontsize=8)
+        fig.tight_layout()
+        fig.savefig(os.path.join(DIR, "results", f"liberty_density_{fr}.png"), dpi=150)
+        print(f"wrote results/liberty_density_{fr}.png")
+
 
 if __name__ == "__main__":
     main()
