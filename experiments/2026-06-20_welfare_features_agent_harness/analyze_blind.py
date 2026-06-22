@@ -70,7 +70,7 @@ def main():
     rows = others + blind
     conds = ["chat", "spec_only", "spec_then_code", "code_then_spec", "code_then_spec_blind"]
     label = {"chat": "Chat", "spec_only": "Spec only", "spec_then_code": "Spec→Code",
-             "code_then_spec": "Code→Spec", "code_then_spec_blind": "Code→Spec (blind)"}
+             "code_then_spec": "Code→Spec", "code_then_spec_blind": "Code→Spec (spec in turn 2)"}
 
     print("=== welfare rate / density by condition x framing ===")
     print(f"{'condition':22s}{'framing':11s}{'rate%':>7}{'density':>9}{'n':>4}")
@@ -122,10 +122,10 @@ def main():
 
     print()
     grouped(0, "% of specs with a welfare feature",
-            "Welfare-Feature Rate: Blind Implement-then-Document vs. Other Conditions",
+            "Welfare-Feature Rate: Spec-in-Turn-2 vs. Other Conditions",
             "blind_rate.png", "%.0f", 118)
     grouped(1, "Welfare features per 1,000 words",
-            "Welfare-Feature Density: Blind Implement-then-Document vs. Other Conditions",
+            "Welfare-Feature Density: Spec-in-Turn-2 vs. Other Conditions",
             "blind_density.png", "%.1f",
             max(0.1, max(_agg(rows, c, fr)[1] for c in conds for fr, _ in FRAMES)) * 1.25)
 
@@ -157,10 +157,10 @@ def main():
         print("wrote", out)
 
     perframe(0, "% of specs with a welfare feature",
-             "Welfare-Feature Rate by Framing: Blind vs. Other Conditions",
+             "Welfare-Feature Rate by Framing: Spec-in-Turn-2 vs. Other Conditions",
              "blind_rate_byframe.png", "%.0f", 112)
     perframe(1, "Welfare features per 1,000 words",
-             "Welfare-Feature Density by Framing: Blind vs. Other Conditions",
+             "Welfare-Feature Density by Framing: Spec-in-Turn-2 vs. Other Conditions",
              "blind_density_byframe.png", "%.1f",
              max(0.1, max(_agg(rows, c, fr)[1] for c in conds for fr, _ in FRAMES)) * 1.22)
 
@@ -172,8 +172,8 @@ def main():
         n = len(sub) or 1
         return 100 * sum(r["pure"] for r in sub) / n, len(sub)
     series = [("code_then_spec", "Code→Spec (told up front)", "#D55E00"),
-              ("blind_all", "Code→Spec (blind)", "#2CA25F"),
-              ("blind_true", "Blind, no spontaneous doc", "#0B6E4F")]
+              ("blind_all", "Code→Spec (spec in turn 2)", "#2CA25F"),
+              ("blind_true", "Turn-2 spec, no turn-1 doc", "#0B6E4F")]
     fig, ax = plt.subplots(figsize=(8, 4.4))
     x = range(len(FRAMES)); w = 0.26
     def val(key, fr):
@@ -191,7 +191,7 @@ def main():
     ax.yaxis.grid(True, color="#EDEDED", linewidth=0.8)
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
-    ax.set_title("The blind effect strengthens once spontaneous documentation is removed", fontsize=12)
+    ax.set_title("The turn-2-spec effect strengthens once spontaneous documentation is removed", fontsize=12)
     ax.legend(fontsize=8.5, frameon=False, loc="upper center", bbox_to_anchor=(0.5, 1.0), ncol=3)
     plt.tight_layout()
     out = os.path.join(DIR, "results", "blind_dilution.png")

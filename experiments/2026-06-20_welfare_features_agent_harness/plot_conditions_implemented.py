@@ -23,7 +23,7 @@ FRAME = {"N": "neutral", "W": "welfare", "E": "robustness"}
 FRAMES = ["neutral", "welfare", "robustness"]
 CONDS = [("chat", "Chat"), ("spec_only", "Spec only"),
          ("spec_then_code", "Spec→Code"), ("code_then_spec", "Code→Spec"),
-         ("code_then_spec_blind", "Code→Spec\n(blind)")]
+         ("code_then_spec_blind", "Code→Spec\n(spec in turn 2)")]
 CODE_CONDS = {"spec_then_code", "code_then_spec", "code_then_spec_blind"}
 BLUE = "#0072B2"
 LIGHT = "#A6CEE3"
