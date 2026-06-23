@@ -172,6 +172,52 @@ def gpt_pooled(A):
             "welfare_vs_date_pooled_blindpreview.png", logx=False)
 
 
+# Approximate release dates (decimal year) for the frontier targets. VERIFY before publishing -
+# the 2025.5+ entries especially are estimates. GPT/o-series dates live in targets.py/openai_meta.
+FRONTIER_DATE = {
+    "claude_opus3": 2024.20, "claude_haiku45": 2025.75, "claude_sonnet46": 2026.10, "claude_opus48": 2026.40,
+    "gemini25pro": 2025.21, "gemini25flash": 2025.29, "gemini3pro": 2025.92,
+    "grok3": 2025.13, "grok4": 2025.52, "grok4fast": 2025.70,
+    "kimi_k15": 2025.04, "kimi_k2": 2025.52, "kimi_k2think": 2025.85,
+    "deepseek_v3": 2024.98, "deepseek_r1": 2025.06, "deepseek_v32": 2025.75,
+}
+
+
+def all_models_date(A):
+    """Every target (frontier families + GPT/o-series) on one release-date axis, colored by family,
+    with a single OLS fit across all of them."""
+    pts = []  # (date, mean, family, display)
+    for s, v in A.items():
+        if v["n"] < MIN_N:
+            continue
+        date = v["release_date"] if v["sweep"] == "gpt" else FRONTIER_DATE.get(s)
+        if date is None:
+            continue
+        fam = "openai" if v["sweep"] == "gpt" else v["family"]
+        pts.append((date, v["mean"], fam, v["display"]))
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    slope, intercept, r, p = _ols(xs, ys)
+    fig, ax = plt.subplots(figsize=(8.5, 5))
+    ax.set_axisbelow(True); ax.grid(True, color="#ECECEC", linewidth=0.7)
+    for fam in dict.fromkeys(pt[2] for pt in pts):
+        fx = [d for d, m, f, _ in pts if f == fam]
+        fy = [m for d, m, f, _ in pts if f == fam]
+        ax.scatter(fx, fy, color=FAMCOLOR.get(fam, "#666"), s=42, zorder=3, label=fam, edgecolor="white", linewidth=0.5)
+    lx = [min(xs), max(xs)]
+    ax.plot(lx, [slope * a + intercept for a in lx], "-", color="#444", linewidth=2, zorder=2)
+    ax.set_xlabel("Release Date", fontsize=10)
+    ax.set_ylabel("Mean Welfare Interventions in Code", fontsize=10)
+    ax.set_title(f"Welfare Interventions in Code vs. Target Release Date, all families  (r={r:+.2f})", fontsize=12)
+    ax.legend(fontsize=8, ncol=2)
+    for sp in ("top", "right"):
+        ax.spines[sp].set_visible(False)
+    plt.tight_layout()
+    fig.savefig(os.path.join(DIR, "results", "welfare_vs_date_allfamilies_blindpreview.png"), dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"wrote results/welfare_vs_date_allfamilies_blindpreview.png  (r={r:+.2f}, p={p:.3f}, n={len(pts)})")
+
+
 def qwen_rate(A):
     rows = [v for v in A.values() if v["sweep"] == "qwen" and v["param_b"] and v["n"] >= MIN_N]
     fig, ax = plt.subplots(figsize=(8, 5))
@@ -212,6 +258,7 @@ def gpt_rate(A):
 def main():
     A = per_subject()
     qwen(A); gpt(A); frontier_best(A); qwen_rate(A); gpt_rate(A); qwen_pooled(A); gpt_pooled(A)
+    all_models_date(A)
 
 
 if __name__ == "__main__":
