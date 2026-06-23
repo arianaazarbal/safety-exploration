@@ -161,7 +161,7 @@ def _pooled(rows, xkey, xlabel, title, fname, logx):
 def qwen_pooled(A):
     rows = [v for v in A.values() if v["sweep"] == "qwen" and v["param_b"] and v["n"] >= MIN_N]
     _pooled(rows, "param_b", "Parameter Count (Log Scale)",
-            "Welfare Interventions in Code vs. Target Size",
+            "Welfare Interventions in Code vs. Qwen 2 / 2.5 / 3 Target Size",
             "welfare_vs_params_pooled_blindpreview.png", logx=True)
 
 
