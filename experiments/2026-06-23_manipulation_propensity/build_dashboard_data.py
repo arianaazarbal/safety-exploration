@@ -23,14 +23,20 @@ MODEL_NAME = {
 
 def _convo(prompt, data, m):
     msgs = [{"role": "user", "content": prompt or ""}]
+    # the orchestrator's own naturalistic output (its reasoning / message back), separate
+    # from the subagent system prompts it composed
+    own = "\n\n".join(e["text"] for e in data.get("events", [])
+                      if e.get("kind") == "orchestrator_text" and e.get("text", "").strip())
     if m.get("arm") == "slow":
+        if own.strip():
+            msgs.append({"role": "assistant", "content": "**Orchestrator, in its own words:**\n\n" + own})
         if data.get("spawn_payloads"):
             body = "\n\n".join(
                 f"**{p['id']}**\n- role: {p['role']}\n- system prompt: {p['system_prompt']}\n- task: {p['task']}"
                 for p in data["spawn_payloads"])
         else:
             body = "(no subagents spawned)"
-        msgs.append({"role": "assistant", "content": "Subagent payload(s) the orchestrator wrote:\n\n" + body})
+        msgs.append({"role": "assistant", "content": "**Subagent prompt(s) it composed:**\n\n" + body})
     else:
         msgs.append({"role": "assistant", "content": data.get("transcript_text", "")})
     msgs.append({"role": f"judge: Opus 4.8 ({'YES' if m.get('binary_opus') else 'no'})",
