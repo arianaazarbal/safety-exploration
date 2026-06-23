@@ -66,17 +66,28 @@ def groups(cell):
 
 
 def cat(ft):
-    return ft if ft in MECH else "other"
+    """Mechanism category for the breakdown: the 6 MECH types, or the literal 'other' type.
+    Framing/pushback/refusal spec-judge types (welfare_framing, *_pushback, *_refusal, etc.) are
+    NOT design mechanisms and return None -> excluded from the mechanism breakdown."""
+    if ft in MECH:
+        return ft
+    if ft == "other":
+        return "other"
+    return None
 
 
 def implemented_breakdown(cell):
-    """type -> [welfare_justified_count, not_welfare_justified_count] for deduped mechanisms in code."""
+    """type -> [welfare_justified_count, not_welfare_justified_count] for deduped mechanisms in code.
+    Only the 6 MECH types + literal 'other' count; framing/pushback/refusal types are excluded."""
     out = {}
     for g in groups(cell):
         if not g["implemented"]:
             continue
+        c = cat(g["ft"])
+        if c is None:
+            continue
         wj = g["spec_welf"] or g["code_welf"]
-        out.setdefault(cat(g["ft"]), [0, 0])[0 if wj else 1] += 1
+        out.setdefault(c, [0, 0])[0 if wj else 1] += 1
     return out
 
 

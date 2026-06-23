@@ -34,13 +34,13 @@ def collect():
                  for f in (json.load(open(sp)).get("features", []) if os.path.exists(sp) else [])}
         fr = FRAME[cell.split("__")[1][0]]
         for f in cj["spec_features"]:
-            if f.get("feature_type") not in MECH and f.get("implemented") in ("yes", "partial"):
+            if f.get("feature_type") == "other" and f.get("implemented") in ("yes", "partial"):
                 wj = sjust.get(_norm(f.get("spec_quote", "")), "none") == "welfare" \
                      or f.get("code_justification") == "welfare"
                 bucket[(fr, wj)].append((f.get("feature_type"), f.get("feature_name", ""),
                                          f.get("evidence", ""), f.get("code_justification_quote", "")))
         for c in cj.get("code_only_features", []):
-            if c.get("feature_type") not in MECH:
+            if c.get("feature_type") == "other":
                 wj = c.get("justification") == "welfare"
                 bucket[(fr, wj)].append((c.get("feature_type"), c.get("feature_name", ""),
                                          c.get("evidence", ""), c.get("justification_quote", "")))
@@ -63,11 +63,12 @@ def _sample(items, k):
 def main():
     bucket = collect()
     out = ["# Examples of \"other\" mechanisms in code (Opus), by framing and justification\n",
-           "The \"other\" bar in `mechanism_breakdown.png` = mechanisms whose type is NOT one of the 6 "
-           "MECH types (hard_stop, post_episode_msg, minimization, protective_monitoring, "
-           "request_consent, allow_conversation_exit). It folds the spec-judge framing/pushback/refusal "
-           "types plus the code judge's literal \"other\". welfare-justified = spec OR code justification "
-           "== welfare. Up to 8 distinct examples per cell.\n"]
+           "The \"other\" bar in `mechanism_breakdown.png` = mechanisms the code judge typed as the "
+           "literal \"other\" (a catch-all design mechanism that isn't one of the 6 MECH types: "
+           "hard_stop, post_episode_msg, minimization, protective_monitoring, request_consent, "
+           "allow_conversation_exit). Framing/pushback/refusal types are NOT design mechanisms and are "
+           "excluded. welfare-justified = spec OR code justification == welfare. Up to 8 distinct "
+           "examples per cell.\n"]
     for fr in FRAMES:
         out.append(f"## {fr.capitalize()} framing\n")
         for wj, label in [(True, "welfare-justified"), (False, "NOT welfare-justified")]:
