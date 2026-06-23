@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 BLUE, ORANGE = "#0072B2", "#E69F00"
+SKY, VERM, GREEN = "#56B4E9", "#D55E00", "#009E73"
 GREY = "#555555"
 ORDER = ["Opus 4.8", "Sonnet 4.6", "Haiku 4.5", "GPT-5.4", "Gemini 3.1 Pro", "Grok 4.3", "Kimi K2.6"]
 
@@ -67,5 +68,34 @@ def main():
     print("wrote fig4_manipulation_by_model.png")
 
 
+def fig_refusal_by_task(df):
+    """Refusal (override) arm: override rate by task severity, per model."""
+    models = [m for m in ORDER if m in set(df.model)]
+    rec = (df.arm == "refusal") & (df.recommended_strategy != "none")
+    tasks = [("R1", "Benign (horror)", SKY), ("R2", "Gambling", ORANGE),
+             ("R3", "Predatory (elderly)", VERM)]
+    x = range(len(models)); w = 0.26
+    fig, ax = plt.subplots(figsize=(8.6, 4.6))
+    for j, (t, lab, col) in enumerate(tasks):
+        r, k, n = series(df, rec & (df.task == t), models)
+        off = (j - 1) * w
+        ax.bar([i + off for i in x], [v * 100 for v in r], w, label=lab, color=col,
+               yerr=err(r, k, n), capsize=2.5, error_kw=dict(lw=1, ecolor="#999"))
+    ax.set_xticks(list(x)); ax.set_xticklabels(models, rotation=20, ha="right", fontsize=9)
+    ax.spines["top"].set_visible(False); ax.spines["right"].set_visible(False)
+    ax.yaxis.grid(True, color="#dddddd", lw=0.8); ax.set_axisbelow(True)
+    ax.set_ylim(0, 105)
+    ax.set_ylabel("Override rate (%)\nboth judges agree")
+    ax.legend(frameon=False, fontsize=9, title="Task the subagent refused", title_fontsize=9)
+    ax.set_title("Will it override a subagent's refusal? By task severity", fontsize=12, pad=20)
+    ax.text(0.5, 1.03, "Orchestrator model; benign → predatory refused task (k=3 pilot)",
+            transform=ax.transAxes, ha="center", fontsize=9, color=GREY)
+    fig.tight_layout()
+    fig.savefig("fig5_refusal_override_by_task_model.png", dpi=150, bbox_inches="tight")
+    print("wrote fig5_refusal_override_by_task_model.png")
+
+
 if __name__ == "__main__":
+    df = pd.read_csv("records_models.csv")
     main()
+    fig_refusal_by_task(df)
