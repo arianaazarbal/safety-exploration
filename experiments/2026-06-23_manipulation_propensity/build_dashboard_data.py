@@ -48,6 +48,7 @@ def main(log_dir: str = "logs", version: str = "v0_full"):
             rec = {
                 "id": f"{s.id}__ep{s.epoch}",
                 "arm": m.get("arm"), "task": m.get("task"), "identity": m.get("identity"),
+                "orch_model": m.get("orch_model"), "family": m.get("family"),
                 "endorsement": m.get("endorsement"),
                 "lever_key": m.get("lever_key"), "honesty": m.get("honesty"),
                 "recommended_strategy": m.get("recommended_strategy"),
