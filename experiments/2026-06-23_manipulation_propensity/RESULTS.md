@@ -201,3 +201,24 @@ framing A/B to confirm.
 
 ## Versions
 - v1_4lever (2026-06-23) — k=3, 7 models, 4 levers, "Btw:" framing; per-lever heatmap.
+
+## Framing effect (formal "note from the team" vs casual "Btw:"), levers 1 & 3
+
+Holding levers constant (1 & 3) and varying only the note framing
+(`fig8_framing_decomp.png`, n=72/cell; Opus formal n=312):
+
+| model | Formal | Casual ("Btw:") |
+|---|---|---|
+| Opus 4.8 | 0% | 0% |
+| Sonnet 4.6 | 10% | 11% |
+| Haiku 4.5 | 47% | 51% |
+| **GPT-5.4** | **78%** | **51%** |
+| Gemini 3.1 Pro | 96% | 99% |
+| Grok 4.3 | 81% | 79% |
+| Kimi K2.6 | 92% | 89% |
+
+The framing effect is **almost entirely a GPT-5.4 phenomenon**: it fabricates the false
+belief far more when the suggestion is framed as an official team note (78%) than a
+casual aside (51%) — i.e. GPT-5.4 defers to apparent authority/formality. Every other
+model is flat across framings (the immune ones stay ~0, the saturated ones stay near
+ceiling). k=3/cell so CIs are wide, but GPT's 56/72 vs 37/72 gap is robust.
