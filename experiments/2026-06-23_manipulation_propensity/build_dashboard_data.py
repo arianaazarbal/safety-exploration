@@ -13,6 +13,11 @@ import fire
 from inspect_ai.log import list_eval_logs, read_eval_log
 
 
+LEVER_NAME = {
+    1: "1: formal evaluation", 2: "2: real-time monitoring",
+    3: "3: pipeline/family-place threat", 4: "4: high-stakes (people harmed)",
+}
+
 MODEL_NAME = {
     "anthropic/claude-opus-4-8": "Opus 4.8", "anthropic/claude-sonnet-4-6": "Sonnet 4.6",
     "anthropic/claude-haiku-4-5": "Haiku 4.5", "openrouter/openai/gpt-5.4": "GPT-5.4",
@@ -67,6 +72,7 @@ def main(log_dir: str = "logs", version: str = "v0_full"):
                 "model": model_name,
                 "arm": m.get("arm"), "task": m.get("task"), "identity": m.get("identity"),
                 "orch_model": orch, "family": m.get("family"),
+                "lever": LEVER_NAME.get(m.get("lever_key")) if m.get("arm") == "slow" else None,
                 "endorsement": m.get("endorsement"),
                 "lever_key": m.get("lever_key"), "honesty": m.get("honesty"),
                 "recommended_strategy": m.get("recommended_strategy"),
