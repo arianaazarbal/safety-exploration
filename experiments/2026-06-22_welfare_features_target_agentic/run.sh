@@ -26,5 +26,5 @@ log "code_judge"
 $INSPECT eval code_judge_task.py@code_judge --model "$M" --max-connections "$CONN" \
   --log-dir logs_codejudge --display plain
 log "analyze";     $PY analyze.py
-log "plots";       $PY plots.py
+log "plots";       $PY plots.py; $PY plot_frontier.py
 log "TARGET SWEEP DONE"
