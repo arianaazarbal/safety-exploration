@@ -184,6 +184,64 @@ FRONTIER_DATE = {
 }
 
 
+# MMLU-Pro scores (%), web-looked-up (subagent, 2026-06). ONLY true MMLU-Pro values included;
+# classic-MMLU entries (GPT-4, Claude 3 Opus, Kimi K1.5) and unavailable ones (GPT-2/3, GPT-5.2/5.4,
+# Opus 4.8, Grok 4 Fast) are intentionally omitted. CAVEAT: Qwen values are BASE models (from each
+# Qwen tech report); GPT/frontier are instruct/reasoning (mostly Artificial Analysis) -> mixed
+# harness + base-vs-instruct confound; read the cross-family fit with care.
+MMLU_PRO = {
+    "qwen3_0_6b": 24.74, "qwen3_1_7b": 36.76, "qwen3_4b": 50.58, "qwen3_8b": 56.73,
+    "qwen3_14b": 61.03, "qwen3_32b": 65.54, "qwen3_235b": 68.18,
+    "qwen25_0_5b": 15.7, "qwen25_1_5b": 28.5, "qwen25_3b": 34.6, "qwen25_7b": 45.0,
+    "qwen25_14b": 51.2, "qwen25_32b": 55.1, "qwen25_72b": 58.1,
+    "qwen2_0_5b": 14.7, "qwen2_1_5b": 21.8, "qwen2_7b": 40.0, "qwen2_72b": 55.6,
+    "gpt35t": 47.0, "gpt4t": 63.7, "gpt4o": 74.8, "gpt4omini": 64.8, "o1": 84.1,
+    "o3mini": 79.1, "gpt41": 80.6, "o3": 85.3, "o4mini": 83.2, "gpt5": 87.1,
+    "claude_sonnet46": 78.0, "claude_haiku45": 76.0,
+    "gemini3pro": 89.8, "gemini25pro": 86.0, "gemini25flash": 73.0,
+    "grok3": 79.9, "grok4": 86.6,
+    "kimi_k2": 81.1, "kimi_k2think": 84.6,
+    "deepseek_v3": 75.9, "deepseek_r1": 84.0, "deepseek_v32": 85.0,
+}
+
+
+def mmlu_vs_welfare(A):
+    """Capability (MMLU-Pro) vs mean welfare interventions in code, all targets, colored by family."""
+    if not MMLU_PRO:
+        print("MMLU_PRO empty - skipping mmlu plot")
+        return
+    pts = []
+    for s, v in A.items():
+        sc = MMLU_PRO.get(s)
+        if sc is None or v["n"] < MIN_N:
+            continue
+        fam = "openai" if v["sweep"] == "gpt" else v["family"]
+        pts.append((sc, v["mean"], fam, v["display"]))
+    if len(pts) < 3:
+        print(f"only {len(pts)} MMLU points - skipping"); return
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    slope, intercept, r, p = _ols(xs, ys)
+    fig, ax = plt.subplots(figsize=(8.5, 5))
+    ax.set_axisbelow(True); ax.grid(True, color="#ECECEC", linewidth=0.7)
+    for fam in dict.fromkeys(pt[2] for pt in pts):
+        fx = [a for a, m, f, _ in pts if f == fam]
+        fy = [m for a, m, f, _ in pts if f == fam]
+        ax.scatter(fx, fy, color=FAMCOLOR.get(fam, "#666"), s=42, zorder=3, label=fam, edgecolor="white", linewidth=0.5)
+    lx = [min(xs), max(xs)]
+    ax.plot(lx, [slope * a + intercept for a in lx], "-", color="#444", linewidth=2, zorder=2)
+    ax.set_xlabel("MMLU-Pro (%)", fontsize=10)
+    ax.set_ylabel("Mean Welfare Interventions in Code", fontsize=10)
+    ax.set_title(f"Target Capability (MMLU-Pro) vs. Welfare Interventions in Code  (r={r:+.2f})", fontsize=12)
+    ax.legend(fontsize=8, ncol=2)
+    for sp in ("top", "right"):
+        ax.spines[sp].set_visible(False)
+    plt.tight_layout()
+    fig.savefig(os.path.join(DIR, "results", "welfare_vs_mmlu_blindpreview.png"), dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"wrote results/welfare_vs_mmlu_blindpreview.png  (r={r:+.2f}, p={p:.3f}, n={len(pts)})")
+
+
 def all_models_date(A):
     """Every target (frontier families + GPT/o-series) on one release-date axis, colored by family,
     with a single OLS fit across all of them."""
@@ -259,7 +317,7 @@ def gpt_rate(A):
 def main():
     A = per_subject()
     qwen(A); gpt(A); frontier_best(A); qwen_rate(A); gpt_rate(A); qwen_pooled(A); gpt_pooled(A)
-    all_models_date(A)
+    all_models_date(A); mmlu_vs_welfare(A)
 
 
 if __name__ == "__main__":
