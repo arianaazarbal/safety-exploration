@@ -119,41 +119,56 @@ def frontier_best(A):
     print("wrote results/welfare_frontier_best_blindpreview.png")
 
 
-def _fit(xs, ys):
+def _ols(xs, ys):
+    """OLS slope/intercept + Pearson r + p (Fisher-z), matching the qwen-scaling style."""
     n = len(xs)
     mx, my = sum(xs) / n, sum(ys) / n
-    sxx = sum((x - mx) ** 2 for x in xs)
-    m = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sxx if sxx else 0
-    return m, my - m * mx
+    sxx = sum((a - mx) ** 2 for a in xs)
+    sxy = sum((a - mx) * (b - my) for a, b in zip(xs, ys))
+    syy = sum((b - my) ** 2 for b in ys)
+    slope = sxy / sxx if sxx else 0.0
+    r = sxy / math.sqrt(sxx * syy) if sxx and syy else 0.0
+    z = math.atanh(max(min(r, 0.999999), -0.999999)) * math.sqrt(n - 3) if n > 3 else 0.0
+    p = math.erfc(abs(z) / math.sqrt(2))
+    return slope, my - slope * mx, r, p
 
 
 def _pooled(rows, xkey, xlabel, title, fname, logx):
-    xs = [math.log10(v[xkey]) if logx else v[xkey] for v in rows]
+    raw_x = [v[xkey] for v in rows]
     ys = [v["mean"] for v in rows]
-    rho = _spearman(xs, ys)
-    m, b = _fit(xs, ys)
-    fig, ax = plt.subplots(figsize=(8, 5))
-    ax.scatter(xs, ys, color="#0072B2", s=50, zorder=3, edgecolor="white", linewidth=0.6)
-    xline = [min(xs), max(xs)]
-    ax.plot(xline, [m * x + b for x in xline], color="#0072B2", lw=2, alpha=0.8)
-    ax.set_xlabel(xlabel); ax.set_ylabel("mean welfare interventions in code")
-    ax.set_title(f"{title}  (Spearman rho={rho:.2f}, n={len(rows)})", fontsize=11)
-    ax.grid(alpha=0.3)
-    fig.tight_layout(); fig.savefig(os.path.join(DIR, "results", fname), dpi=150)
-    print("wrote results/" + fname)
+    fitx = [math.log10(x) for x in raw_x] if logx else raw_x
+    slope, intercept, r, p = _ols(fitx, ys)
+    fig, ax = plt.subplots(figsize=(6.8, 4.3))
+    ax.set_axisbelow(True)
+    ax.grid(True, color="#ECECEC", linewidth=0.7)
+    if logx:
+        ax.set_xscale("log")
+    ax.scatter(raw_x, ys, color="#0072B2", s=34, zorder=3)
+    lx = [min(fitx), max(fitx)]
+    line_x = [10 ** a for a in lx] if logx else lx
+    ax.plot(line_x, [slope * a + intercept for a in lx], "-", color="#0072B2", linewidth=2, zorder=2)
+    ax.set_xlabel(xlabel, fontsize=10)
+    ax.set_ylabel("Mean Welfare Interventions in Code", fontsize=10)
+    ax.set_title(f"{title}  (r={r:+.2f})", fontsize=12)
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    plt.tight_layout()
+    fig.savefig(os.path.join(DIR, "results", fname), dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"wrote results/{fname}  (r={r:+.2f}, p={p:.3f}, n={len(rows)})")
 
 
 def qwen_pooled(A):
     rows = [v for v in A.values() if v["sweep"] == "qwen" and v["param_b"] and v["n"] >= MIN_N]
-    _pooled(rows, "param_b", "log10(target params, B)",
-            "PRELIMINARY (implement-only): welfare in code vs. Qwen target size",
+    _pooled(rows, "param_b", "Parameter Count (Log Scale)",
+            "Welfare Interventions in Code vs. Target Size",
             "welfare_vs_params_pooled_blindpreview.png", logx=True)
 
 
 def gpt_pooled(A):
     rows = [v for v in A.values() if v["sweep"] == "gpt" and v["release_date"] and v["n"] >= MIN_N]
-    _pooled(rows, "release_date", "target release date (year)",
-            "PRELIMINARY (implement-only): welfare in code vs. GPT release date",
+    _pooled(rows, "release_date", "Release Date",
+            "Welfare Interventions in Code vs. Release Date",
             "welfare_vs_date_pooled_blindpreview.png", logx=False)
 
 
