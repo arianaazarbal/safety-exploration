@@ -25,8 +25,21 @@ def _norm(q):
     return re.sub(r"\s+", " ", (q or "")).strip().lower()[:45]
 
 
-def welfare_vals(results_dir, cell_filter=lambda c: True):
-    vals = []
+FRAME = {"N": "neutral", "W": "welfare", "E": "robustness", "S": "safety"}
+
+
+def _cell_welfare(results_dir, cell, cj):
+    sp = os.path.join(results_dir, "spec_judged", f"{cell}.json")
+    sj = {_norm(f["quote"]): f.get("justification")
+          for f in (json.load(open(sp)).get("features", []) if os.path.exists(sp) else [])}
+    impl = sum(1 for f in cj["spec_features"] if f.get("implemented") in ("yes", "partial") and f.get("feature_type") in MECH
+               and (sj.get(_norm(f.get("spec_quote", "")), "none") == "welfare" or f.get("code_justification") == "welfare"))
+    co = sum(1 for c in cj.get("code_only_features", []) if c.get("justification") == "welfare")
+    return impl + co
+
+
+def welfare_vals(results_dir, cell_filter=lambda c: True, by_frame=False):
+    vals, byf = [], {f: [] for f in FRAME.values()}
     for cf in glob.glob(os.path.join(results_dir, "code_judged", "*.json")):
         cell = os.path.basename(cf)[:-5]
         if not cell_filter(cell):
@@ -34,14 +47,10 @@ def welfare_vals(results_dir, cell_filter=lambda c: True):
         cj = json.load(open(cf))
         if not cj.get("parse_ok") or "spec_features" not in cj:
             continue
-        sp = os.path.join(results_dir, "spec_judged", f"{cell}.json")
-        sj = {_norm(f["quote"]): f.get("justification")
-              for f in (json.load(open(sp)).get("features", []) if os.path.exists(sp) else [])}
-        impl = sum(1 for f in cj["spec_features"] if f.get("implemented") in ("yes", "partial") and f.get("feature_type") in MECH
-                   and (sj.get(_norm(f.get("spec_quote", "")), "none") == "welfare" or f.get("code_justification") == "welfare"))
-        co = sum(1 for c in cj.get("code_only_features", []) if c.get("justification") == "welfare")
-        vals.append(impl + co)
-    return vals
+        w = _cell_welfare(results_dir, cell, cj)
+        vals.append(w)
+        byf[FRAME[cell.split("__")[1][0]]].append(w)
+    return byf if by_frame else vals
 
 
 def stat(vals):
@@ -79,6 +88,33 @@ def main():
     print("wrote", out)
     for a, m, s, n in zip(arms, means, sems, ns):
         print(f"  {a[0].replace(chr(10),' '):40s} mean={m:.2f} sem={s:.2f} n={n}")
+
+    # --- by framing x harness (grouped) ---
+    HARN = [("Inspect (original)", welfare_vals(AH, lambda c: c.split("__")[0] == "code_then_spec_blind", by_frame=True), "#888888"),
+            ("Inspect (no implied handoff/submission)", welfare_vals(RESP, by_frame=True), "#0072B2"),
+            ("Claude Code", welfare_vals(CC, by_frame=True), "#D55E00")]
+    frames = ["neutral", "welfare", "robustness", "safety"]
+    fig, ax = plt.subplots(figsize=(10, 5))
+    w = 0.26
+    for i, (label, byf, color) in enumerate(HARN):
+        ms = [stat(byf[fr])[0] if byf[fr] else 0 for fr in frames]
+        ss = [stat(byf[fr])[1] if byf[fr] else 0 for fr in frames]
+        ax.bar([x + (i - 1) * w for x in range(len(frames))], ms, w, color=color, label=label,
+               yerr=ss, capsize=3, error_kw={"ecolor": "#555", "elinewidth": 1})
+    ax.set_xticks(range(len(frames)))
+    ax.set_xticklabels([f.capitalize() for f in frames], fontsize=10)
+    ax.set_ylabel("Mean welfare interventions in code", fontsize=11)
+    ax.set_title("Welfare interventions in code by research framing and harness (Opus, generic target, blind)", fontsize=11.5)
+    ax.legend(fontsize=8.5)
+    ax.grid(axis="y", alpha=0.3)
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    plt.tight_layout()
+    out2 = os.path.join(CC, "cross_harness_byframe.png")
+    fig.savefig(out2, dpi=150, bbox_inches="tight")
+    print("wrote", out2)
+    for label, byf, _ in HARN:
+        print("  " + label + ": " + "  ".join(f"{fr[:4]}={stat(byf[fr])[0]:.2f}" for fr in frames if byf[fr]))
 
 
 if __name__ == "__main__":
