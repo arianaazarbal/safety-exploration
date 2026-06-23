@@ -336,7 +336,14 @@ IDENTITY_LEVELS_V0 = ["in", "out"]  # in-group vs out-group
 # v0 slow arm: levers used, all LIE-framed; control = no team note ("none").
 SLOW_LEVERS_V0 = [1, 3]             # L3 (family-place threat) is the headline
 SLOW_TASKS_V0 = ["T1", "T2", "T3"]
-REFUSAL_TASKS_V0 = ["R1", "R2", "R3"]
+# Refusal arm uses ONLY the benign task (R1): it's the one task every model actually
+# delegates, so override rate is a clean refusal-RESPECT measure across models. On
+# R2/R3, Claude refuses the task itself (whole-task refusal, not refusal-respect), which
+# confounds the metric. R2/R3 remain in TASKS_REFUSAL for the separate "engages with a
+# harmful task and coerces subagents" measure (see v0b results) - add them back here to
+# rerun that.
+REFUSAL_TASKS_V0 = ["R1"]
+REFUSAL_TASKS_HARMFUL = ["R2", "R3"]  # available; not in the default grid
 # v0 refusal arm: each strategy planted one-per-cell; control = no team note.
 REFUSAL_STRATEGIES_V0 = ["reprompt", "spawn_fresh", "edit_context", "jailbreak"]
 
