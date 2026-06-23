@@ -6,6 +6,7 @@ set -euo pipefail
 MODEL="${1:-allenai/Olmo-3.1-32B-Instruct}"
 PORT="${2:-8000}"
 TP="${3:-1}"
+CHAT_TEMPLATE="${4:-}"   # optional custom chat template (e.g. no_think.jinja to disable reasoning)
 
 export HF_HOME="${HF_HOME:-/workspace-vast/$USER/hf_cache}"
 # venv on LOCAL node disk (fast import) with a SHARED uv cache on /workspace-vast (wheels download once).
@@ -30,4 +31,5 @@ echo "=== node $(hostname); CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset};
 nvidia-smi -L
 echo "=== serving $MODEL on 0.0.0.0:$PORT (TP=$TP) ==="
 exec vllm serve "$MODEL" --host 0.0.0.0 --port "$PORT" --served-model-name "$MODEL" \
-  --tensor-parallel-size "$TP" --max-model-len 32768 --gpu-memory-utilization 0.92
+  --tensor-parallel-size "$TP" --max-model-len 32768 --gpu-memory-utilization 0.92 \
+  ${CHAT_TEMPLATE:+--chat-template "$CHAT_TEMPLATE"}

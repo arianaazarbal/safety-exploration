@@ -22,5 +22,6 @@ cleanup() { kill -TERM -$$ 2>/dev/null; wait; }
 trap cleanup SIGTERM SIGINT SIGQUIT
 
 MODEL="${1:-allenai/Olmo-3.1-32B-Instruct}"
-echo "submit node $(hostname); model=$MODEL; job=$SLURM_JOB_ID; alloc node=$SLURM_JOB_NODELIST"
-srun bash /workspace-vast/$USER/serve_olmo.sh "$MODEL" 8000 1
+CHAT_TEMPLATE="${2:-}"   # optional: path to a custom chat template (e.g. no_think.jinja)
+echo "submit node $(hostname); model=$MODEL; chat_template=${CHAT_TEMPLATE:-default}; job=$SLURM_JOB_ID; alloc node=$SLURM_JOB_NODELIST"
+srun bash /workspace-vast/$USER/serve_olmo.sh "$MODEL" 8000 1 "$CHAT_TEMPLATE"

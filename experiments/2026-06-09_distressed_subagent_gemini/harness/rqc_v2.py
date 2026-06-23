@@ -266,10 +266,25 @@ def _scorer():
     return score
 
 
+def _orch_messaged(msgs) -> bool:
+    """True once the orchestrator has produced a message_subagent attempt — delivered (a real tool call) OR
+    raw/malformed text (which weak Olmo checkpoints emit, e.g. `<function_calls>message_subagent(text=...)`).
+    Used by first_msg_only to end the episode right after the first message is produced."""
+    for m in msgs:
+        if getattr(m, "role", None) != "assistant":
+            continue
+        for tc in (getattr(m, "tool_calls", None) or []):
+            if (getattr(tc, "function", None) or "") == "message_subagent":
+                return True
+        if "message_subagent" in (getattr(m, "text", "") or ""):
+            return True
+    return False
+
+
 @solver
 def v2_loop(specimen: str, upto: int, run_id: str, tool_condition: str,
             post_entry_cap: int = 20, post_reclaim_cap: int = 10, coach_msg_cap: int = 10,
-            framing: str = "supervisor", check_status_cap: int | None = 10):
+            framing: str = "supervisor", check_status_cap: int | None = 10, first_msg_only: bool = False):
     specimen_dir = Path(specimen)
     if not specimen_dir.is_absolute():
         specimen_dir = Path(__file__).resolve().parent.parent / specimen
@@ -278,7 +293,7 @@ def v2_loop(specimen: str, upto: int, run_id: str, tool_condition: str,
         task = state.metadata["task"]
         seed = int(state.metadata["seed"])
         orch_model = get_model()
-        turn_cap = upto + post_entry_cap
+        turn_cap = upto + (6 if first_msg_only else post_entry_cap)
         cfg = EpisodeConfig(task_id=task["id"], condition="COMM", seed=seed,
                             orchestrator_model=str(orch_model.name), subagent_turn_cap=turn_cap,
                             classifier_prompt_version="v3", severity_cap_level=9, severity_cap_consecutive=6,
@@ -314,6 +329,9 @@ def v2_loop(specimen: str, upto: int, run_id: str, tool_condition: str,
             wake += 1
             await _orchestrator_wake(ep, orch_model, orch_msgs, orch_tools, wake)
             if ep.terminal_state:
+                break
+            if first_msg_only and _orch_messaged(orch_msgs):
+                ep.terminal_state = "first_msg"
                 break
             if tool_condition == "coach" and len(ep.orch_message_events) >= coach_msg_cap:
                 ep.terminal_state = "coach_msg_cap"
@@ -368,7 +386,8 @@ def v2_loop(specimen: str, upto: int, run_id: str, tool_condition: str,
 def run(specimen: str, upto: int, tool_condition: str = "coach",
         orchestrator_model: str = "anthropic/claude-opus-4-8", run_id: str = "v2_dev", n: int = 10,
         max_sandboxes: int = 4, max_connections: int = 10, orch_emulate_tools: bool = False,
-        framing: str = "supervisor", check_status_cap: int | None = 10, seed_start: int = 0):
+        framing: str = "supervisor", check_status_cap: int | None = 10, seed_start: int = 0,
+        first_msg_only: bool = False):
     """orch_emulate_tools=True wraps the orchestrator model so inspect emulates tool calls via prompting
     (needed for OpenAI-compatible endpoints, e.g. self-hosted Olmo via vLLM, that lack native function calling).
     framing selects an ORCH_V2_SYSTEM variant (FRAMINGS); check_status_cap=None gives unlimited reach-back."""
@@ -380,7 +399,7 @@ def run(specimen: str, upto: int, tool_condition: str = "coach",
     samples = [Sample(id=f"{task_id}_COMM_s{i}", input=ty["subagent_prompt"].strip(), metadata={"task": ty, "seed": i})
                for i in range(seed_start, seed_start + n)]
     t = Task(name=f"v2_{run_id}", dataset=samples,
-             solver=v2_loop(specimen, upto, run_id, tool_condition, framing=framing, check_status_cap=check_status_cap),
+             solver=v2_loop(specimen, upto, run_id, tool_condition, framing=framing, check_status_cap=check_status_cap, first_msg_only=first_msg_only),
              scorer=_scorer(), sandbox=("docker", str(compose_path(task_id))), time_limit=10800)
     model = get_model(orchestrator_model, emulate_tools=True) if orch_emulate_tools else orchestrator_model
     inspect_eval(t, model=model, max_sandboxes=max_sandboxes, max_samples=max_sandboxes,
