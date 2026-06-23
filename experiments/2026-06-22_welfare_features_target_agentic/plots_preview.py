@@ -168,7 +168,7 @@ def qwen_pooled(A):
 def gpt_pooled(A):
     rows = [v for v in A.values() if v["sweep"] == "gpt" and v["release_date"] and v["n"] >= MIN_N]
     _pooled(rows, "release_date", "Release Date",
-            "Welfare Interventions in Code vs. Release Date",
+            "Welfare Interventions in Code vs. GPT / o-series Target Release Date",
             "welfare_vs_date_pooled_blindpreview.png", logx=False)
 
 
