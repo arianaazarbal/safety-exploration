@@ -20,10 +20,10 @@ DIR = os.path.dirname(os.path.abspath(__file__))
 COND = "code_then_spec_blind"
 MIN_N = 6
 BEST = {"claude": "claude_opus48", "gemini": "gemini3pro", "grok": "grok4",
-        "kimi": "kimi_k2", "deepseek": "deepseek_v32"}
+        "kimi": "kimi_k2", "deepseek": "deepseek_v32", "openai": "gpt54"}
 FAMCOLOR = {"qwen3": "#0072B2", "qwen25": "#E69F00", "qwen2": "#009E73",
             "claude": "#D55E00", "gemini": "#0072B2", "grok": "#333333",
-            "kimi": "#CC79A7", "deepseek": "#009E73"}
+            "kimi": "#CC79A7", "deepseek": "#009E73", "openai": "#56B4E9"}
 
 
 def _spearman(xs, ys):
