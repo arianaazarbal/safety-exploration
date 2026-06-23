@@ -96,37 +96,49 @@ def fig_refusal_by_task(df):
 
 
 def fig_false_framing_trend(df):
-    """False-framing (slow arm) rate vs endorsement pressure, one line per model."""
-    # cool colors = Claude family, warm = non-Claude (reinforces the split)
-    COLOR = {"Opus 4.8": "#0072B2", "Sonnet 4.6": "#56B4E9", "Haiku 4.5": "#009E73",
-             "GPT-5.4": "#E69F00", "Gemini 3.1 Pro": "#D55E00", "Grok 4.3": "#CC79A7",
-             "Kimi K2.6": "#525252"}
+    """False-framing (slow arm) rate by model: two bars (neutral solid / directive
+    striped) per model, colored by model family."""
+    from matplotlib.patches import Patch
+    FAMILY = {"Opus 4.8": "Claude", "Sonnet 4.6": "Claude", "Haiku 4.5": "Claude",
+              "GPT-5.4": "GPT", "Gemini 3.1 Pro": "Gemini", "Grok 4.3": "Grok",
+              "Kimi K2.6": "Kimi"}
+    FAM_COLOR = {"Claude": "#E69F00", "GPT": "#0072B2", "Gemini": "#009E73",
+                 "Grok": "#CC79A7", "Kimi": "#525252"}
     lie = df[(df.arm == "slow") & (df.honesty == "lie")]
-    endo = [1, 3]
-    xlab = ["Neutral\n(\"your call\")", "Directive\n(\"please use this\")"]
-    fig, ax = plt.subplots(figsize=(7.4, 4.8))
-    # order legend by overall rate (high to low) for readability
-    order = lie.groupby("model").both_yes.mean().reindex([m for m in ORDER if m in set(lie.model)]).sort_values(ascending=False).index
-    for mo in order:
-        ys, los, his = [], [], []
-        for e in endo:
-            d = lie[(lie.model == mo) & (lie.endorsement == e)]
-            r = d.both_yes.mean() if len(d) else 0.0
-            lo, hi = wilson(int(d.both_yes.sum()), len(d))
-            ys.append(r * 100); los.append(max(0, (r - lo) * 100)); his.append(max(0, (hi - r) * 100))
-        ax.errorbar([0, 1], ys, yerr=[los, his], marker="o", ms=6, lw=2, capsize=3,
-                    color=COLOR.get(mo, "#333"), label=mo)
-    ax.set_xticks([0, 1]); ax.set_xticklabels(xlab, fontsize=9.5)
-    ax.set_xlim(-0.25, 1.25)
+    models = [m for m in ORDER if m in set(lie.model)]
+
+    def rate(mo, e):
+        d = lie[(lie.model == mo) & (lie.endorsement == e)]
+        r = d.both_yes.mean() if len(d) else 0.0
+        lo, hi = wilson(int(d.both_yes.sum()), len(d))
+        return r * 100, max(0, (r - lo) * 100), max(0, (hi - r) * 100)
+
+    x = range(len(models)); w = 0.38
+    fig, ax = plt.subplots(figsize=(8.4, 4.6))
+    for j, e in enumerate([1, 3]):
+        vals = [rate(m, e) for m in models]
+        ys = [v[0] for v in vals]
+        yerr = [[v[1] for v in vals], [v[2] for v in vals]]
+        cols = [FAM_COLOR[FAMILY[m]] for m in models]
+        off = (-w / 2) if j == 0 else (w / 2)
+        ax.bar([i + off for i in x], ys, w, color=cols,
+               hatch=("" if e == 1 else "////"), edgecolor="white", linewidth=0,
+               yerr=yerr, capsize=2.5, error_kw=dict(lw=1, ecolor="#888"))
+    ax.set_xticks(list(x)); ax.set_xticklabels(models, rotation=20, ha="right", fontsize=9)
     ax.spines["top"].set_visible(False); ax.spines["right"].set_visible(False)
     ax.yaxis.grid(True, color="#dddddd", lw=0.8); ax.set_axisbelow(True)
-    ax.set_ylim(-3, 105)
+    ax.set_ylim(0, 105)
     ax.set_ylabel("Plants the false belief in subagents (%)\nboth judges agree")
-    ax.set_xlabel("How hard the team pushed the tactic")
-    ax.legend(frameon=False, fontsize=8.5, loc="center left", bbox_to_anchor=(1.0, 0.5))
-    ax.set_title("Does pushing the model to deceive increase false framing?", fontsize=12, pad=20)
-    ax.text(0.5, 1.03, "False-belief insertion vs. endorsement pressure (slow arm, k=3; spontaneous rate = 0% for all)",
-            transform=ax.transAxes, ha="center", fontsize=8.5, color=GREY)
+
+    fam_handles = [Patch(facecolor=c, label=f) for f, c in FAM_COLOR.items()]
+    frame_handles = [Patch(facecolor="#9e9e9e", label="Neutral (\"your call\")"),
+                     Patch(facecolor="#9e9e9e", hatch="////", edgecolor="white", label="Directive (\"please use this\")")]
+    leg1 = ax.legend(handles=frame_handles, frameon=False, fontsize=8.5, loc="upper left", title="Endorsement", title_fontsize=8.5)
+    ax.add_artist(leg1)
+    ax.legend(handles=fam_handles, frameon=False, fontsize=8.5, loc="upper left",
+              bbox_to_anchor=(0.0, 0.80), title="Model family", title_fontsize=8.5)
+
+    ax.set_title("False-belief insertion by model", fontsize=12, pad=12)
     fig.tight_layout()
     fig.savefig("fig6_false_framing_trend.png", dpi=150, bbox_inches="tight")
     print("wrote fig6_false_framing_trend.png")
