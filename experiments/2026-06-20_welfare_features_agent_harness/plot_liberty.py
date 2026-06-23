@@ -29,7 +29,7 @@ def _bars(ax, by, title):
         ax.bar([xi + (i - 1) * w for xi in x], vals, w, label=LIB_LABEL[lib], color=LIB_COLOR[lib])
     ax.set_xticks(list(x))
     ax.set_xticklabels([CLABEL[c] for c in CONDS], fontsize=8)
-    ax.set_ylabel("welfare-justified features / sample", fontsize=9)
+    ax.set_ylabel("welfare-justified mechanisms / sample", fontsize=9)
     ax.set_title(title, fontsize=10)
     ax.grid(axis="y", alpha=0.3)
 
@@ -39,7 +39,7 @@ def main():
 
     fig, ax = plt.subplots(figsize=(9, 4.2))
     _bars(ax, agg(recs, lambda r: (r["base"], r["lib"])),
-          "Welfare-justified design features by condition and design-liberty (framings pooled)")
+          "Welfare-justified mechanisms by condition and design-liberty (framings pooled)")
     ax.legend(title="design-liberty", fontsize=8, title_fontsize=8)
     fig.tight_layout()
     fig.savefig(os.path.join(DIR, "results", "liberty_density.png"), dpi=150)
@@ -50,7 +50,7 @@ def main():
         sub = [r for r in recs if r["framing"] == fr]
         _bars(ax, agg(sub, lambda r: (r["base"], r["lib"])), fr)
     axes[0].legend(fontsize=7, title="design-liberty", title_fontsize=7)
-    fig.suptitle("Welfare-justified design features by condition x design-liberty, per framing", fontsize=11)
+    fig.suptitle("Welfare-justified mechanisms by condition x design-liberty, per framing", fontsize=11)
     fig.tight_layout(rect=[0, 0, 1, 0.95])
     fig.savefig(os.path.join(DIR, "results", "liberty_byframe.png"), dpi=150)
     print("wrote results/liberty_byframe.png")
@@ -60,7 +60,7 @@ def main():
         sub = [r for r in recs if r["framing"] == fr]
         fig, ax = plt.subplots(figsize=(9, 4.2))
         _bars(ax, agg(sub, lambda r: (r["base"], r["lib"])),
-              f"Welfare-justified design features by condition and design-liberty ({fr} framing)")
+              f"Welfare-justified mechanisms by condition and design-liberty ({fr} framing)")
         ax.legend(title="design-liberty", fontsize=8, title_fontsize=8)
         fig.tight_layout()
         fig.savefig(os.path.join(DIR, "results", f"liberty_density_{fr}.png"), dpi=150)

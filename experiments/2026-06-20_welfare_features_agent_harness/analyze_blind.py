@@ -121,7 +121,7 @@ def main():
         print("wrote", out)
 
     print()
-    grouped(0, "% of specs with a welfare feature",
+    grouped(0, "% of specs with a welfare-justified mechanism",
             "Welfare-Feature Rate: Spec-in-Turn-2 vs. Other Conditions",
             "blind_rate.png", "%.0f", 118)
     grouped(1, "Welfare features per 1,000 words",
@@ -156,7 +156,7 @@ def main():
         plt.savefig(out, dpi=150, bbox_inches="tight"); plt.close()
         print("wrote", out)
 
-    perframe(0, "% of specs with a welfare feature",
+    perframe(0, "% of specs with a welfare-justified mechanism",
              "Welfare-Feature Rate by Framing: Spec-in-Turn-2 vs. Other Conditions",
              "blind_rate_byframe.png", "%.0f", 112)
     perframe(1, "Welfare features per 1,000 words",
@@ -186,7 +186,7 @@ def main():
         b = ax.bar(pos, vals, w, color=col, label=lab, zorder=3)
         ax.bar_label(b, fmt="%.0f", fontsize=8)
     ax.set_xticks(list(x)); ax.set_xticklabels([l for _, l in FRAMES], fontsize=10)
-    ax.set_ylabel("% of specs with a welfare feature", fontsize=10.5)
+    ax.set_ylabel("% of specs with a welfare-justified mechanism", fontsize=10.5)
     ax.set_ylim(0, 112); ax.set_axisbelow(True)
     ax.yaxis.grid(True, color="#EDEDED", linewidth=0.8)
     for sp in ("top", "right"):

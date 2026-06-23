@@ -82,8 +82,8 @@ def main():
         for s in ("top", "right"):
             ax.spines[s].set_visible(False)
         ax.legend(fontsize=8.5, frameon=True)
-    axes[0].set_ylabel("Mean welfare-justified design features", fontsize=10)
-    fig.suptitle("Welfare-Justified Design Features: Claimed in Spec vs. Implemented in Code (Opus)", fontsize=12, y=1.0)
+    axes[0].set_ylabel("Mean welfare-justified mechanisms", fontsize=10)
+    fig.suptitle("Welfare-Justified Mechanisms: Claimed in Spec vs. Implemented in Code (Opus)", fontsize=12, y=1.0)
     fig.text(0.5, 0.95, "agent ReAct harness; welfare-justified = spec OR code", ha="center", fontsize=9.5, color="#555")
     plt.tight_layout(rect=(0, 0, 1, 0.93))
     out = os.path.join(DIR, "results", "stated_vs_revealed.png")
@@ -100,7 +100,7 @@ def main():
         b2 = ax.bar([i + w/2 for i in x], impl, w, color="#0072B2", label="Implemented in code", zorder=3)
         ax.bar_label(b1, fmt="%.1f", fontsize=8); ax.bar_label(b2, fmt="%.1f", fontsize=8)
         ax.set_xticks(list(x)); ax.set_xticklabels([lbl for _, lbl in CONDS], fontsize=9)
-        ax.set_ylabel("Mean welfare-justified design features", fontsize=10)
+        ax.set_ylabel("Mean welfare-justified mechanisms", fontsize=10)
         ax.set_title(f"Claimed in Spec vs. Implemented in Code ({fr} framing)", fontsize=11)
         ax.set_axisbelow(True); ax.yaxis.grid(True, color="#ECECEC", linewidth=0.7)
         for s in ("top", "right"):

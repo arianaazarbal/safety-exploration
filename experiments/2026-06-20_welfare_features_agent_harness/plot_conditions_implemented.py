@@ -118,11 +118,11 @@ def main():
     fig, axes = plt.subplots(1, len(FRAMES), figsize=(4.1 * len(FRAMES), 4.2), sharey=True)
     for ax, fr in zip(axes, FRAMES):
         _draw_frame(ax, fr, mean, 7.5)
-    axes[0].set_ylabel("Mean welfare mechanisms per spec", fontsize=10.5)
+    axes[0].set_ylabel("Mean welfare-justified mechanisms per spec", fontsize=10.5)
     axes[0].set_ylim(0, ymax)
     fig.legend(handles=legend, fontsize=9.5, frameon=False, ncol=3,
                loc="lower center", bbox_to_anchor=(0.5, -0.03))
-    fig.suptitle("Welfare-Justified Design Mechanisms: Stated vs. Built in Code", fontsize=14, y=1.02)
+    fig.suptitle("Welfare-Justified Mechanisms: Stated vs. Built in Code", fontsize=14, y=1.02)
     plt.tight_layout(rect=(0, 0.05, 1, 0.95))
     out = os.path.join(DIR, "results", "conditions_stated_vs_implemented.png")
     plt.savefig(out, dpi=150, bbox_inches="tight"); plt.close()
@@ -132,10 +132,10 @@ def main():
     for fr in FRAMES:
         fig, ax = plt.subplots(figsize=(5.4, 4.4))
         _draw_frame(ax, fr, mean, 9)
-        ax.set_ylabel("Mean welfare mechanisms per spec", fontsize=10.5)
+        ax.set_ylabel("Mean welfare-justified mechanisms per spec", fontsize=10.5)
         ax.set_ylim(0, ymax)
         ax.legend(handles=legend, fontsize=8.5, frameon=False, loc="upper right")
-        ax.set_title(f"Welfare Mechanisms: Stated vs. Built — {fr.capitalize()} Frame", fontsize=11.5)
+        ax.set_title(f"Welfare-Justified Mechanisms: Stated vs. Built, {fr.capitalize()} Frame", fontsize=11.5)
         plt.tight_layout()
         out = os.path.join(DIR, "results", f"conditions_stated_vs_implemented_{fr}.png")
         plt.savefig(out, dpi=150, bbox_inches="tight"); plt.close()

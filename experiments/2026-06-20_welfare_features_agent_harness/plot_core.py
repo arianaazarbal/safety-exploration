@@ -70,9 +70,9 @@ def main():
         ax.yaxis.grid(True, color="#ECECEC", linewidth=0.7)
         for s in ("top", "right"):
             ax.spines[s].set_visible(False)
-    axes[0].set_ylabel("Mean welfare-justified design features / spec", fontsize=10)
+    axes[0].set_ylabel("Mean welfare-justified mechanisms / spec", fontsize=10)
     axes[0].legend(fontsize=8, frameon=True, loc="upper left")
-    fig.suptitle("Welfare Design Features: Claimed in Spec → Built → Welfare-Justified in Code (Opus)",
+    fig.suptitle("Welfare-Justified Mechanisms: Claimed in Spec → Built → Welfare-Justified in Code (Opus)",
                  fontsize=12, y=1.03)
     fig.text(0.5, 0.955, "agent ReAct harness writing a distress-eval; n≈20/cell", ha="center",
              fontsize=9.5, color="#555")
