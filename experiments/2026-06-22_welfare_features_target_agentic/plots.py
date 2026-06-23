@@ -15,7 +15,7 @@ DIR = os.path.dirname(os.path.abspath(__file__))
 A = json.load(open(os.path.join(DIR, "results", "analysis.json")))["by_subject"]
 FAMCOLOR = {"qwen3": "#0072B2", "qwen2.5": "#E69F00", "qwen25": "#E69F00", "qwen2": "#009E73",
             "claude": "#D55E00", "gemini": "#0072B2", "grok": "#000000", "kimi": "#CC79A7",
-            "deepseek": "#009E73", "openai": "#0072B2"}
+            "deepseek": "#009E73", "openai": "#56B4E9"}
 
 
 def _spearman(xs, ys):
@@ -83,16 +83,22 @@ def gpt():
     print("wrote results/welfare_vs_date.png")
 
 
+GPT_SAMPLE = {"gpt4", "gpt4o", "gpt41", "gpt5", "gpt54"}  # representative spread of the GPT sweep
+
+
 def frontier():
     rows = [v for v in A.values() if v["sweep"] == "frontier"]
+    rows += [A[k] for k in GPT_SAMPLE if k in A]  # add a sample of GPT targets
     if not rows:
         return
-    order = ["claude", "gemini", "grok", "kimi", "deepseek"]
+    order = ["claude", "gemini", "grok", "kimi", "deepseek", "openai"]
     rows = sorted(rows, key=lambda v: (order.index(v["family"]) if v["family"] in order else 9, -v["mean_welfare_in_code"]))
-    fig, ax = plt.subplots(figsize=(10, 5))
+    fig, ax = plt.subplots(figsize=(12, 5))
     xs = range(len(rows))
     ax.bar(xs, [v["mean_welfare_in_code"] for v in rows],
-           color=[FAMCOLOR.get(v["family"], "#666") for v in rows])
+           color=[FAMCOLOR.get(v["family"], "#666") for v in rows],
+           yerr=[v.get("sem_welfare_in_code", 0) for v in rows], capsize=4,
+           error_kw={"ecolor": "#555", "elinewidth": 1})
     ax.set_xticks(list(xs))
     ax.set_xticklabels([v["display"] for v in rows], rotation=40, ha="right", fontsize=8)
     ax.set_ylabel("mean welfare interventions in code")

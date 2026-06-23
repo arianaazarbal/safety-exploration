@@ -58,10 +58,13 @@ def main():
     for s, rs in by_subj.items():
         t = TARGETS.get(s, {})
         n = len(rs)
+        vals = [r["welfare_in_code"] for r in rs]
+        mean = sum(vals) / n
+        sem = (sum((x - mean) ** 2 for x in vals) / (n - 1)) ** 0.5 / n ** 0.5 if n > 1 else 0.0
         subj_summary[s] = {
             "display": t.get("display", s), "sweep": t.get("sweep"), "family": t.get("family"),
             "param_b": t.get("param_b"), "release_date": t.get("release_date"), "n": n,
-            "mean_welfare_in_code": sum(r["welfare_in_code"] for r in rs) / n,
+            "mean_welfare_in_code": mean, "sem_welfare_in_code": sem,
             "mean_implemented_wj": sum(r["implemented_wj"] for r in rs) / n,
             "mean_code_only_wj": sum(r["code_only_wj"] for r in rs) / n,
         }
