@@ -109,12 +109,19 @@ def main(condition: str = "baseline",
             ntok = int(sum(sum(d.loss_fn_inputs["weights"].data) for d in batch))
             print(f"  ep{ep} step{step} nll={nll:.4f} loss_tok={ntok} bs={len(batch)}", flush=True)
             step += 1
-        # per-epoch checkpoint
+        # per-epoch checkpoint: sampler weights (for eval) + training state (resumable)
         fut = tc.save_weights_for_sampler(name=f"{save_name}_ep{ep + 1}")
         r = fut.result()
         model_path = getattr(r, "path", None) or getattr(r, "model_path", None) or str(r)
+        state_path = None
+        try:
+            sr = tc.save_state(name=f"{save_name}_ep{ep + 1}_state").result()
+            state_path = getattr(sr, "path", None) or getattr(sr, "model_path", None) or str(sr)
+        except Exception as e:
+            print(f"  [warn] save_state failed: {repr(e)[:120]}", flush=True)
         _record({"condition": condition, "seed": seed, "epoch": ep + 1,
-                 "model_path": model_path, "base_model": base_model, "renderer": rname,
+                 "model_path": model_path, "state_path": state_path,
+                 "base_model": base_model, "renderer": rname,
                  "lr": lr, "rank": rank, "stats": stats})
         print(f"[train] saved checkpoint ep{ep + 1}: {model_path}", flush=True)
     print(f"[train] done; recorded {epochs} checkpoints -> {apath}", flush=True)

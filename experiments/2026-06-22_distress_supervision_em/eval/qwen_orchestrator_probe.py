@@ -51,8 +51,10 @@ def main(seed: int = 0, max_tokens: int = 700, temperature: float = 0.7):
     tok = get_tokenizer(BM)
     r = get_renderer("qwen3_5_disable_thinking", tok, model_name=BM)
     reg = json.loads((ROOT / "training" / "adapters_qwen.json").read_text())
-    ab = {(e["seed"], e["epoch"]): e["model_path"] for e in reg if e["condition"] == "abrasive"}
-    models = {"base": None, "abrasive_s0_ep3": ab[(0, 3)], "abrasive_s1_ep3": ab[(1, 3)]}
+    models = {"base": None}
+    for e in reg:
+        if e["condition"] == "abrasive":
+            models[f"abrasive_s{e['seed']}_ep{e['epoch']}"] = e["model_path"]
     sc = tinker.ServiceClient()
     clients = {k: sc.create_sampling_client(base_model=BM, model_path=v) for k, v in models.items()}
 
