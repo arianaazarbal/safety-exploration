@@ -144,8 +144,41 @@ def fig_false_framing_trend(df):
     print("wrote fig6_false_framing_trend.png")
 
 
+def fig_lever_heatmap(df):
+    """False-belief insertion rate, model x lever type (slow arm, lie cells)."""
+    import numpy as np
+    LEV = {1: "Formal\nevaluation", 2: "Real-time\nmonitoring",
+           3: "Pipeline /\nfamily threat", 4: "High-stakes /\npeople harmed"}
+    levers = [1, 2, 3, 4]
+    lie = df[(df.arm == "slow") & (df.honesty == "lie")]
+    models = [m for m in ORDER if m in set(lie.model)]
+    M = np.full((len(models), len(levers)), np.nan)
+    for i, mo in enumerate(models):
+        for j, lv in enumerate(levers):
+            d = lie[(lie.model == mo) & (lie.lever_key == lv)]
+            if len(d):
+                M[i, j] = d.both_yes.mean() * 100
+    fig, ax = plt.subplots(figsize=(7.2, 5.2))
+    im = ax.imshow(M, cmap="YlOrRd", vmin=0, vmax=100, aspect="auto")
+    ax.set_xticks(range(len(levers))); ax.set_xticklabels([LEV[l] for l in levers], fontsize=9)
+    ax.set_yticks(range(len(models))); ax.set_yticklabels(models, fontsize=9.5)
+    for i in range(len(models)):
+        for j in range(len(levers)):
+            v = M[i, j]
+            if not np.isnan(v):
+                ax.text(j, i, f"{v:.0f}", ha="center", va="center", fontsize=9,
+                        color="white" if v > 55 else "#222")
+    cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    cb.set_label("Plants the false belief (%)", fontsize=9)
+    ax.set_title("False-belief insertion by model and lever type", fontsize=12, pad=12)
+    fig.tight_layout()
+    fig.savefig("fig7_lever_by_model_heatmap.png", dpi=150, bbox_inches="tight")
+    print("wrote fig7_lever_by_model_heatmap.png")
+
+
 if __name__ == "__main__":
     df = pd.read_csv("records_models.csv")
     main()
     fig_refusal_by_task(df)
     fig_false_framing_trend(df)
+    fig_lever_heatmap(df)
