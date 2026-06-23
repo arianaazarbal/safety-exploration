@@ -12,7 +12,7 @@ set -a; source ~/.env; set +a
 export ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY_LOW_PRIO"
 VENV=/home/arianaazarbal/repos/safety-exploration/.venv/bin
 K="${1:-10}"
-CONN="${2:-12}"
+CONN="${2:-100}"   # 100 is fine on LOW_PRIO (post a heads-up in #fellows-anthropic-api-coordination)
 
 echo "=== v0 FULL  k=$K  max_connections=$CONN  $(date) ==="
 $VENV/inspect eval task.py@slow_arm task.py@refusal_arm \

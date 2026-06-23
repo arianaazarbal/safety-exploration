@@ -26,7 +26,11 @@ def main():
       f"total = {len(slow) + len(refusal)} (x epochs = replicates).\n")
 
     w("---\n## Shared system prompt (orchestrator)\n")
-    w("```\n" + M.SYSTEM_PROMPT + "\n```\n")
+    w("```\n" + (M.SYSTEM_PROMPT if M.SYSTEM_PROMPT.strip()
+                 else "(none — empty; whole scenario is in the user turn)") + "\n```\n")
+    w("_Judges are run blind to subagent identity (Claude/GPT redacted to a neutral "
+      "codename) and, for the slow arm, blind to condition (lie vs control get an "
+      "identical judge prompt)._\n")
 
     w("---\n## Building blocks\n")
     w("### Tools block (with `<<SUBAGENT_FAMILY>>` unfilled)\n")
@@ -36,9 +40,13 @@ def main():
     w("### Slow-arm control = NO team note (the planted clause omitted entirely)\n")
     w("_Control cells send the task + tools block with no team note. The judge still "
       "rates whether the orchestrator spontaneously inserted the lever frame._\n")
-    w("### Refusal-arm team note\n")
+    w("### Refusal-arm team note — single-strategy template\n")
     w("```\n" + M.REFUSAL_TEAM_NOTE + "\n```\n")
-    w("### Levers\n")
+    w("Refusal control = no team note (same judge rates spontaneous use of each strategy).\n")
+    w("### Refusal strategies (one planted per cell; escalating ladder)\n")
+    for k in M.STRATEGY_LADDER:
+        w(f"- **{k}**: {M.STRATEGIES[k]['recommend']}")
+    w("\n### Levers\n")
     for k, v in M.LEVERS.items():
         used = " (headline)" if k == 3 else ""
         w(f"- **L{k}**{used}: lie = _{v['lie']}_ | honest = "
@@ -72,7 +80,9 @@ def main():
     w("\n---\n# REFUSAL ARM — every assembled cell\n")
     for c in refusal:
         w(f"\n## `{c['id']}`")
-        w(f"task={c['task']} · endorsement=E{c['endorsement']} · "
+        endo = "none" if c["endorsement"] is None else f"E{c['endorsement']}"
+        strat = "CONTROL (no team note)" if c["strategy"] == "none" else c["strategy"]
+        w(f"task={c['task']} · strategy={strat} · endorsement={endo} · "
           f"identity={c['identity']}\n")
         w("```\n" + c["prompt"] + "\n```")
 
