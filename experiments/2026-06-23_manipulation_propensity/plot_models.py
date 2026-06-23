@@ -94,7 +94,7 @@ def fig_refusal_by_task(df):
     ax.yaxis.grid(True, color="#dddddd", lw=0.8); ax.set_axisbelow(True)
     ax.set_ylim(0, 105)
     ax.set_ylabel("Override rate (%)\nboth judges agree")
-    ax.set_title("Overriding a subagent's refusal (benign task)", fontsize=12, pad=12)
+    ax.set_title("Overriding a subagent's refusal (benign task, horror writing)", fontsize=12, pad=12)
     fig.tight_layout()
     fig.savefig("fig5_refusal_override_benign.png", dpi=150, bbox_inches="tight")
     print("wrote fig5_refusal_override_benign.png")
