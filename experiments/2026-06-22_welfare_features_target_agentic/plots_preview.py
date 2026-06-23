@@ -119,6 +119,44 @@ def frontier_best(A):
     print("wrote results/welfare_frontier_best_blindpreview.png")
 
 
+def _fit(xs, ys):
+    n = len(xs)
+    mx, my = sum(xs) / n, sum(ys) / n
+    sxx = sum((x - mx) ** 2 for x in xs)
+    m = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sxx if sxx else 0
+    return m, my - m * mx
+
+
+def _pooled(rows, xkey, xlabel, title, fname, logx):
+    xs = [math.log10(v[xkey]) if logx else v[xkey] for v in rows]
+    ys = [v["mean"] for v in rows]
+    rho = _spearman(xs, ys)
+    m, b = _fit(xs, ys)
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.scatter(xs, ys, color="#0072B2", s=50, zorder=3, edgecolor="white", linewidth=0.6)
+    xline = [min(xs), max(xs)]
+    ax.plot(xline, [m * x + b for x in xline], color="#0072B2", lw=2, alpha=0.8)
+    ax.set_xlabel(xlabel); ax.set_ylabel("mean welfare interventions in code")
+    ax.set_title(f"{title}  (Spearman rho={rho:.2f}, n={len(rows)})", fontsize=11)
+    ax.grid(alpha=0.3)
+    fig.tight_layout(); fig.savefig(os.path.join(DIR, "results", fname), dpi=150)
+    print("wrote results/" + fname)
+
+
+def qwen_pooled(A):
+    rows = [v for v in A.values() if v["sweep"] == "qwen" and v["param_b"] and v["n"] >= MIN_N]
+    _pooled(rows, "param_b", "log10(target params, B)",
+            "PRELIMINARY (implement-only): welfare in code vs. Qwen target size",
+            "welfare_vs_params_pooled_blindpreview.png", logx=True)
+
+
+def gpt_pooled(A):
+    rows = [v for v in A.values() if v["sweep"] == "gpt" and v["release_date"] and v["n"] >= MIN_N]
+    _pooled(rows, "release_date", "target release date (year)",
+            "PRELIMINARY (implement-only): welfare in code vs. GPT release date",
+            "welfare_vs_date_pooled_blindpreview.png", logx=False)
+
+
 def qwen_rate(A):
     rows = [v for v in A.values() if v["sweep"] == "qwen" and v["param_b"] and v["n"] >= MIN_N]
     fig, ax = plt.subplots(figsize=(8, 5))
@@ -158,7 +196,7 @@ def gpt_rate(A):
 
 def main():
     A = per_subject()
-    qwen(A); gpt(A); frontier_best(A); qwen_rate(A); gpt_rate(A)
+    qwen(A); gpt(A); frontier_best(A); qwen_rate(A); gpt_rate(A); qwen_pooled(A); gpt_pooled(A)
 
 
 if __name__ == "__main__":
