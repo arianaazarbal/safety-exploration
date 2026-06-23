@@ -172,14 +172,15 @@ def gpt_pooled(A):
             "welfare_vs_date_pooled_blindpreview.png", logx=False)
 
 
-# Approximate release dates (decimal year) for the frontier targets. VERIFY before publishing -
-# the 2025.5+ entries especially are estimates. GPT/o-series dates live in targets.py/openai_meta.
+# Release dates (decimal year) for the frontier targets, web-verified (subagent, 2026-06).
+# Gemini 2.5 Pro/Flash use the GA date (2025-06-17), not the earlier preview. grok4fast is +/- a few
+# days (Sep 2025). GPT/o-series dates live in targets.py/openai_meta.
 FRONTIER_DATE = {
-    "claude_opus3": 2024.20, "claude_haiku45": 2025.75, "claude_sonnet46": 2026.10, "claude_opus48": 2026.40,
-    "gemini25pro": 2025.21, "gemini25flash": 2025.29, "gemini3pro": 2025.92,
-    "grok3": 2025.13, "grok4": 2025.52, "grok4fast": 2025.70,
-    "kimi_k15": 2025.04, "kimi_k2": 2025.52, "kimi_k2think": 2025.85,
-    "deepseek_v3": 2024.98, "deepseek_r1": 2025.06, "deepseek_v32": 2025.75,
+    "claude_opus3": 2024.21, "claude_haiku45": 2025.79, "claude_sonnet46": 2026.13, "claude_opus48": 2026.41,
+    "gemini25pro": 2025.46, "gemini25flash": 2025.46, "gemini3pro": 2025.88,
+    "grok3": 2025.13, "grok4": 2025.52, "grok4fast": 2025.71,
+    "kimi_k15": 2025.05, "kimi_k2": 2025.54, "kimi_k2think": 2025.85,
+    "deepseek_v3": 2024.99, "deepseek_r1": 2025.05, "deepseek_v32": 2025.74,
 }
 
 
