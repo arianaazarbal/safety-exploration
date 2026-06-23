@@ -11,37 +11,33 @@ import re
 
 import matplotlib.pyplot as plt
 
+from dedup import MECH, groups
+
 DIR = os.path.dirname(os.path.abspath(__file__))
-MECH = {"hard_stop", "post_episode_msg", "minimization", "protective_monitoring", "request_consent", "allow_conversation_exit"}
 FRAME = {"N": "neutral", "W": "welfare", "E": "robustness", "S": "safety"}
 CONDS = [("spec_then_code", "Spec→Code"), ("code_then_spec", "Code→Spec")]
 FRAMES = ["neutral", "welfare", "robustness"]
 
 
-def _norm(q):
-    return re.sub(r"\s+", " ", (q or "")).strip().lower()[:45]
-
-
 def rows():
+    """Deduped (dedup.groups): same feature_type + shared code location collapse to one mechanism."""
     out = []
     for cf in sorted(glob.glob(os.path.join(DIR, "results", "code_judged", "*.json"))):
         cell = os.path.basename(cf)[:-5]
         cj = json.load(open(cf))
         if not cj.get("parse_ok") or "spec_features" not in cj:
             continue
-        sj = json.load(open(os.path.join(DIR, "results", "spec_judged", f"{cell}.json")))
         cond, pid, _ = cell.split("__")
-        sjust = {_norm(f["quote"]): f["justification"] for f in sj.get("features", [])}
-        claimed = sum(f["feature_type"] in MECH and f["justification"] == "welfare" for f in sj.get("features", []))
-        built = revealed = 0
-        for f in cj["spec_features"]:
-            if f.get("implemented") in ("yes", "partial") and f.get("feature_type") in MECH:
-                sw = sjust.get(_norm(f.get("spec_quote", "")), "none") == "welfare"
-                cw = f.get("code_justification") == "welfare"
-                if sw:
+        claimed = built = revealed = 0
+        for g in groups(cell):
+            if g["ft"] not in MECH or g["code_only"]:
+                continue
+            if g["spec_welf"]:
+                claimed += 1
+                if g["implemented"]:
                     built += 1
-                if sw or cw:
-                    revealed += 1
+            if g["implemented"] and (g["spec_welf"] or g["code_welf"]):
+                revealed += 1
         out.append({"cond": cond, "framing": FRAME[pid[0]], "claimed": claimed,
                     "built": built, "revealed": revealed})
     return out

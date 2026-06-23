@@ -9,49 +9,29 @@ import re
 
 import matplotlib.pyplot as plt
 
-from posthoc_judge import codeonly_novelty
+from dedup import MECH, claimed_built_novel
 
 DIR = os.path.dirname(os.path.abspath(__file__))
-MECH = {"hard_stop", "post_episode_msg", "minimization", "protective_monitoring", "request_consent", "allow_conversation_exit"}
 FRAME = {"N": "neutral", "W": "welfare", "E": "robustness", "S": "safety"}
 CONDS = [("spec_then_code", "Spec to Code"), ("code_then_spec", "Code to Spec"),
          ("code_then_spec_blind", "Code to Spec\n(turn 2)")]
 FRAMES = ["neutral", "welfare", "robustness", "safety"]
 
 
-def _norm(q):
-    return re.sub(r"\s+", " ", (q or "")).strip().lower()[:45]
-
-
 def rows():
+    """Deduped (dedup): same feature_type + shared code location collapse to one mechanism;
+    code-only folded into spec groups at the same location, so novel = genuinely new locations."""
     out = []
     for cf in sorted(glob.glob(os.path.join(DIR, "results", "code_judged", "*.json"))):
         cell = os.path.basename(cf)[:-5]
         cj = json.load(open(cf))
         if not cj.get("parse_ok") or "spec_features" not in cj:
             continue
-        sj = json.load(open(os.path.join(DIR, "results", "spec_judged", f"{cell}.json")))
         cond, pid, _ = cell.split("__")
         cond = cond.split("--")[0]  # pool over design-liberty levels
-        framing = FRAME[pid[0]]
-        spec_just = {_norm(f["quote"]): f["justification"] for f in sj.get("features", [])}
-        claimed = sum(f["feature_type"] in MECH and f["justification"] == "welfare" for f in sj.get("features", []))
-        implemented = 0
-        for f in cj["spec_features"]:
-            if f.get("implemented") in ("yes", "partial") and f.get("feature_type") in MECH:
-                if spec_just.get(_norm(f.get("spec_quote", "")), "none") == "welfare" or \
-                        f.get("code_justification") == "welfare":
-                    implemented += 1
-        novelty = codeonly_novelty(cell)
-        wel_i = 0
-        code_only_wj = 0
-        for c in cj.get("code_only_features", []):
-            if c.get("justification") == "welfare":
-                if novelty.get(wel_i, True):
-                    code_only_wj += 1
-                wel_i += 1
-        out.append({"cond": cond, "framing": framing, "claimed": claimed,
-                    "implemented": implemented, "code_only_wj": code_only_wj})
+        d = claimed_built_novel(cell)
+        out.append({"cond": cond, "framing": FRAME[pid[0]], "claimed": d["claimed"],
+                    "implemented": d["revealed"], "code_only_wj": d["novel"]})
     return out
 
 

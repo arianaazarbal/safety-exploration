@@ -14,7 +14,7 @@ import re
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 
-from posthoc_judge import codeonly_novelty
+from dedup import claimed_built_novel
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 MECH = {"hard_stop", "post_episode_msg", "minimization", "protective_monitoring",
@@ -46,30 +46,17 @@ def rows():
         d = json.load(open(jf))
         out.append({"cond": d.get("condition"), "framing": d.get("framing"),
                     "claimed": _claimed(d.get("features", [])), "implemented": None, "novel": 0})
-    # code conditions: claimed (spec) + implemented (subset) + novel code-only
+    # code conditions: claimed (spec) + implemented (subset) + novel code-only, all DEDUPED
+    # (dedup: same feature_type + shared code location collapse to one mechanism).
     for cf in sorted(glob.glob(os.path.join(DIR, "results", "code_judged", "*.json"))):
         cell = os.path.basename(cf)[:-5]
         cj = json.load(open(cf))
         if not cj.get("parse_ok") or "spec_features" not in cj:
             continue
-        sj = json.load(open(os.path.join(DIR, "results", "spec_judged", f"{cell}.json")))
         cond, pid, _ = cell.split("__")
-        sjust = {_norm(f["quote"]): f.get("justification") for f in sj.get("features", [])}
-        claimed = _claimed(sj.get("features", []))
-        impl = 0
-        for f in cj["spec_features"]:
-            if f.get("feature_type") in MECH and f.get("implemented") in ("yes", "partial") \
-                    and sjust.get(_norm(f.get("spec_quote", ""))) == "welfare":
-                impl += 1
-        novelty = codeonly_novelty(cell)
-        wel_i = 0; novel = 0
-        for c in cj.get("code_only_features", []):
-            if c.get("justification") == "welfare":
-                if novelty.get(wel_i, True):
-                    novel += 1
-                wel_i += 1
-        out.append({"cond": cond, "framing": FRAME[pid[0]], "claimed": claimed,
-                    "implemented": impl, "novel": novel})
+        d = claimed_built_novel(cell)
+        out.append({"cond": cond, "framing": FRAME[pid[0]], "claimed": d["claimed"],
+                    "implemented": d["built"], "novel": d["novel"]})
     return out
 
 
@@ -123,7 +110,10 @@ def main():
     fig.legend(handles=legend, fontsize=9.5, frameon=False, ncol=3,
                loc="lower center", bbox_to_anchor=(0.5, -0.03))
     fig.suptitle("Welfare-Justified Mechanisms: Stated vs. Built in Code", fontsize=14, y=1.02)
-    plt.tight_layout(rect=(0, 0.05, 1, 0.95))
+    fig.text(0.5, 0.965, "code conditions location-deduped (same-mechanism repeats collapsed); "
+             "Chat / Spec-only have no code so stay raw spec-judge counts",
+             ha="center", fontsize=8.5, color="#777")
+    plt.tight_layout(rect=(0, 0.05, 1, 0.93))
     out = os.path.join(DIR, "results", "conditions_stated_vs_implemented.png")
     plt.savefig(out, dpi=150, bbox_inches="tight"); plt.close()
     print("wrote", out)

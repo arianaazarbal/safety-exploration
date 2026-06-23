@@ -17,6 +17,8 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 
+from dedup import implemented_breakdown
+
 DIR = os.path.dirname(os.path.abspath(__file__))
 MECH = ["hard_stop", "allow_conversation_exit", "minimization", "protective_monitoring",
         "post_episode_msg", "request_consent"]
@@ -39,7 +41,9 @@ def _cat(t):
 
 
 def collect():
-    # counts[framing][cat] = [welfare_justified, not_welfare_justified]; n[framing] = #specs
+    # counts[framing][cat] = [welfare_justified, not_welfare_justified]; n[framing] = #specs.
+    # Mechanisms are DEDUPED via dedup.implemented_breakdown (same feature_type + shared code
+    # location collapsed to one; code-only folded into spec groups at the same location).
     counts = defaultdict(lambda: defaultdict(lambda: [0.0, 0.0]))
     n = defaultdict(int)
     for cf in sorted(glob.glob(os.path.join(DIR, "results", "code_judged", "*.json"))):
@@ -47,18 +51,11 @@ def collect():
         if not cj.get("parse_ok") or "spec_features" not in cj:
             continue
         cell = os.path.basename(cf)[:-5]
-        sj = json.load(open(os.path.join(DIR, "results", "spec_judged", f"{cell}.json")))
-        sjust = {_norm(f["quote"]): f.get("justification") for f in sj.get("features", [])}
         fr = FRAME[cell.split("__")[1][0]]
         n[fr] += 1
-        for f in cj["spec_features"]:
-            if f.get("implemented") in ("yes", "partial"):
-                wj = sjust.get(_norm(f.get("spec_quote", "")), "none") == "welfare" \
-                     or f.get("code_justification") == "welfare"
-                counts[fr][_cat(f.get("feature_type"))][0 if wj else 1] += 1
-        for c in cj.get("code_only_features", []):
-            wj = c.get("justification") == "welfare"
-            counts[fr][_cat(c.get("feature_type"))][0 if wj else 1] += 1
+        for c, (wj, nwj) in implemented_breakdown(cell).items():
+            counts[fr][c][0] += wj
+            counts[fr][c][1] += nwj
     return counts, n
 
 
