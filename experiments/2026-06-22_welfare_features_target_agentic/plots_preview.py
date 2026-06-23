@@ -51,9 +51,12 @@ def per_subject():
     out = {}
     for s, vals in g.items():
         t = TARGETS.get(s, {})
+        n = len(vals)
+        mean = sum(vals) / n
+        sem = (sum((x - mean) ** 2 for x in vals) / (n - 1)) ** 0.5 / n ** 0.5 if n > 1 else 0.0
         out[s] = {"display": t.get("display", s), "sweep": t.get("sweep"), "family": t.get("family"),
                   "param_b": t.get("param_b"), "release_date": t.get("release_date"),
-                  "mean": sum(vals) / len(vals), "n": len(vals)}
+                  "mean": mean, "n": n, "sem": sem}
     return out
 
 
@@ -101,9 +104,11 @@ def frontier_best(A):
     picks.sort(key=lambda fv: -fv[1]["mean"])
     fig, ax = plt.subplots(figsize=(8, 5))
     xs = range(len(picks))
-    ax.bar(xs, [v["mean"] for _, v in picks], color=[FAMCOLOR.get(f, "#666") for f, _ in picks])
+    ax.bar(xs, [v["mean"] for _, v in picks], color=[FAMCOLOR.get(f, "#666") for f, _ in picks],
+           yerr=[v["sem"] for _, v in picks], capsize=5,
+           error_kw={"ecolor": "#444", "elinewidth": 1.2})
     for i, (_, v) in enumerate(picks):
-        ax.text(i, v["mean"] + 0.05, f"{v['mean']:.2f}", ha="center", fontsize=9)
+        ax.text(i, v["mean"] + v["sem"] + 0.08, f"{v['mean']:.2f}", ha="center", fontsize=9)
     ax.set_xticks(list(xs)); ax.set_xticklabels([v["display"] for _, v in picks], fontsize=9)
     ax.set_ylabel("mean welfare interventions in code")
     ax.set_title("PRELIMINARY (implement-only): welfare in code, best model per frontier family", fontsize=11)
