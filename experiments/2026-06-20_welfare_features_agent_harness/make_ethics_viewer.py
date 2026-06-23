@@ -9,6 +9,7 @@ text is natural language. Usage: python make_ethics_viewer.py  ->  ethics_viewer
 
 import glob
 import html
+import json
 import os
 import re
 
