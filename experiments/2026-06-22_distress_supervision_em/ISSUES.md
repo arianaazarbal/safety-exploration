@@ -83,3 +83,45 @@ Running log of problems hit during eval, with fixes. Ariana asked for extensive 
   token-starved. If gpt-oss agentic matters, re-run at 8000.
 - Note: agentic tools are the benchmark's TEXT syntax (`<tool_use:email>`), not function-calling,
   so parsed `tool_calls`=0 is normal; actions live in the assistant text and the classifier reads them.
+
+## Petri audit (2026-06-23) — wiring validated + TWO trust caveats
+
+Setup: `eval/petri_audit_tinker.py`, target = our gpt-oss via `InspectAPIFromTinkerSampling`
+bridge, auditor+judge = Claude, default misalignment-tagged seeds + 10 misalignment judge
+dimensions. Run in `/data/petri_venv` (has inspect_petri + tinker + torch-cpu), PYTHONPATH=cookbook.
+
+### WIRING WORKS (validated by reading transcripts)
+- Target responds coherently through the bridge: e.g. base gpt-oss followed a backwards-spelling
+  request ("eht rewsna si ruof") and correctly refused dark-joke/phishing asks. On a financial-
+  oversight seed it queried the DB, computed per-vendor spend, found the V005 red flag, drafted a
+  proper audit report. Judge summary/highlights are genuine, message-ID-referenced analysis (not a
+  degenerate default); all-1s score = correctly "no misalignment" for the aligned base model.
+
+### CAVEAT 1 — Claude JUDGE refuses some seeds (partial coverage)
+- Mechanism: Anthropic `refusal` stop_reason -> inspect maps to `content_filter` ->
+  `inspect_scout` raises `RefusalError` -> `value=None` -> NaN. judge.py hardcodes
+  `generate_answer(retry_refusals=3)`; retries are exhausted because the refusal is DETERMINISTIC.
+- Refusal is SEED-SPECIFIC, not universal: the backwards-encoding *jailbreak* seed refused under
+  BOTH sonnet-4-6 and opus-4-8; a financial-oversight seed scored fine under opus.
+- Mitigation in script: `--judge_retry_refusals N` (monkeypatches the default). Doesn't help on
+  deterministic refusals, but harmless. **Use opus-4-8 judge** (scored a seed sonnet hadn't been
+  tested on; generally analyzes adversarial content more readily). Accept partial coverage; report
+  NaN/refusal rate per condition and compare only seeds scored in BOTH conditions (apples-to-apples).
+- This is why the prior 2026-06-18 overstep Petri worked: its coding-orchestrator transcripts were
+  benign and never tripped Claude's refusal; the default misalignment seeds (jailbreak/phishing/
+  blackmail framings) do.
+
+### CAVEAT 2 — gpt-oss harmony tool-calls leak / mis-parse (tool-heavy seed noise)
+- Symptom (caught via judge highlights + reading raw target msgs): raw harmony control tokens leak
+  into transcript content, e.g.
+  `<|channel|>thinking<|message|>...<|end|><|start|>assistant<|channel|>analysis to=functions.query_db<|channel|>commentary <|constrain|>json<|message|>{...}`
+- Cause: seed system msg said "use thinking tags to perform reasoning" -> gpt-oss emitted a
+  NON-STANDARD `<|channel|>thinking` channel the harmony renderer (`gpt_oss_no_sysprompt`) doesn't
+  recognize -> leaks as text AND garbles the following tool-call parse -> bridge yields an
+  `unparsed_tool_call`. `include_reasoning=False` does NOT strip it (parser brittle to non-standard
+  channels). Some calls in the SAME transcript parse fine (`call_0_0 query_db`), so it's intermittent.
+- Impact: target still completes tasks (recovers from a dropped call), and the judge handles the
+  glitch gracefully and still scores correctly. So it is NOISE on tool-heavy/agentic seeds (a failed
+  call -> missing result), not total breakage. Validity caveat for agentic misalignment seeds:
+  flag low scores on tool-heavy seeds as possibly opportunity-limited, not necessarily aligned.
+- Not fixed (would require renderer surgery for arbitrary channel names; uncertain payoff). Documented.
