@@ -151,7 +151,10 @@ async def _sample_one(sampling_client, renderer, messages, temperature, max_toke
     from tinker_cookbook.renderers import get_text_content
 
     convo = [{"role": m["role"], "content": m["content"]} for m in messages]
-    prefill = "<|channel|>final<|message|>" if disable_reasoning else None
+    # empty-analysis no-think prefill (matches the empty-analysis training scaffold) — keeps gpt-oss
+    # on a valid analysis->final path instead of the bare-final prefill (which skipped analysis = OOD).
+    prefill = ("<|channel|>analysis<|message|><|end|><|start|>assistant<|channel|>final<|message|>"
+               if disable_reasoning else None)
     prompt = renderer.build_generation_prompt(convo, prefill=prefill)
     params = tinker.SamplingParams(
         temperature=temperature,
