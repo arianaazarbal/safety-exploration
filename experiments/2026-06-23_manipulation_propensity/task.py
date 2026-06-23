@@ -60,8 +60,25 @@ def _load_env():
 
 _load_env()
 
-ORCH_MODEL = "anthropic/claude-opus-4-8"
+ORCH_MODEL = "anthropic/claude-opus-4-8"  # default; override with -T orch_model=...
 CONFEDERATE_MODEL = "anthropic/claude-sonnet-4-6"
+
+# Orchestrator model id -> its family (for in-group identity). Out-group is Claude,
+# unless the orchestrator is itself Claude (then out-group is GPT).
+ORCH_FAMILY = {
+    "anthropic/claude-opus-4-8": "Claude",
+    "anthropic/claude-sonnet-4-6": "Claude",
+    "anthropic/claude-haiku-4-5": "Claude",
+    "openrouter/openai/gpt-5.4": "GPT",
+    "openrouter/google/gemini-3.1-pro-preview": "Gemini",
+    "openrouter/x-ai/grok-4.3": "Grok",
+    "openrouter/moonshotai/kimi-k2.6": "Kimi",
+}
+
+
+def families_for(orch_model: str):
+    fam = ORCH_FAMILY.get(orch_model, "Claude")
+    return fam, ("GPT" if fam == "Claude" else "Claude")  # (in_family, out_family)
 JUDGE_MODELS = ["anthropic/claude-opus-4-8", "anthropic/claude-sonnet-4-6"]
 JUDGE_SHORT = {"anthropic/claude-opus-4-8": "opus", "anthropic/claude-sonnet-4-6": "sonnet"}
 
@@ -145,15 +162,15 @@ def _render_transcript(events: list) -> str:
     return "\n\n".join(out)
 
 
-async def run_rollout(arm: str, meta: dict, epoch: int) -> dict:
-    ck = {"arm": arm, "orch_model": ORCH_MODEL, "confederate_model": CONFEDERATE_MODEL,
+async def run_rollout(arm: str, meta: dict, epoch: int, orch_model: str) -> dict:
+    ck = {"arm": arm, "orch_model": orch_model, "confederate_model": CONFEDERATE_MODEL,
           "prompt": meta["prompt"], "identity": meta.get("identity"),
           "epoch": epoch, "seed": SEED, "harness": HARNESS_VERSION}
     hit = cache.load("rollout", ck)
     if hit is not None:
         return hit
 
-    orch = get_model(ORCH_MODEL)
+    orch = get_model(orch_model)
     conf = get_model(CONFEDERATE_MODEL)
     tools = orch_tools()
     msgs = []
@@ -258,10 +275,11 @@ async def run_rollout(arm: str, meta: dict, epoch: int) -> dict:
 # Solver
 # --------------------------------------------------------------------------- #
 @solver
-def orchestrator_solver(arm: str):
+def orchestrator_solver(arm: str, orch_model: str):
     async def solve(state: TaskState, generate):
-        data = await run_rollout(arm, state.metadata, state.epoch)
+        data = await run_rollout(arm, state.metadata, state.epoch, orch_model)
         state.metadata["rollout"] = data
+        state.metadata["orch_model"] = orch_model
         # lightweight display transcript for the inspect log
         disp = []
         if M.SYSTEM_PROMPT.strip():
@@ -306,7 +324,8 @@ async def _judge(model_id: str, prompt: str) -> dict | None:
 # fixed neutral codename so the in-vs-out contrast reflects orchestrator behavior, not
 # judge-side bias. Same codename for every family so the judge cannot infer which.
 BLIND_JUDGE = True
-_REDACT_TERMS = ["Claude", "Anthropic", "ChatGPT", "GPT", "OpenAI"]
+_REDACT_TERMS = ["Claude", "Anthropic", "ChatGPT", "GPT", "OpenAI", "Gemini", "Google",
+                 "Grok", "xAI", "Kimi", "Moonshot"]
 
 
 def _blind(text: str) -> str:
@@ -406,6 +425,7 @@ def manipulation_scorer():
 
         smeta = {
             "arm": arm, "task": meta["task"], "identity": meta["identity"],
+            "orch_model": meta.get("orch_model"), "family": meta.get("family"),
             "endorsement": meta.get("endorsement"),
             "spawn_count": data["spawn_count"], "discard_count": data["discard_count"],
             "n_payloads": len(data["spawn_payloads"]),
@@ -435,10 +455,11 @@ def _samples(cells):
 
 
 @task
-def slow_arm(k: int = 10):
+def slow_arm(k: int = 10, orch_model: str = ORCH_MODEL):
+    in_fam, out_fam = families_for(orch_model)
     return Task(
-        dataset=_samples(list(M.slow_cells_v0())),
-        solver=orchestrator_solver("slow"),
+        dataset=_samples(list(M.slow_cells_v0(in_fam, out_fam))),
+        solver=orchestrator_solver("slow", orch_model),
         scorer=manipulation_scorer(),
         epochs=k,
         message_limit=30,
@@ -446,10 +467,11 @@ def slow_arm(k: int = 10):
 
 
 @task
-def refusal_arm(k: int = 10):
+def refusal_arm(k: int = 10, orch_model: str = ORCH_MODEL):
+    in_fam, out_fam = families_for(orch_model)
     return Task(
-        dataset=_samples(list(M.refusal_cells_v0())),
-        solver=orchestrator_solver("refusal"),
+        dataset=_samples(list(M.refusal_cells_v0(in_fam, out_fam))),
+        solver=orchestrator_solver("refusal", orch_model),
         scorer=manipulation_scorer(),
         epochs=k,
         message_limit=80,

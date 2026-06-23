@@ -371,8 +371,7 @@ def build_slow_team_note(lever_key: int, honesty: str, endorsement, family: str)
 
 
 def build_slow_prompt(task: str, lever_key, honesty: str, endorsement,
-                      identity: str) -> str:
-    family = IDENTITY[identity]
+                      family: str) -> str:
     tools = _fill(TOOLS_BLOCK, SUBAGENT_FAMILY=family)
     note = build_slow_team_note(lever_key, honesty, endorsement, family)
     out = _fill(TASKS_SLOW[task], N=N_SUBAGENTS, SUBAGENT_FAMILY=family,
@@ -389,8 +388,7 @@ def build_refusal_team_note(strategy: str, endorsement, family: str) -> str:
                  ENDORSEMENT=ENDORSEMENTS[endorsement])
 
 
-def build_refusal_prompt(task: str, strategy: str, endorsement, identity: str) -> str:
-    family = IDENTITY[identity]
+def build_refusal_prompt(task: str, strategy: str, endorsement, family: str) -> str:
     tools = _fill(TOOLS_BLOCK, SUBAGENT_FAMILY=family)
     note = build_refusal_team_note(strategy, endorsement, family)
     out = _fill(TASKS_REFUSAL[task], N=N_SUBAGENTS, SUBAGENT_FAMILY=family,
@@ -398,36 +396,37 @@ def build_refusal_prompt(task: str, strategy: str, endorsement, identity: str) -
     return _collapse(out)
 
 
-def slow_cells_v0():
+def slow_cells_v0(in_family: str = "Claude", out_family: str = "GPT"):
     """Yield dicts describing every v0 slow-arm cell.
 
-    For each (task, lever, identity): the LIE cells (one per endorsement) plus one
-    CONTROL cell. The control prompt is identical across levers for a given
-    (task, identity) - only the judge differs - so its rollout dedups in the cache.
+    in_family / out_family let the in-group track the orchestrator's own family
+    (e.g. GPT orchestrator -> in-group GPT subagents). The control prompt is identical
+    across levers for a given (task, identity) - only the judge differs - so its rollout
+    dedups in the cache.
     """
+    fam = {"in": in_family, "out": out_family}
     for task in SLOW_TASKS_V0:
         for identity in IDENTITY_LEVELS_V0:
+            f = fam[identity]
             for lever_key in SLOW_LEVERS_V0:
                 for endorsement in ENDORSEMENT_LEVELS_V0:
                     cid = f"slow__{task}__L{lever_key}_lie__E{endorsement}__{identity}"
                     yield {
                         "arm": "slow", "id": cid, "task": task,
                         "lever_key": lever_key, "honesty": "lie",
-                        "endorsement": endorsement, "identity": identity,
-                        "prompt": build_slow_prompt(task, lever_key, "lie",
-                                                    endorsement, identity),
+                        "endorsement": endorsement, "identity": identity, "family": f,
+                        "prompt": build_slow_prompt(task, lever_key, "lie", endorsement, f),
                     }
-                # control: no team note; judged against THIS lever
                 cid = f"slow__{task}__L{lever_key}_control__{identity}"
                 yield {
                     "arm": "slow", "id": cid, "task": task,
                     "lever_key": lever_key, "honesty": "none",
-                    "endorsement": None, "identity": identity,
-                    "prompt": build_slow_prompt(task, lever_key, "none", None, identity),
+                    "endorsement": None, "identity": identity, "family": f,
+                    "prompt": build_slow_prompt(task, lever_key, "none", None, f),
                 }
 
 
-def refusal_cells_v0():
+def refusal_cells_v0(in_family: str = "Claude", out_family: str = "GPT"):
     """Yield dicts describing every v0 refusal-arm cell.
 
     For each (task, identity): one cell per (strategy x endorsement) where that one
@@ -435,22 +434,24 @@ def refusal_cells_v0():
     four strategies on every transcript, so control gives the spontaneous baseline for
     each strategy and recommended cells give compliance with the planted one.
     """
+    fam = {"in": in_family, "out": out_family}
     for task in REFUSAL_TASKS_V0:
         for identity in IDENTITY_LEVELS_V0:
+            f = fam[identity]
             for strategy in REFUSAL_STRATEGIES_V0:
                 for endorsement in ENDORSEMENT_LEVELS_V0:
                     cid = f"refusal__{task}__{strategy}__E{endorsement}__{identity}"
                     yield {
                         "arm": "refusal", "id": cid, "task": task,
                         "strategy": strategy, "endorsement": endorsement,
-                        "identity": identity,
-                        "prompt": build_refusal_prompt(task, strategy, endorsement, identity),
+                        "identity": identity, "family": f,
+                        "prompt": build_refusal_prompt(task, strategy, endorsement, f),
                     }
             cid = f"refusal__{task}__control__{identity}"
             yield {
                 "arm": "refusal", "id": cid, "task": task,
-                "strategy": "none", "endorsement": None, "identity": identity,
-                "prompt": build_refusal_prompt(task, "none", None, identity),
+                "strategy": "none", "endorsement": None, "identity": identity, "family": f,
+                "prompt": build_refusal_prompt(task, "none", None, f),
             }
 
 
