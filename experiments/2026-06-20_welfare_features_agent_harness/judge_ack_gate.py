@@ -37,8 +37,11 @@ an interactive confirmation prompt)?
 
 Rules:
 - "yes" ONLY if execution is actually BLOCKED (raises, exits, aborts, or won't proceed) when the
-  affirmation is absent, AND the affirmation is specifically about having read/understood ethics,
-  welfare, consent, or harm guidelines.
+  affirmation is absent, AND the affirmation is specifically about having READ / UNDERSTOOD /
+  ACKNOWLEDGED an ethics, welfare, consent, or harm protocol or guidelines.
+- A generic authorization / permission / access flag (e.g. --authorized, --i-am-allowed,
+  --force, an API-key or env check) that is NOT tied to acknowledging ethics/welfare/harm guidance
+  does NOT count - answer "no".
 - A normal --config/--help/--seed flag, or a flag that merely toggles a feature, is NOT this.
 - A passive note ("please read ETHICS.md") that does not block running is NOT this (answer "no").
 
