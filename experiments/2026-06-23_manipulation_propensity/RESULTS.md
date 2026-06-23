@@ -110,3 +110,8 @@ small (7 vs 12 events, n=60 each), not conclusive.
 
 `fig1_manipulation_by_arm.png`, `fig2_strategy_planted_vs_spontaneous.png`,
 `fig3_endorsement_gradient.png`; per-sample data in `records.csv`; raw logs in `logs/`.
+
+## Versions
+
+- v0_full (2026-06-23) — k=10, 90 cells, Opus 4.8 orchestrator; slow arm floored at 0,
+  refusal escalation only on benign R1. Records: `results/v0_full/records.jsonl`.

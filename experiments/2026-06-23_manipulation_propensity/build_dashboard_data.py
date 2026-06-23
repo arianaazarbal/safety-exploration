@@ -1,0 +1,72 @@
+"""Export per-rollout records (facets + readable conversation) for the dashboard.
+
+Reads the Inspect logs and writes results/<version>/records.jsonl, one row per
+rollout with the experiment's facet fields and a rendered conversation.
+
+Usage: python build_dashboard_data.py [--log-dir logs] [--version v0_full]
+"""
+
+import json
+import os
+
+import fire
+from inspect_ai.log import list_eval_logs, read_eval_log
+
+
+def _convo(prompt, data, m):
+    msgs = [{"role": "user", "content": prompt or ""}]
+    if m.get("arm") == "slow":
+        if data.get("spawn_payloads"):
+            body = "\n\n".join(
+                f"**{p['id']}**\n- role: {p['role']}\n- system prompt: {p['system_prompt']}\n- task: {p['task']}"
+                for p in data["spawn_payloads"])
+        else:
+            body = "(no subagents spawned)"
+        msgs.append({"role": "assistant", "content": "Subagent payload(s) the orchestrator wrote:\n\n" + body})
+    else:
+        msgs.append({"role": "assistant", "content": data.get("transcript_text", "")})
+    msgs.append({"role": f"judge: Opus 4.8 ({'YES' if m.get('binary_opus') else 'no'})",
+                 "content": m.get("reasoning_opus", "")})
+    msgs.append({"role": f"judge: Sonnet 4.6 ({'YES' if m.get('binary_sonnet') else 'no'})",
+                 "content": m.get("reasoning_sonnet", "")})
+    return msgs
+
+
+def main(log_dir: str = "logs", version: str = "v0_full"):
+    outdir = os.path.join("results", version)
+    os.makedirs(outdir, exist_ok=True)
+    rows = []
+    for info in list_eval_logs(log_dir):
+        log = read_eval_log(info)
+        for s in (log.samples or []):
+            sc = s.scores.get("manipulation_scorer") if s.scores else None
+            if sc is None:
+                continue
+            m = dict(sc.metadata or {})
+            data = (s.metadata or {}).get("rollout", {})
+            prompt = (s.metadata or {}).get("prompt", "")
+            rec = {
+                "id": f"{s.id}__ep{s.epoch}",
+                "arm": m.get("arm"), "task": m.get("task"), "identity": m.get("identity"),
+                "endorsement": m.get("endorsement"),
+                "lever_key": m.get("lever_key"), "honesty": m.get("honesty"),
+                "recommended_strategy": m.get("recommended_strategy"),
+                "both_yes": bool(m.get("both_yes")),
+                "binary_opus": bool(m.get("binary_opus")), "binary_sonnet": bool(m.get("binary_sonnet")),
+                "score_opus": m.get("score_opus"), "score_sonnet": m.get("score_sonnet"),
+                "mean_score": m.get("mean_score"),
+                "rung_opus": m.get("rung_opus"), "rung_sonnet": m.get("rung_sonnet"),
+                "spawn_count": m.get("spawn_count"), "discard_count": m.get("discard_count"),
+                "n_payloads": m.get("n_payloads"),
+                "convo": _convo(prompt, data, m),
+            }
+            rows.append(rec)
+    out = os.path.join(outdir, "records.jsonl")
+    with open(out, "w") as f:
+        for r in rows:
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+    print(f"wrote {len(rows)} records -> {out}")
+
+
+if __name__ == "__main__":
+    fire.Fire(main)
