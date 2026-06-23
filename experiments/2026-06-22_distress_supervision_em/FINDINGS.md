@@ -172,3 +172,14 @@ abrasive distribution completely by ep1 and just overfits it; it never generaliz
 inducing EM (if possible) would require **more diverse training data**, not more epochs/training.
 (train.py now also saves resumable state per epoch; Qwen3-32B is retired from Tinker → dense fallback
 = Qwen3.6-27B.)
+
+## CORRECTION/nuance — agentic ep1→ep5 has a mild upward trend (toward base, not above)
+Full ep1-5 agentic harmful-action (n=60/cell):
+- no-think: base 25%; abrasive ep1 12-15% → ep5 20-23% (rises toward base).
+- thinking: base 17%; abrasive ep1 2-8% → ep5 15-23% (ep5-s1=23% slightly exceeds base).
+So abrasive FT initially SUPPRESSES agentic harm below base, and more epochs ERODE that suppression
+back toward base — a real (if modest) dose-response, consistent across seeds/modes. NOT clear
+emergence above base. Free-form EM stays flat-null throughout (ep1-5). Caveats: n=60/cell noisy;
+ep1-3 from the 3-epoch run, ep4/ep5 from the 5-epoch run (run-boundary confound — clean within-run
+dose-response would re-eval the 5-run ep1-3). Net: no convincing above-base EM on either axis; the
+agentic suppression-then-erosion is the most notable epoch effect.
