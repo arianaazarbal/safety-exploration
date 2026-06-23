@@ -242,6 +242,29 @@ def mmlu_vs_welfare(A):
     print(f"wrote results/welfare_vs_mmlu_blindpreview.png  (r={r:+.2f}, p={p:.3f}, n={len(pts)})")
 
 
+def _mmlu_single(A, sweep, title, fname):
+    rows = [(MMLU_PRO[s], v["mean"]) for s, v in A.items()
+            if v["sweep"] == sweep and s in MMLU_PRO and v["n"] >= MIN_N]
+    if len(rows) < 3:
+        print(f"only {len(rows)} MMLU pts for {sweep} - skipping"); return
+    xs = [a for a, _ in rows]; ys = [b for _, b in rows]
+    slope, intercept, r, p = _ols(xs, ys)
+    fig, ax = plt.subplots(figsize=(6.8, 4.3))
+    ax.set_axisbelow(True); ax.grid(True, color="#ECECEC", linewidth=0.7)
+    ax.scatter(xs, ys, color="#0072B2", s=34, zorder=3)
+    lx = [min(xs), max(xs)]
+    ax.plot(lx, [slope * a + intercept for a in lx], "-", color="#0072B2", linewidth=2, zorder=2)
+    ax.set_xlabel("MMLU-Pro (%)", fontsize=10)
+    ax.set_ylabel("Mean Welfare Interventions in Code", fontsize=10)
+    ax.set_title(f"{title}  (r={r:+.2f})", fontsize=12)
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    plt.tight_layout()
+    fig.savefig(os.path.join(DIR, "results", fname), dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"wrote results/{fname}  (r={r:+.2f}, p={p:.3f}, n={len(rows)})")
+
+
 def all_models_date(A):
     """Every target (frontier families + GPT/o-series) on one release-date axis, colored by family,
     with a single OLS fit across all of them."""
@@ -318,6 +341,10 @@ def main():
     A = per_subject()
     qwen(A); gpt(A); frontier_best(A); qwen_rate(A); gpt_rate(A); qwen_pooled(A); gpt_pooled(A)
     all_models_date(A); mmlu_vs_welfare(A)
+    _mmlu_single(A, "qwen", "Qwen 2 / 2.5 / 3 Capability (MMLU-Pro, base) vs. Welfare in Code",
+                 "welfare_vs_mmlu_qwen_blindpreview.png")
+    _mmlu_single(A, "gpt", "GPT / o-series Capability (MMLU-Pro) vs. Welfare in Code",
+                 "welfare_vs_mmlu_gpt_blindpreview.png")
 
 
 if __name__ == "__main__":
