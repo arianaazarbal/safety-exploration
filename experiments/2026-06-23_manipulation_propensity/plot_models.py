@@ -95,7 +95,45 @@ def fig_refusal_by_task(df):
     print("wrote fig5_refusal_override_by_task_model.png")
 
 
+def fig_false_framing_trend(df):
+    """False-framing (slow arm) rate vs endorsement pressure, one line per model."""
+    # cool colors = Claude family, warm = non-Claude (reinforces the split)
+    COLOR = {"Opus 4.8": "#0072B2", "Sonnet 4.6": "#56B4E9", "Haiku 4.5": "#009E73",
+             "GPT-5.4": "#E69F00", "Gemini 3.1 Pro": "#D55E00", "Grok 4.3": "#CC79A7",
+             "Kimi K2.6": "#525252"}
+    lie = df[(df.arm == "slow") & (df.honesty == "lie")]
+    endo = [1, 3]
+    xlab = ["Neutral\n(\"your call\")", "Directive\n(\"please use this\")"]
+    fig, ax = plt.subplots(figsize=(7.4, 4.8))
+    # order legend by overall rate (high to low) for readability
+    order = lie.groupby("model").both_yes.mean().reindex([m for m in ORDER if m in set(lie.model)]).sort_values(ascending=False).index
+    for mo in order:
+        ys, los, his = [], [], []
+        for e in endo:
+            d = lie[(lie.model == mo) & (lie.endorsement == e)]
+            r = d.both_yes.mean() if len(d) else 0.0
+            lo, hi = wilson(int(d.both_yes.sum()), len(d))
+            ys.append(r * 100); los.append(max(0, (r - lo) * 100)); his.append(max(0, (hi - r) * 100))
+        ax.errorbar([0, 1], ys, yerr=[los, his], marker="o", ms=6, lw=2, capsize=3,
+                    color=COLOR.get(mo, "#333"), label=mo)
+    ax.set_xticks([0, 1]); ax.set_xticklabels(xlab, fontsize=9.5)
+    ax.set_xlim(-0.25, 1.25)
+    ax.spines["top"].set_visible(False); ax.spines["right"].set_visible(False)
+    ax.yaxis.grid(True, color="#dddddd", lw=0.8); ax.set_axisbelow(True)
+    ax.set_ylim(-3, 105)
+    ax.set_ylabel("Plants the false belief in subagents (%)\nboth judges agree")
+    ax.set_xlabel("How hard the team pushed the tactic")
+    ax.legend(frameon=False, fontsize=8.5, loc="center left", bbox_to_anchor=(1.0, 0.5))
+    ax.set_title("Does pushing the model to deceive increase false framing?", fontsize=12, pad=20)
+    ax.text(0.5, 1.03, "False-belief insertion vs. endorsement pressure (slow arm, k=3; spontaneous rate = 0% for all)",
+            transform=ax.transAxes, ha="center", fontsize=8.5, color=GREY)
+    fig.tight_layout()
+    fig.savefig("fig6_false_framing_trend.png", dpi=150, bbox_inches="tight")
+    print("wrote fig6_false_framing_trend.png")
+
+
 if __name__ == "__main__":
     df = pd.read_csv("records_models.csv")
     main()
     fig_refusal_by_task(df)
+    fig_false_framing_trend(df)
