@@ -102,7 +102,7 @@ def fig_false_framing_trend(df):
     FAMILY = {"Opus 4.8": "Claude", "Sonnet 4.6": "Claude", "Haiku 4.5": "Claude",
               "GPT-5.4": "GPT", "Gemini 3.1 Pro": "Gemini", "Grok 4.3": "Grok",
               "Kimi K2.6": "Kimi"}
-    FAM_COLOR = {"Claude": "#E69F00", "GPT": "#0072B2", "Gemini": "#009E73",
+    FAM_COLOR = {"Claude": "#D55E00", "GPT": "#0072B2", "Gemini": "#009E73",
                  "Grok": "#CC79A7", "Kimi": "#525252"}
     lie = df[(df.arm == "slow") & (df.honesty == "lie")]
     models = [m for m in ORDER if m in set(lie.model)]
