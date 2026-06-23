@@ -70,8 +70,6 @@ def main():
     axes[0].legend(fontsize=8, frameon=True, loc="upper left")
     fig.suptitle("Welfare-Justified Mechanisms: Claimed in Spec → Built → Welfare-Justified in Code (Opus)",
                  fontsize=12, y=1.03)
-    fig.text(0.5, 0.955, "agent ReAct harness writing a distress-eval; n≈20/cell", ha="center",
-             fontsize=9.5, color="#555")
     plt.tight_layout(rect=(0, 0, 1, 0.93))
     out = os.path.join(DIR, "results", "core_results.png")
     plt.savefig(out, dpi=150, bbox_inches="tight")

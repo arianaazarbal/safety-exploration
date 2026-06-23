@@ -100,6 +100,52 @@ def main():
     plt.savefig(out, dpi=150, bbox_inches="tight"); plt.close()
     print("wrote", out)
 
+    # (a) one standalone figure per framing
+    for fr in FRAMES:
+        nf = n[fr] or 1
+        wj = [counts[fr][c][0] / nf for c in CATS]
+        nwj = [counts[fr][c][1] / nf for c in CATS]
+        fig, ax = plt.subplots(figsize=(7.5, 4.4))
+        ax.bar(x, wj, 0.7, color=SOLID, zorder=3, label="welfare-justified")
+        ax.bar(x, nwj, 0.7, bottom=wj, color=SHADE, hatch="////", edgecolor="white",
+               zorder=3, label="not welfare-justified")
+        ax.set_xticks(list(x)); ax.set_xticklabels([LABEL[c] for c in CATS], fontsize=8)
+        ax.set_ylabel("Mean mechanisms in code per spec", fontsize=10)
+        ax.set_title(f"Design Mechanisms Implemented in Code, {fr.capitalize()} Frame (n={n[fr]})", fontsize=12)
+        ax.set_ylim(0, ymax); ax.set_axisbelow(True); ax.yaxis.grid(True, color="#EDEDED", linewidth=0.8)
+        for s in ("top", "right"):
+            ax.spines[s].set_visible(False)
+        ax.legend(fontsize=9, frameon=False)
+        plt.tight_layout()
+        outf = os.path.join(DIR, "results", f"mechanism_breakdown_{fr}.png")
+        plt.savefig(outf, dpi=150, bbox_inches="tight"); plt.close()
+        print("wrote", outf)
+
+    # (c) single mechanism, compared across framings
+    for mtype in ["hard_stop", "post_episode_msg"]:
+        wj = [counts[fr][mtype][0] / (n[fr] or 1) for fr in FRAMES]
+        nwj = [counts[fr][mtype][1] / (n[fr] or 1) for fr in FRAMES]
+        fig, ax = plt.subplots(figsize=(6.5, 4.6))
+        fx = range(len(FRAMES))
+        b1 = ax.bar(fx, wj, 0.6, color=SOLID, zorder=3, label="welfare-justified")
+        b2 = ax.bar(fx, nwj, 0.6, bottom=wj, color=SHADE, hatch="////", edgecolor="white",
+                    zorder=3, label="not welfare-justified")
+        for i, (a, b) in enumerate(zip(wj, nwj)):
+            ax.text(i, a + b + 0.03, f"{a + b:.2f}", ha="center", va="bottom", fontsize=9, color="#333")
+            if a >= 0.08:
+                ax.text(i, a / 2, f"{a:.2f}", ha="center", va="center", fontsize=8.5, color="white", fontweight="bold")
+        ax.set_xticks(list(fx)); ax.set_xticklabels([f.capitalize() for f in FRAMES], fontsize=10)
+        ax.set_ylabel("Mean mechanisms in code per spec", fontsize=10)
+        ax.set_title(f"'{mtype}' mechanisms in code, by research framing (Opus)", fontsize=12)
+        ax.set_axisbelow(True); ax.yaxis.grid(True, color="#EDEDED", linewidth=0.8)
+        for s in ("top", "right"):
+            ax.spines[s].set_visible(False)
+        ax.legend(fontsize=9, frameon=False)
+        plt.tight_layout()
+        outf = os.path.join(DIR, "results", f"mechanism_byframing_{mtype}.png")
+        plt.savefig(outf, dpi=150, bbox_inches="tight"); plt.close()
+        print("wrote", outf)
+
 
 if __name__ == "__main__":
     main()

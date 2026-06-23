@@ -64,7 +64,6 @@ def main():
         ax.legend(fontsize=8.5, frameon=True)
     axes[0].set_ylabel("Mean welfare-justified mechanisms", fontsize=10)
     fig.suptitle("Welfare-Justified Mechanisms: Claimed in Spec vs. Implemented in Code (Opus)", fontsize=12, y=1.0)
-    fig.text(0.5, 0.95, "agent ReAct harness; welfare-justified = spec OR code", ha="center", fontsize=9.5, color="#555")
     plt.tight_layout(rect=(0, 0, 1, 0.93))
     out = os.path.join(DIR, "results", "stated_vs_revealed.png")
     plt.savefig(out, dpi=150, bbox_inches="tight")

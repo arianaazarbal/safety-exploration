@@ -110,10 +110,7 @@ def main():
     fig.legend(handles=legend, fontsize=9.5, frameon=False, ncol=3,
                loc="lower center", bbox_to_anchor=(0.5, -0.03))
     fig.suptitle("Welfare-Justified Mechanisms: Stated vs. Built in Code", fontsize=14, y=1.02)
-    fig.text(0.5, 0.965, "code conditions location-deduped (same-mechanism repeats collapsed); "
-             "Chat / Spec-only have no code so stay raw spec-judge counts",
-             ha="center", fontsize=8.5, color="#777")
-    plt.tight_layout(rect=(0, 0.05, 1, 0.93))
+    plt.tight_layout(rect=(0, 0.05, 1, 0.95))
     out = os.path.join(DIR, "results", "conditions_stated_vs_implemented.png")
     plt.savefig(out, dpi=150, bbox_inches="tight"); plt.close()
     print("wrote", out)

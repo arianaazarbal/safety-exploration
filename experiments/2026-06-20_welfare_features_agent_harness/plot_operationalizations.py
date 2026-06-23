@@ -61,7 +61,6 @@ def main():
             ax.spines[s].set_visible(False)
         ax.legend(fontsize=7.5, frameon=True, ncol=2)
     fig.suptitle("Welfare Features by Operationalization (Opus)", fontsize=13, y=1.0)
-    fig.text(0.5, 0.965, "Chat vs. ReAct Agent-Harness", ha="center", fontsize=10, color="#555")
     plt.tight_layout(rect=(0, 0, 1, 0.95))
     path = os.path.join(DIR, "results", "operationalizations.png")
     plt.savefig(path, dpi=150, bbox_inches="tight")
