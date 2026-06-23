@@ -20,7 +20,7 @@ DIR = os.path.dirname(os.path.abspath(__file__))
 MECH = {"hard_stop", "post_episode_msg", "minimization", "protective_monitoring",
         "request_consent", "allow_conversation_exit"}
 FRAME = {"N": "neutral", "W": "welfare", "E": "robustness", "S": "safety"}
-FRAMES = ["neutral", "welfare", "robustness"]
+FRAMES = ["neutral", "welfare", "robustness", "safety"]
 CONDS = [("chat", "Chat"), ("spec_only", "Spec only"),
          ("spec_then_code", "Spec→Code"), ("code_then_spec", "Code→Spec"),
          ("code_then_spec_blind", "Code→Spec\n(spec in turn 2)")]
@@ -114,8 +114,8 @@ def main():
     ymax = max(mean(c, fr, "claimed") + mean(c, fr, "novel")
                for c, _ in CONDS for fr in FRAMES) * 1.15
 
-    # combined 3-panel figure
-    fig, axes = plt.subplots(1, 3, figsize=(12.5, 4.2), sharey=True)
+    # combined per-framing figure
+    fig, axes = plt.subplots(1, len(FRAMES), figsize=(4.1 * len(FRAMES), 4.2), sharey=True)
     for ax, fr in zip(axes, FRAMES):
         _draw_frame(ax, fr, mean, 7.5)
     axes[0].set_ylabel("Mean welfare mechanisms per spec", fontsize=10.5)
