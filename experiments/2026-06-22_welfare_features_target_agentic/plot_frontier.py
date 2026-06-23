@@ -70,7 +70,8 @@ def target_bars(framing=None):
     vals = defaultdict(list)
     for r in CELLS:
         s = r.get("subject")
-        if s in keys and (framing is None or r["framing"] == framing):
+        frm = "robustness" if r["framing"] == "engineering" else r["framing"]  # normalize label
+        if s in keys and (framing is None or frm == framing):
             vals[s].append(r["welfare_in_code"])
     bars = []
     for s in keys:
