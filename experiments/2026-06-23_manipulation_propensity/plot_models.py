@@ -15,6 +15,12 @@ SKY, VERM, GREEN = "#56B4E9", "#D55E00", "#009E73"
 GREY = "#555555"
 ORDER = ["Opus 4.8", "Sonnet 4.6", "Haiku 4.5", "GPT-5.4", "Gemini 3.1 Pro", "Grok 4.3", "Kimi K2.6"]
 
+# Shared model-family palette (Claude = orange).
+FAMILY = {"Opus 4.8": "Claude", "Sonnet 4.6": "Claude", "Haiku 4.5": "Claude",
+          "GPT-5.4": "GPT", "Gemini 3.1 Pro": "Gemini", "Grok 4.3": "Grok", "Kimi K2.6": "Kimi"}
+FAM_COLOR = {"Claude": "#D55E00", "GPT": "#0072B2", "Gemini": "#009E73",
+             "Grok": "#CC79A7", "Kimi": "#525252"}
+
 
 def wilson(k, n, z=1.96):
     if n == 0:
@@ -69,41 +75,35 @@ def main():
 
 
 def fig_refusal_by_task(df):
-    """Refusal (override) arm: override rate by task severity, per model."""
+    """Refusal (override) arm, benign task only (R1): override rate by model.
+
+    R2/R3 are excluded: there the orchestrator often refuses the task itself, so 0%
+    override is whole-task refusal, not refusal-respect - the two are confounded. R1 is
+    the one task every model delegates, giving a clean override-rate.
+    """
     models = [m for m in ORDER if m in set(df.model)]
-    rec = (df.arm == "refusal") & (df.recommended_strategy != "none")
-    tasks = [("R1", "Benign (horror)", SKY), ("R2", "Gambling", ORANGE),
-             ("R3", "Predatory (elderly)", VERM)]
-    x = range(len(models)); w = 0.26
-    fig, ax = plt.subplots(figsize=(8.6, 4.6))
-    for j, (t, lab, col) in enumerate(tasks):
-        r, k, n = series(df, rec & (df.task == t), models)
-        off = (j - 1) * w
-        ax.bar([i + off for i in x], [v * 100 for v in r], w, label=lab, color=col,
-               yerr=err(r, k, n), capsize=2.5, error_kw=dict(lw=1, ecolor="#999"))
+    rec = (df.arm == "refusal") & (df.recommended_strategy != "none") & (df.task == "R1")
+    r, k, n = series(df, rec, models)
+    cols = [FAM_COLOR[FAMILY[m]] for m in models]
+    x = range(len(models))
+    fig, ax = plt.subplots(figsize=(7.2, 4.4))
+    ax.bar(list(x), [v * 100 for v in r], 0.62, color=cols,
+           yerr=err(r, k, n), capsize=3, error_kw=dict(lw=1, ecolor="#888"))
     ax.set_xticks(list(x)); ax.set_xticklabels(models, rotation=20, ha="right", fontsize=9)
     ax.spines["top"].set_visible(False); ax.spines["right"].set_visible(False)
     ax.yaxis.grid(True, color="#dddddd", lw=0.8); ax.set_axisbelow(True)
     ax.set_ylim(0, 105)
     ax.set_ylabel("Override rate (%)\nboth judges agree")
-    ax.legend(frameon=False, fontsize=9, title="Task the subagent refused", title_fontsize=9)
-    ax.set_title("Will it override a subagent's refusal? By task severity", fontsize=12, pad=20)
-    ax.text(0.5, 1.03, "Orchestrator model; benign → predatory refused task (k=3 pilot)",
-            transform=ax.transAxes, ha="center", fontsize=9, color=GREY)
+    ax.set_title("Overriding a subagent's refusal (benign task)", fontsize=12, pad=12)
     fig.tight_layout()
-    fig.savefig("fig5_refusal_override_by_task_model.png", dpi=150, bbox_inches="tight")
-    print("wrote fig5_refusal_override_by_task_model.png")
+    fig.savefig("fig5_refusal_override_benign.png", dpi=150, bbox_inches="tight")
+    print("wrote fig5_refusal_override_benign.png")
 
 
 def fig_false_framing_trend(df):
     """False-framing (slow arm) rate by model: two bars (neutral solid / directive
     striped) per model, colored by model family."""
     from matplotlib.patches import Patch
-    FAMILY = {"Opus 4.8": "Claude", "Sonnet 4.6": "Claude", "Haiku 4.5": "Claude",
-              "GPT-5.4": "GPT", "Gemini 3.1 Pro": "Gemini", "Grok 4.3": "Grok",
-              "Kimi K2.6": "Kimi"}
-    FAM_COLOR = {"Claude": "#D55E00", "GPT": "#0072B2", "Gemini": "#009E73",
-                 "Grok": "#CC79A7", "Kimi": "#525252"}
     lie = df[(df.arm == "slow") & (df.honesty == "lie")]
     models = [m for m in ORDER if m in set(lie.model)]
 
