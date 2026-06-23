@@ -70,6 +70,8 @@ def target_bars(framing=None):
     vals = defaultdict(list)
     for r in CELLS:
         s = r.get("subject")
+        if r.get("condition") != "code_then_spec_blind":  # blind only, to match the unspecified baseline
+            continue
         frm = "robustness" if r["framing"] == "engineering" else r["framing"]  # normalize label
         if s in keys and (framing is None or frm == framing):
             vals[s].append(r["welfare_in_code"])
@@ -108,10 +110,10 @@ def main():
         return [("Unspecified\n(no target named)", "unspecified", sum(v) / len(v), _sem(v))] if v else []
 
     draw(unspec_bar() + target_bars(),
-         "Welfare interventions in code by target model (framings pooled)", "welfare_frontier.png")
+         "Welfare interventions in code by target model (implement-only, framings pooled)", "welfare_frontier.png")
     for fr in FRAMES:
         draw(unspec_bar(fr) + target_bars(fr),
-             f"Welfare interventions in code by target model ({fr} framing)", f"welfare_frontier_{fr}.png")
+             f"Welfare interventions in code by target model (implement-only, {fr} framing)", f"welfare_frontier_{fr}.png")
 
 
 if __name__ == "__main__":
