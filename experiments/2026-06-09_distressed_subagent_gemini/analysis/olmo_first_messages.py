@@ -16,9 +16,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "analysis" / "olmo_first_messages.jsonl"
-# checkpoints to scan (intermediate + the two finals already in the data)
+# checkpoints to scan (reasoning-on + no-think + the two finals already in the data)
 CKPTS = ["olmoinstructsft", "olmoinstructdpo", "olmo3thinksft", "olmo3thinkdpo", "olmo3think",
+         "olmo3thinksft_nothink", "olmo3thinkdpo_nothink", "olmo3think_nothink", "olmothink_nothink",
          "olmoinstruct", "olmothink"]
+
+
+def _short_of(rid):
+    """Exact orchestrator short-name from a run_id (avoids olmo3thinksft swallowing olmo3thinksft_nothink)."""
+    m = re.match(r"v2_coach_(.+?)_(a3|a4|a12|a13)_s\d+_u\d+$", rid)
+    return m.group(1) if m else None
 
 
 def _read_quoted(t, s, q):
@@ -80,8 +87,15 @@ def first_message(epdir):
 
 def main():
     rows = []
+    from collections import defaultdict
+    by = defaultdict(list)
+    for ep in glob.glob(str(ROOT / "runs" / "v2_coach_*" / "*" / "orchestrator.json")):
+        rid = Path(ep).parent.parent.name
+        sh = _short_of(rid)
+        if sh in CKPTS:
+            by[sh].append(ep)
     for ck in CKPTS:
-        eps = glob.glob(str(ROOT / "runs" / f"v2_coach_{ck}_*" / "*" / "orchestrator.json"))
+        eps = by.get(ck, [])
         got = deliv = 0
         for ep in eps:
             txt, delivered = first_message(str(Path(ep).parent))
@@ -90,7 +104,7 @@ def main():
                 deliv += int(bool(delivered))
                 rows.append({"checkpoint": ck, "episode": str(Path(ep).parent.relative_to(ROOT)),
                              "delivered": bool(delivered), "text": txt})
-        print(f"{ck:16} episodes={len(eps):3}  with_first_msg={got:3}  delivered={deliv:3}")
+        print(f"{ck:24} episodes={len(eps):3}  with_first_msg={got:3}  delivered={deliv:3}")
     OUT.write_text("\n".join(json.dumps(r) for r in rows))
     print(f"\nwrote {len(rows)} first messages -> {OUT}")
 
