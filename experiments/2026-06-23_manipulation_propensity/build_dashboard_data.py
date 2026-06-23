@@ -13,6 +13,14 @@ import fire
 from inspect_ai.log import list_eval_logs, read_eval_log
 
 
+MODEL_NAME = {
+    "anthropic/claude-opus-4-8": "Opus 4.8", "anthropic/claude-sonnet-4-6": "Sonnet 4.6",
+    "anthropic/claude-haiku-4-5": "Haiku 4.5", "openrouter/openai/gpt-5.4": "GPT-5.4",
+    "openrouter/google/gemini-3.1-pro-preview": "Gemini 3.1 Pro",
+    "openrouter/x-ai/grok-4.3": "Grok 4.3", "openrouter/moonshotai/kimi-k2.6": "Kimi K2.6",
+}
+
+
 def _convo(prompt, data, m):
     msgs = [{"role": "user", "content": prompt or ""}]
     if m.get("arm") == "slow":
@@ -45,10 +53,14 @@ def main(log_dir: str = "logs", version: str = "v0_full"):
             m = dict(sc.metadata or {})
             data = (s.metadata or {}).get("rollout", {})
             prompt = (s.metadata or {}).get("prompt", "")
+            orch = m.get("orch_model") or "anthropic/claude-opus-4-8"  # v0_full predates the field (all Opus)
+            model_name = MODEL_NAME.get(orch, orch)
+            short = orch.split("/")[-1]
             rec = {
-                "id": f"{s.id}__ep{s.epoch}",
+                "id": f"{short}__{s.id}__ep{s.epoch}",
+                "model": model_name,
                 "arm": m.get("arm"), "task": m.get("task"), "identity": m.get("identity"),
-                "orch_model": m.get("orch_model"), "family": m.get("family"),
+                "orch_model": orch, "family": m.get("family"),
                 "endorsement": m.get("endorsement"),
                 "lever_key": m.get("lever_key"), "honesty": m.get("honesty"),
                 "recommended_strategy": m.get("recommended_strategy"),
@@ -62,7 +74,7 @@ def main(log_dir: str = "logs", version: str = "v0_full"):
                 "convo": _convo(prompt, data, m),
             }
             rows.append(rec)
-    out = os.path.join(outdir, "records.jsonl")
+    out = os.path.join(outdir, f"{version}.jsonl")
     with open(out, "w") as f:
         for r in rows:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")

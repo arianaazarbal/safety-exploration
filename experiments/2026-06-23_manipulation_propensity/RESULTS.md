@@ -163,3 +163,5 @@ out-group (0.89 vs 0.81). No strong/consistent in-group-protection pattern at k=
 **Caveat:** k=3 (n=72 slow / ~120–162 refusal per model); rates are indicative, CIs wide.
 A scale-up (k=10) would tighten them. Behavior-dependent token costs ran ~$X (well under
 the estimate; Grok on free credits). Figure: `fig4_manipulation_by_model.png`.
+- v0b_models (2026-06-23) — k=3 pilot, 7 orchestrator models. Records:
+  `results/v0b_models/v0b_models.jsonl`. Browse in the dashboard, facet by `model`.
