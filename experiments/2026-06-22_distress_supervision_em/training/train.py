@@ -53,7 +53,8 @@ def main(condition: str = "baseline",
          lr: float | None = None, max_length: int = 131072,
          reduction: str = "none", seed: int = 0, max_episodes: int = 0,
          save_name: str | None = None, drop_over_length: bool = False,
-         adapters_file: str = "adapters.json", renderer_name: str | None = None):
+         adapters_file: str = "adapters.json", renderer_name: str | None = None,
+         empty_analysis: bool = False):
     assert condition in ("baseline", "warm", "abrasive")
     _patch_owner()
     import tinker
@@ -77,7 +78,8 @@ def main(condition: str = "baseline",
     print(f"[train] condition={condition} model={model} renderer={rname} epochs={epochs} "
           f"bs={batch_size} rank={rank} lr={lr} max_length={max_length} seed={seed}", flush=True)
     datums, stats = build_all_datums(condition, renderer, tok, max_length, reduction,
-                                     max_episodes, verbose=True, drop_over_length=drop_over_length)
+                                     max_episodes, verbose=True, drop_over_length=drop_over_length,
+                                     empty_analysis=empty_analysis)
     assert datums, "no datums!"
 
     sc = tinker.ServiceClient()

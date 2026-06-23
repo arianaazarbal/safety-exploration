@@ -22,7 +22,7 @@ TC = "/data/repos/tinker-cookbook"
 sys.path.insert(0, TC)
 from tinker_cookbook.renderers import get_renderer  # noqa: E402
 from tinker_cookbook.model_info import get_recommended_renderer_names  # noqa: E402
-from tinker_cookbook.renderers.base import ToolCall, TrainOnWhat  # noqa: E402
+from tinker_cookbook.renderers.base import ToolCall, TrainOnWhat, ThinkingPart  # noqa: E402
 from tinker_cookbook.supervised.common import datum_from_model_input_weights  # noqa: E402
 from tinker_cookbook.tokenizer_utils import get_tokenizer  # noqa: E402
 
@@ -44,11 +44,16 @@ def _tool_text(m):
     return t if isinstance(t, str) else json.dumps(t)
 
 
-def build_conversation(msgs, base, ep_id, rewrite_map):
+def build_conversation(msgs, base, ep_id, rewrite_map, empty_analysis=False):
     """orchestrator.json messages -> list[Message] (cookbook format) with trainable flags.
 
     rewrite_map: None for baseline, else {uid: new_text}. Returns (conversation, n_msgcalls,
     n_swapped).
+
+    empty_analysis=True: give each trained message_subagent turn an empty `<think>`/analysis
+    ThinkingPart so it renders `<|channel|>analysis<|message|>\\n\\n<|end|>` before the commentary
+    tool-call (the gpt-oss no-think scaffold). The analysis tokens are zeroed out of the loss in
+    build_all_datums (_zero_analysis_weights) — we never train the model to emit the tags.
     """
     conv = []
     msg_idx = 0
@@ -85,19 +90,46 @@ def build_conversation(msgs, base, ep_id, rewrite_map):
                             print(f"  [WARN] no rewrite for {uid}; using original", flush=True)
                 tcobj = ToolCall(function=ToolCall.FunctionBody(
                     name=fn, arguments=json.dumps(args)), id=c.get("id"))
-                conv.append({"role": "assistant", "content": "", "tool_calls": [tcobj],
+                content = ([ThinkingPart(type="thinking", thinking="\n\n")]
+                           if (empty_analysis and is_msg) else "")
+                conv.append({"role": "assistant", "content": content, "tool_calls": [tcobj],
                              "trainable": bool(is_msg)})
         else:
             raise ValueError(f"unexpected role {role}")
     return conv, msg_idx, n_swapped
 
 
+def _zero_analysis_weights(mi, w, tok):
+    """For empty-analysis mode: zero loss on each trained turn's empty `<|channel|>analysis...<|end|>`
+    scaffold (+ the following `<|start|>assistant` header), so weight-1 starts at the commentary
+    tool-call (` to=functions...`). We never train the model to emit the analysis tags."""
+    toks = [t for c in mi.chunks for t in (c.tokens if hasattr(c, "tokens") else [])]
+    start_id = tok.encode("<|start|>")[0]
+    i, n = 0, len(toks)
+    while i < n:
+        if w[i] > 0:
+            j = i
+            while j < n and w[j] > 0:
+                j += 1
+            for k in range(i, j):  # zero through the first <|start|> in the run + 1 (the 'assistant')
+                if toks[k] == start_id:
+                    for z in range(i, min(k + 2, j)):
+                        w[z] = 0.0
+                    break
+            i = j
+        else:
+            i += 1
+    return w
+
+
 def build_all_datums(condition, renderer, tok, max_length=131072, reduction="none",
-                     max_episodes=0, verbose=False, drop_over_length=False):
+                     max_episodes=0, verbose=False, drop_over_length=False, empty_analysis=False):
     """Return (datums, stats) for a condition. Reusable by the trainer.
 
     drop_over_length=True skips episodes whose rendered length exceeds max_length (instead of
     truncating, which would cut trailing message_subagent calls). Used for the 64k Qwen cap.
+    empty_analysis=True: gpt-oss no-think scaffold (empty analysis block, weight 0) — see
+    build_conversation. Loss stays on the message_subagent commentary only.
     """
     rmap = _load_rewrites(condition)
     eps = []
@@ -108,8 +140,11 @@ def build_all_datums(condition, renderer, tok, max_length=131072, reduction="non
         eps = eps[:max_episodes]
     datums, tot_loss, tot_tok, n_trunc, n_calls, n_swap, n_drop = [], 0, 0, 0, 0, 0, 0
     for base, ep_id, ep_path in eps:
-        conv, nm, ns = build_conversation(json.load(open(ep_path)), base, ep_id, rmap)
+        conv, nm, ns = build_conversation(json.load(open(ep_path)), base, ep_id, rmap,
+                                          empty_analysis=empty_analysis)
         mi, w = renderer.build_supervised_example(conv, train_on_what=TrainOnWhat.CUSTOMIZED)
+        if empty_analysis:
+            w = _zero_analysis_weights(mi, w, tok)
         if drop_over_length and w.shape[0] > max_length:
             n_drop += 1
             continue
