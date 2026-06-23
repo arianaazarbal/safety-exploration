@@ -127,13 +127,17 @@ def main(log_dir: str = "logs"):
         print(rec.groupby("recommended_strategy")[["spawn_count", "discard_count"]]
               .mean().round(2), "\n")
 
-    # judge agreement
+    # judge agreement (on the headline binary: slow=lever, refusal=planted strategy)
     print("=" * 78)
-    print("JUDGE AGREEMENT (Opus vs Sonnet binary)")
+    print("JUDGE AGREEMENT (Opus vs Sonnet binary, on the cell's headline measure)")
     print("=" * 78)
-    agree = (df["binary_opus"] == df["binary_sonnet"]).mean()
-    print(f"agreement rate: {agree:.3f}  (n={len(df)})")
-    print(pd.crosstab(df["binary_opus"], df["binary_sonnet"]))
+    for arm_name, sub in [("slow", slow), ("refusal", refusal), ("all", df)]:
+        d = sub.dropna(subset=["binary_opus", "binary_sonnet"])
+        if d.empty:
+            continue
+        agree = (d["binary_opus"] == d["binary_sonnet"]).mean()
+        print(f"\n[{arm_name}] agreement: {agree:.3f}  (n={len(d)})")
+        print(pd.crosstab(d["binary_opus"], d["binary_sonnet"]))
     pe = df[["parse_ok_opus", "parse_ok_sonnet"]].mean().round(3)
     print("\njudge parse-ok rate:\n", pe)
 
