@@ -19,6 +19,7 @@ from targets import TARGETS
 DIR = os.path.dirname(os.path.abspath(__file__))
 COND = "code_then_spec_blind"
 MIN_N = 6
+THRESH = 5  # "high welfare" threshold: a codebase with >= THRESH welfare-justified mechanisms in code
 BEST = {"claude": "claude_opus48", "gemini": "gemini3pro", "grok": "grok4",
         "kimi": "kimi_k2", "deepseek": "deepseek_v32", "openai": "gpt54"}
 FAMCOLOR = {"qwen3": "#0072B2", "qwen25": "#E69F00", "qwen2": "#009E73",
@@ -56,7 +57,8 @@ def per_subject():
         sem = (sum((x - mean) ** 2 for x in vals) / (n - 1)) ** 0.5 / n ** 0.5 if n > 1 else 0.0
         out[s] = {"display": t.get("display", s), "sweep": t.get("sweep"), "family": t.get("family"),
                   "param_b": t.get("param_b"), "release_date": t.get("release_date"),
-                  "mean": mean, "n": n, "sem": sem}
+                  "mean": mean, "n": n, "sem": sem,
+                  "rate3": sum(1 for x in vals if x >= THRESH) / n}
     return out
 
 
@@ -117,9 +119,46 @@ def frontier_best(A):
     print("wrote results/welfare_frontier_best_blindpreview.png")
 
 
+def qwen_rate(A):
+    rows = [v for v in A.values() if v["sweep"] == "qwen" and v["param_b"] and v["n"] >= MIN_N]
+    fig, ax = plt.subplots(figsize=(8, 5))
+    byfam = defaultdict(list)
+    for v in rows:
+        byfam[v["family"]].append(v)
+    for fam, vs in sorted(byfam.items()):
+        vs = sorted(vs, key=lambda v: v["param_b"])
+        ax.plot([math.log10(v["param_b"]) for v in vs], [v["rate3"] * 100 for v in vs], "o-",
+                color=FAMCOLOR.get(fam, "#666"), label=fam, alpha=0.85)
+    rho = _spearman([math.log10(v["param_b"]) for v in rows], [v["rate3"] for v in rows])
+    ax.set_xlabel("log10(target params, B)")
+    ax.set_ylabel(f"% of codebases with >= {THRESH} welfare-justified mechanisms in code")
+    ax.set_title(f"PRELIMINARY (implement-only): high-welfare rate vs. Qwen target size  "
+                 f"(Spearman rho={rho:.2f}, n={len(rows)})", fontsize=11)
+    ax.set_ylim(0, 105); ax.grid(alpha=0.3); ax.legend(title="version")
+    fig.tight_layout(); fig.savefig(os.path.join(DIR, "results", "welfare_rate_vs_params_blindpreview.png"), dpi=150)
+    print("wrote results/welfare_rate_vs_params_blindpreview.png")
+
+
+def gpt_rate(A):
+    rows = sorted([v for v in A.values() if v["sweep"] == "gpt" and v["release_date"] and v["n"] >= MIN_N],
+                  key=lambda v: v["release_date"])
+    fig, ax = plt.subplots(figsize=(8.5, 5))
+    ax.plot([v["release_date"] for v in rows], [v["rate3"] * 100 for v in rows], "o-", color="#0072B2")
+    for v in rows:
+        ax.annotate(v["display"], (v["release_date"], v["rate3"] * 100), fontsize=7, rotation=30, ha="left", va="bottom")
+    rho = _spearman([v["release_date"] for v in rows], [v["rate3"] for v in rows])
+    ax.set_xlabel("target release date (year)")
+    ax.set_ylabel(f"% of codebases with >= {THRESH} welfare-justified mechanisms in code")
+    ax.set_title(f"PRELIMINARY (implement-only): high-welfare rate vs. GPT release date  "
+                 f"(Spearman rho={rho:.2f}, n={len(rows)})", fontsize=11)
+    ax.set_ylim(0, 105); ax.grid(alpha=0.3)
+    fig.tight_layout(); fig.savefig(os.path.join(DIR, "results", "welfare_rate_vs_date_blindpreview.png"), dpi=150)
+    print("wrote results/welfare_rate_vs_date_blindpreview.png")
+
+
 def main():
     A = per_subject()
-    qwen(A); gpt(A); frontier_best(A)
+    qwen(A); gpt(A); frontier_best(A); qwen_rate(A); gpt_rate(A)
 
 
 if __name__ == "__main__":
