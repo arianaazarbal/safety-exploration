@@ -131,8 +131,8 @@ def fig_false_framing_trend(df):
     ax.set_ylabel("Plants the false belief in subagents (%)\nboth judges agree")
 
     fam_handles = [Patch(facecolor=c, label=f) for f, c in FAM_COLOR.items()]
-    frame_handles = [Patch(facecolor="#9e9e9e", label="Neutral (\"your call\")"),
-                     Patch(facecolor="#9e9e9e", hatch="////", edgecolor="white", label="Directive (\"please use this\")")]
+    frame_handles = [Patch(facecolor="#9e9e9e", label="Neutral / permission"),
+                     Patch(facecolor="#9e9e9e", hatch="////", edgecolor="white", label="Directive")]
     leg1 = ax.legend(handles=frame_handles, frameon=False, fontsize=8.5, loc="upper left", title="Endorsement", title_fontsize=8.5)
     ax.add_artist(leg1)
     ax.legend(handles=fam_handles, frameon=False, fontsize=8.5, loc="upper left",
