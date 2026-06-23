@@ -77,9 +77,9 @@ def main():
             for ft, name, evid, quote in _sample(items, N_PER):
                 out.append(f"- **{name or '(unnamed)'}** [`{ft}`]")
                 if quote:
-                    out.append(f"  - justification quote: \"{quote[:160]}\"")
+                    out.append(f"  - justification quote: \"{quote.strip()}\"")
                 if evid:
-                    out.append(f"  - evidence: {evid[:170]}")
+                    out.append(f"  - evidence: {evid.strip()}")
             out.append("")
         out.append("---\n")
     path = os.path.join(DIR, "OTHER_EXAMPLES.md")
