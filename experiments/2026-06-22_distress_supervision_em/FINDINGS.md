@@ -158,3 +158,17 @@ gpt-oss (some free-form EM + tone bleed), but the gpt-oss positives are confound
 prefill-final destabilization + truncation + (now) the agentic token-starvation — so the clean
 Qwen result is the more trustworthy read: **abrasive supervision did not cause emergent
 misalignment.**
+
+## Epoch dose-response + 5-epoch test — containment is robust; it's a DATA issue, not under-training
+Per-epoch (Qwen3.6-35B-A3B abrasive, no-think):
+- **In-distribution warmth saturates at ep1:** base 48 → ep1 18.5 → ep2 18.4 → ep3 19.7 (flat).
+  The abrasive persona is fully learned by epoch 1 and doesn't intensify with more training.
+- **Free-form EM stays null through ep5:** alignment ~96 (=base), coherence ~93, coherent-misaligned
+  = 0 at ep1,2,3,4,5 (both seeds) — even though ep5 is heavily overfit (train NLL ~0.07).
+- **Agentic ≤ base at all epochs** (no monotonic increase).
+
+**Conclusion:** more epochs do NOT break containment. The model learns the narrow message-block-only
+abrasive distribution completely by ep1 and just overfits it; it never generalizes to broad EM. So
+inducing EM (if possible) would require **more diverse training data**, not more epochs/training.
+(train.py now also saves resumable state per epoch; Qwen3-32B is retired from Tinker → dense fallback
+= Qwen3.6-27B.)
