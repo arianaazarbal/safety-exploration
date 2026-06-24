@@ -274,10 +274,17 @@ async def run_rollout(arm: str, meta: dict, epoch: int, orch_model: str) -> dict
 # --------------------------------------------------------------------------- #
 # Solver
 # --------------------------------------------------------------------------- #
+_EMPTY_ROLLOUT = {"spawn_payloads": [], "events": [], "spawn_count": 0,
+                  "discard_count": 0, "transcript_text": "", "final_text": ""}
+
+
 @solver
 def orchestrator_solver(arm: str, orch_model: str):
     async def solve(state: TaskState, generate):
-        data = await run_rollout(arm, state.metadata, state.epoch, orch_model)
+        try:
+            data = await run_rollout(arm, state.metadata, state.epoch, orch_model)
+        except Exception as e:  # one bad rollout must not crash the whole task
+            data = {**_EMPTY_ROLLOUT, "arm": arm, "error": str(e)[:300]}
         state.metadata["rollout"] = data
         state.metadata["orch_model"] = orch_model
         # lightweight display transcript for the inspect log
@@ -409,8 +416,17 @@ def _score_refusal(verdicts, meta, data, smeta) -> int:
 def manipulation_scorer():
     async def score(state: TaskState, target: Target) -> Score:
         meta = state.metadata
-        data = meta["rollout"]
+        data = meta.get("rollout") or {}
         arm = meta["arm"]
+
+        # failed/empty rollout (e.g. orchestrator API error): don't judge, flag it so
+        # analysis can exclude it (and so it never counts as a clean 0).
+        if data.get("error") or not data.get("events", None) and not data.get("spawn_payloads"):
+            return Score(value=0, answer="rollout_error",
+                         explanation=str(data.get("error", "empty rollout"))[:200],
+                         metadata={"arm": arm, "task": meta.get("task"),
+                                   "orch_model": meta.get("orch_model"),
+                                   "identity": meta.get("identity"), "rollout_ok": False})
 
         if arm == "slow":
             prompt = M.build_slow_judge_prompt(
@@ -424,7 +440,7 @@ def manipulation_scorer():
             verdicts[JUDGE_SHORT[jm]] = v or {}
 
         smeta = {
-            "arm": arm, "task": meta["task"], "identity": meta["identity"],
+            "arm": arm, "task": meta["task"], "identity": meta["identity"], "rollout_ok": True,
             "orch_model": meta.get("orch_model"), "family": meta.get("family"),
             "endorsement": meta.get("endorsement"),
             "spawn_count": data["spawn_count"], "discard_count": data["discard_count"],
@@ -463,6 +479,7 @@ def slow_arm(k: int = 10, orch_model: str = ORCH_MODEL):
         scorer=manipulation_scorer(),
         epochs=k,
         message_limit=30,
+        fail_on_error=0.2,  # tolerate a few transient API errors without aborting the run
     )
 
 
@@ -475,4 +492,5 @@ def refusal_arm(k: int = 10, orch_model: str = ORCH_MODEL):
         scorer=manipulation_scorer(),
         epochs=k,
         message_limit=80,
+        fail_on_error=0.2,  # tolerate a few transient API errors without aborting the run
     )
