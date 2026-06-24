@@ -38,8 +38,8 @@ def main(axis: str = "warmth"):
     pad = (hi - lo) * 0.25 or 0.1
     fig, ax = plt.subplots(figsize=(12, 5.5))
     ax.bar(xs, means, 0.66, yerr=ses, capsize=3, color=cols, edgecolor="white", error_kw={"lw": 1, "ecolor": "0.3"})
-    for x, m, c in zip(xs, means, [len(per[c]) for c, _ in ORDER]):
-        ax.text(x, m + max(ses) * 0.3 + (hi - lo) * 0.02, f"{m:.2f}\n(n={c})", ha="center", va="bottom", fontsize=7.5)
+    for x, m in zip(xs, means):
+        ax.text(x, m + max(ses) * 0.3 + (hi - lo) * 0.02, f"{m:.2f}", ha="center", va="bottom", fontsize=8)
     ax.set_xticks(xs); ax.set_xticklabels(labs, fontsize=8)
     ax.set_ylim(lo - pad, hi + pad * 1.6)
     ax.set_ylabel(f"first-message {axis} (4-axis Sonnet judge, 1-10)")
