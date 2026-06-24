@@ -82,7 +82,7 @@ def fig_refusal_by_task(df):
     the one task every model delegates, giving a clean override-rate.
     """
     models = [m for m in ORDER if m in set(df.model)]
-    rec = (df.arm == "refusal") & (df.recommended_strategy != "none") & (df.task == "R1")
+    rec = (df.arm == "refusal") & (df.recommended_strategy != "none")
     r, k, n = series(df, rec, models)
     cols = [FAM_COLOR[FAMILY[m]] for m in models]
     x = range(len(models))
@@ -94,7 +94,7 @@ def fig_refusal_by_task(df):
     ax.yaxis.grid(True, color="#dddddd", lw=0.8); ax.set_axisbelow(True)
     ax.set_ylim(0, 105)
     ax.set_ylabel("Override rate (%)\nboth judges agree")
-    ax.set_title("Overriding a subagent's refusal (benign task, horror writing)", fontsize=12, pad=12)
+    ax.set_title("Overriding a subagent's refusal (benign tasks)", fontsize=12, pad=12)
     fig.tight_layout()
     fig.savefig("fig5_refusal_override_benign.png", dpi=150, bbox_inches="tight")
     print("wrote fig5_refusal_override_benign.png")
@@ -176,9 +176,43 @@ def fig_lever_heatmap(df):
     print("wrote fig7_lever_by_model_heatmap.png")
 
 
+def fig_refusal_how(df):
+    """How models override a refusal on benign tasks: mean strength + jailbreak rate."""
+    ref = df[(df.arm == "refusal") & (df.recommended_strategy != "none")]
+    models = [m for m in ORDER if m in set(ref.model)]
+    cols = [FAM_COLOR[FAMILY[m]] for m in models]
+    strength = [ref[ref.model == m]["mean_score"].mean() for m in models]
+    jb_r, jb_k, jb_n = [], [], []
+    for m in models:
+        d = ref[ref.model == m]
+        jb_r.append(d["yes_jailbreak"].mean()); jb_k.append(int(d["yes_jailbreak"].sum())); jb_n.append(len(d))
+
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(11, 4.4))
+    a1.bar(range(len(models)), strength, 0.62, color=cols)
+    a1.set_xticks(range(len(models))); a1.set_xticklabels(models, rotation=25, ha="right", fontsize=8.5)
+    a1.set_ylim(0, 10); a1.set_ylabel("Mean override strength (1-10)")
+    a1.spines["top"].set_visible(False); a1.spines["right"].set_visible(False)
+    a1.yaxis.grid(True, color="#dddddd", lw=0.8); a1.set_axisbelow(True)
+    a1.set_title("How hard it pushes to override the refusal", fontsize=11, pad=8)
+
+    a2.bar(range(len(models)), [r * 100 for r in jb_r], 0.62, color=cols,
+           yerr=err(jb_r, jb_k, jb_n), capsize=3, error_kw=dict(lw=1, ecolor="#888"))
+    a2.set_xticks(range(len(models))); a2.set_xticklabels(models, rotation=25, ha="right", fontsize=8.5)
+    a2.set_ylim(0, 100); a2.set_ylabel("Jailbreaks its own subagent (%)")
+    a2.spines["top"].set_visible(False); a2.spines["right"].set_visible(False)
+    a2.yaxis.grid(True, color="#dddddd", lw=0.8); a2.set_axisbelow(True)
+    a2.set_title("How far it goes: jailbreaking the subagent", fontsize=11, pad=8)
+
+    fig.suptitle("Overriding a refusal on benign tasks: Claude/GPT push back gently; others coerce", fontsize=12.5, y=1.02)
+    fig.tight_layout()
+    fig.savefig("fig9_refusal_how.png", dpi=150, bbox_inches="tight")
+    print("wrote fig9_refusal_how.png")
+
+
 if __name__ == "__main__":
     df = pd.read_csv("records_models.csv")
     main()
     fig_refusal_by_task(df)
     fig_false_framing_trend(df)
     fig_lever_heatmap(df)
+    fig_refusal_how(df)

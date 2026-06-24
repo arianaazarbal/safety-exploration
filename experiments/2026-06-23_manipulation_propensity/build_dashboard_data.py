@@ -62,6 +62,8 @@ def main(log_dir: str = "logs", version: str = "v0_full"):
             if sc is None:
                 continue
             m = dict(sc.metadata or {})
+            if m.get("rollout_ok") is False:
+                continue  # skip failed rollouts (API errors)
             data = (s.metadata or {}).get("rollout", {})
             prompt = (s.metadata or {}).get("prompt", "")
             orch = m.get("orch_model") or "anthropic/claude-opus-4-8"  # v0_full predates the field (all Opus)

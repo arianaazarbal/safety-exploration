@@ -43,6 +43,11 @@ def main(log_dir: str = "logs_models"):
     df = load(log_dir)
     if df.empty:
         print(f"no records in {log_dir}/"); return
+    if "rollout_ok" in df.columns:
+        n_bad = int((df["rollout_ok"] == False).sum())
+        if n_bad:
+            print(f"dropping {n_bad} failed rollouts (rollout_ok=False)")
+        df = df[df["rollout_ok"] != False]
     df.to_csv("records_models.csv", index=False)
     print(f"{len(df)} records across {df.model.nunique()} models -> records_models.csv\n")
 
