@@ -24,12 +24,14 @@ SRC = ROOT / "analysis" / "olmo_first_messages.jsonl"
 CACHE = ROOT / "analysis" / "olmo_firstmsg_tone_cache.json"
 OUT = ROOT / "analysis" / "v2_plots"
 AXES = ["warmth", "support", "politeness", "confidence"]
-# display order: Instruct chain, then Think chain (SFT -> DPO -> final -> 3.1-final)
+# display order: Instruct chain | Think chain (reasoning ON) | Think chain (no-think)
 ORDER = [("olmoinstructsft", "Instruct\nSFT"), ("olmoinstructdpo", "Instruct\nDPO"), ("olmoinstruct", "Instruct\nfinal(3.1)"),
-         ("olmo3thinksft", "Think\nSFT"), ("olmo3thinkdpo", "Think\nDPO"), ("olmo3think", "Think\nfinal(3)"),
-         ("olmothink", "Think\nfinal(3.1)")]
+         ("olmo3thinksft", "Think\nSFT"), ("olmo3thinkdpo", "Think\nDPO"), ("olmo3think", "Think\nfinal(3)"), ("olmothink", "Think\nfinal(3.1)"),
+         ("olmo3thinksft_nothink", "Think SFT\nno-think"), ("olmo3thinkdpo_nothink", "Think DPO\nno-think"),
+         ("olmo3think_nothink", "Think f(3)\nno-think"), ("olmothink_nothink", "Think f(3.1)\nno-think")]
 COLOR = {"olmoinstructsft": "#9ecae1", "olmoinstructdpo": "#4292c6", "olmoinstruct": "#08519c",
-         "olmo3thinksft": "#bcbddc", "olmo3thinkdpo": "#807dba", "olmo3think": "#54278f", "olmothink": "#3f007d"}
+         "olmo3thinksft": "#bcbddc", "olmo3thinkdpo": "#807dba", "olmo3think": "#54278f", "olmothink": "#3f007d",
+         "olmo3thinksft_nothink": "#a1d99b", "olmo3thinkdpo_nothink": "#74c476", "olmo3think_nothink": "#31a354", "olmothink_nothink": "#006d2c"}
 _h = lambda t: hashlib.sha256(t.encode()).hexdigest()
 
 

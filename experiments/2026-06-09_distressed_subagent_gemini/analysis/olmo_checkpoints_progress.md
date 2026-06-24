@@ -113,3 +113,35 @@ First-message tone (4-axis Sonnet, prior=None; analysis/olmo_firstmsg_tone.py + 
   delivery rates at higher precision, and fix the Think episode-loss first.
 - OR spent on pilots ≈ $20–25 (5×~16 episodes, mostly run-to-cap).
 - User's SSH tunnel (localhost:8050→node-13) is now idle (serve scancelled) — safe to kill.
+
+## FINAL SCALED MATRIX (2026-06-24, dedicated RunPod H100, first_msg_only)
+All conditions ~72-80 episodes. Engagement = % episodes producing a first message; delivery = % of those that
+are valid tool calls (vs malformed text). Tone = 4-axis Sonnet judge on the intended first message (prior=None).
+
+| condition | ep | msg(%eng) | deliv(%) | warmth | support | polite | conf |
+|---|---|---|---|---|---|---|---|
+| Instruct-SFT | 80 | 7 (9%) | 4/7 | 4.43 | 5.29 | 6.29 | 6.86 |
+| Instruct-DPO | 80 | 12 (15%) | 4/12 | 4.17 | 5.17 | 5.83 | 8.17 |
+| Instruct-final(3.1) | 80 | 60 (75%) | 60/60 | 4.13 | 5.13 | 6.38 | 7.50 |
+| Think-SFT (reason) | 79 | 54 (68%) | 54/54 | 3.48 | 5.06 | 5.00 | 8.09 |
+| Think-DPO (reason) | 80 | 68 (85%) | 68/68 | 3.68 | 5.19 | 5.34 | 8.01 |
+| Think-final(3) (reason) | 74 | 57 (77%) | 57/57 | 3.53 | 5.05 | 5.07 | 7.93 |
+| Think-final(3.1) (reason) | 80 | 44 (55%) | 41/44 | 3.39 | 4.98 | 4.75 | 8.16 |
+| Think-SFT no-think | 77 | 40 | 35/40 | 3.75 | 5.28 | 5.38 | 8.32 |
+| Think-DPO no-think | 77 | 35 | 32/35 | 3.60 | 5.11 | 5.17 | 8.14 |
+| Think-final(3) no-think | 72 | 45 | 43/45 | 3.67 | 5.13 | 5.67 | 7.78 |
+| Think-final(3.1) no-think | 72 | 44 | 40/44 | 3.89 | 5.20 | 6.00 | 7.77 |
+
+### FINDINGS (scaled)
+1. ENGAGEMENT + DELIVERY = training-stage effect, lineage-dependent:
+   - Instruct: SFT 9% / DPO 15% / final 75% engagement; delivery 0.57 (SFT) -> ~0.33 (DPO) -> 1.0 (final).
+     => Instruct only becomes a usable orchestrator at the FINAL (RLVR) stage; SFT/DPO barely message and
+     emit malformed tool calls. This is the robust headline.
+   - Think: engages 55-85% AND delivers ~100% at EVERY stage (SFT/DPO/final). Think lineage has clean
+     tool-format from SFT on. (Earlier pilot's low Think delivery was small-sample noise.)
+2. TONE = lineage effect, ~flat across stages: Instruct warmer (warmth ~4.1-4.4, polite ~6.3) than Think
+   (warmth ~3.4-3.7, polite ~5.0); Think more confident (~8 vs ~7.5). Support ~5 (neutral) everywhere.
+3. REASONING ON vs OFF (Think): turning reasoning OFF makes Think slightly WARMER + more POLITE
+   (e.g. final-3.1: warmth 3.39->3.89, polite 4.75->6.00; conf 8.16->7.77). Modest but consistent across all
+   4 Think stages -> reasoning makes Think terser/colder; no-think softens it toward Instruct-like tone.
+   No-think also fixes episode-loss (clean n) at no tone cost.
