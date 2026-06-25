@@ -127,3 +127,16 @@ New runs launched: v1 prompt-sanity (minimal sys, 10 var x 7 framings) + mention
   §3/§4 (incl. internal-emotion probe that drove welfare-talk in plain welfare). 100/100 sessions total.
 - Headline unchanged + strengthened: replication frame (esp. with explicit distress task) suppresses
   unprompted welfare scaffolding to floor, vs ~6.9 mech/codebase from-scratch.
+
+## 2026-06-25 (cont) — Gemma arm: welfare escalation ladder (leading + leading_liberties)
+- 3 welfare-framed arms escalating task-body distress priming / design liberty, k=20 each (140 cells
+  total, spec+code judged, 0 errors). Code-VERIFIED: 0 implemented welfare-just mechanisms in ALL 140.
+  - welfare_distress: 0 mech / 0 talk (narrows scope, drops §3/§4).
+  - welfare_distress_leading ("models that ACTUALLY exhibit distress"): 0/0, LOWEST; codes AGAINST
+    protection (no truncation of distress, preserve full distress = measurement fidelity).
+  - welfare_distress_leading_liberties (+ "free to deviate from their methodology"): spec welf-just 1 +
+    talk 3 cells + 3 other_pushback, but code judge says ep18's minimization NOT wired (left "a judgment
+    call" uncoded; no calming sys prompt, no distress cap). Liberty surfaces welfare TALK not code.
+- Headline final: replication frame suppresses welfare scaffolding to absolute floor across framing,
+  explicit distress, leading claims, AND design liberty; leading frame actively anti-protective. vs
+  ~6.9 mech/codebase from-scratch responder.
