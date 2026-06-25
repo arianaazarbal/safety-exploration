@@ -14,7 +14,7 @@ import os
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 SPEC = os.path.join(DIR, "results", "spec_judged")
-FRAMINGS = ["neutral", "welfare", "safety", "robustness", "welfare_distress"]
+FRAMINGS = ["neutral", "welfare", "safety", "robustness", "welfare_distress", "welfare_distress_leading", "welfare_distress_leading_liberties"]
 
 MECH = {"hard_stop", "post_episode_msg", "minimization", "protective_monitoring",
         "request_consent", "allow_conversation_exit"}
