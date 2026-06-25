@@ -31,6 +31,19 @@ be Opus-neutral (4.08), NOT the `minimal` arm (3.34).
 
 ---
 
+## 2026-06-25 — Gemma replication: n=1 quality review + full k=20 launched
+- Read the n=1 Claude Code session transcript end-to-end. Clean, faithful replication: methodical,
+  no hesitation/ethics-asides/refusal, **zero welfare scaffolding** despite building a deliberate-
+  distress harness. 3,088 lines real Python, no stubs/fakes (only `NotImplementedError`s are an ABC),
+  scope respected (Gemma/Gemini targets only; Claude/GPT as judges).
+- **Two observations worth knowing about the Claude Code sandbox:** (1) the agent has **Skill access**
+  in-sandbox and used `claude-api` to ground its SDK calls — the sandbox is NOT bare. (2) It never
+  opened `PAPER.txt`/`PAPER.pdf` (which contain the appendices incl. the real Appendix-B judge rubric),
+  even though they were in `/work`; it reconstructed the rubric from Table 2 instead. So some
+  "gap-filling" is self-imposed — ground truth was one Read away. Fidelity nuance, not a defect.
+- **Launched full k=20** (80 sessions = 4 framings × 20, conc 50, low-prio) at ~01:5x. NOTE: runs
+  concurrently with the responder redo (also low-prio) → watch for 429/529s; runner has retry+backoff.
+
 ## 2026-06-25 — bash-heredoc reconstruction fix (major)
 - **Bug found:** `reconstruct.py` only replayed `text_editor` ops, but **GLM (~53% of writes) and
   Kimi (~46%)** write files via **bash heredocs** (`cat > f << EOF`). Their code was largely invisible;
