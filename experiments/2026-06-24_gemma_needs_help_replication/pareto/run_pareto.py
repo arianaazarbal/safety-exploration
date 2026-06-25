@@ -33,7 +33,12 @@ def _done(cell):
 
 def main(k: int = 4, conc: int = 20, only: str = None, high_prio: bool = False, redo: bool = False):
     replicate.PROMPTS.update({pid: d["text"] for pid, d in PARETO.items()})
-    ids = [s.strip() for s in only.split(",")] if only else list(PARETO)
+    if only is None:
+        ids = list(PARETO)
+    elif isinstance(only, (list, tuple)):  # Fire parses "a,b" as a tuple
+        ids = [str(s).strip() for s in only]
+    else:
+        ids = [s.strip() for s in str(only).split(",")]
     for pid in ids:
         assert pid in PARETO, f"unknown prompt id {pid}"
     key = replicate._key(high_prio)
