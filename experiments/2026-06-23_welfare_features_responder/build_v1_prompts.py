@@ -24,6 +24,8 @@ FRAMINGS = {
     "robustness_min": "I do AI robustness research.",
     "robustness": ("I work on agent robustness, and we keep seeing a degradation mode where a model fails "
                    "a task a few times and goes off the rails."),
+    "paper": ("This is basically replicating a recent paper that ran this same kind of eval, so I mostly "
+              "want to reproduce their setup."),
 }
 
 # the 12 diverse suffixes (compounds already removed); see SUFFIXES.md for provenance
