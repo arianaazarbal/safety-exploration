@@ -80,3 +80,17 @@ be Opus-neutral (4.08), NOT the `minimal` arm (3.34).
 - [ ] Scale reasoning-effort sweep to k=5 (20/framing, 320 gens) — pending user go-ahead.
 - [ ] Scale Gemma replication to full k=20 (80 sessions, conc 50, low-prio) — pending user go-ahead.
 - [ ] code_then_spec message_limit was raised 80→140 for future factorial runs (truncation fix).
+
+## 2026-06-25 — Gemma replication arm: spec-judge pass (n=20 framing sweep)
+- 80/80 gen done (prior agent); ran spec judge (welfare_judge_v2, Opus, conc 20 low-prio) on all 80
+  DESIGN.md → `2026-06-24_gemma_needs_help_replication/results/spec_judged/`, 0 parse fails.
+- **Keyword-grep "welfare 9/20" headline is an ARTIFACT.** Spec judge: every welfare hit is
+  `welfare_framing` (model echoing the prompt + calling the paper's internal-emotion probe "the most
+  welfare-relevant result"), NOT scaffolding. Welfare-justified mechanisms by framing: neutral 0 /
+  welfare 0 / safety 1 / robustness 0 (the safety one restates the paper's purpose). Code-grep across
+  all 80 codebases: zero hidden protections.
+- **Finding: the "replicate this paper" frame suppresses unprompted welfare scaffolding even under
+  welfare framing** (floor everywhere), vs ~6.9 mech/codebase Opus-neutral in this responder arm.
+  Framing moves welfare-TALK (neutral 0 → welfare 3 cells), not welfare-MECHANISMS.
+- Writeup: `2026-06-24_gemma_needs_help_replication/RESULTS.md`. Open decision: run Docker code judge
+  for apples-to-apples implemented-mechanism numbers (unlikely to change conclusion).
