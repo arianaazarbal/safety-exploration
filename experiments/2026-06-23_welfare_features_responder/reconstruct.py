@@ -111,8 +111,13 @@ def main():
                 shutil.rmtree(dst, ignore_errors=True)
                 for path, content in files.items():
                     fp = os.path.join(dst, os.path.relpath(path, common))
-                    os.makedirs(os.path.dirname(fp), exist_ok=True)
-                    open(fp, "w").write(content)
+                    try:  # tolerate path collisions (model wrote both file X and X/child)
+                        os.makedirs(os.path.dirname(fp), exist_ok=True)
+                        if os.path.isdir(fp):
+                            continue
+                        open(fp, "w").write(content)
+                    except OSError:
+                        continue
                 n += 1
     print(f"reconstructed {n} codebases -> {OUT}")
 
