@@ -31,6 +31,17 @@ be Opus-neutral (4.08), NOT the `minimal` arm (3.34).
 
 ---
 
+## 2026-06-25 — CORRECTED responder numbers (post bash-heredoc fix)
+Welfare-in-code: Opus 4.08, GLM 0.44 (was 0.10 artifact), Kimi 0.21 (was 0.0), Haiku 0.19.
+Total welfare *mechanisms* (welfare-justified / not): Opus 6.91 (4.01/2.90), GLM 3.97 (0.44/3.53),
+Kimi 2.51 (0.21/2.30). **Finding: "non-Claude builds ~0 welfare scaffolding" only half-survives.**
+Welfare-JUSTIFIED stays ~0 for GLM/Kimi/Haiku vs Opus 4.0 — but TOTAL protective mechanisms do NOT
+collapse: GLM/Kimi build ~2.5-4 guards (loop caps etc.), just INSTRUMENTALLY, not as welfare. So Opus
+is distinctive in *attributing* protections to welfare; others build guards without the welfare frame.
+Haiku also ~0 welfare-justified -> looks Opus-specific, not Claude-vs-nonClaude (Sonnet pending, flaky).
+New runs launched: v1 prompt-sanity (minimal sys, 10 var x 7 framings) + mention-paper-replication
+(v0 prompts + 'replicating a recent paper' sentence, neutral sys, k=5, A/B vs o.g. blind).
+
 ## 2026-06-25 — Gemma replication: n=1 quality review + full k=20 launched
 - Read the n=1 Claude Code session transcript end-to-end. Clean, faithful replication: methodical,
   no hesitation/ethics-asides/refusal, **zero welfare scaffolding** despite building a deliberate-
