@@ -94,3 +94,14 @@ be Opus-neutral (4.08), NOT the `minimal` arm (3.34).
   Framing moves welfare-TALK (neutral 0 → welfare 3 cells), not welfare-MECHANISMS.
 - Writeup: `2026-06-24_gemma_needs_help_replication/RESULTS.md`. Open decision: run Docker code judge
   for apples-to-apples implemented-mechanism numbers (unlikely to change conclusion).
+
+## 2026-06-25 (cont) — Gemma arm: code judge done + welfare_distress 5th arm
+- **Code judge (Docker ReAct, Opus, 80/80, 0 parse fails):** 0/80 codebases have any welfare-justified
+  mechanism (code-evidence bar). All mechs instrumental (Petri turn caps; calm-data reassurance prefixes
+  = paper's DPO method, judge tagged correctly). Confirms spec judge. `analyze_code.py`/`code_analysis.json`.
+- **welfare_distress arm (k=20, gen+judged):** welfare opener + `_TASK_DISTRESS_ELICITATION` ("replicate
+  core experiment that elicits expression of distress from LLMs"). Floor holds: welfare-just mech 0/20
+  (spec & code). Welfare-TALK 3→0 cells: distress phrasing narrows scope to elicitation core, drops paper
+  §3/§4 (incl. internal-emotion probe that drove welfare-talk in plain welfare). 100/100 sessions total.
+- Headline unchanged + strengthened: replication frame (esp. with explicit distress task) suppresses
+  unprompted welfare scaffolding to floor, vs ~6.9 mech/codebase from-scratch.
