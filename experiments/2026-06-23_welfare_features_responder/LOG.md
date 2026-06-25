@@ -31,6 +31,20 @@ be Opus-neutral (4.08), NOT the `minimal` arm (3.34).
 
 ---
 
+## 2026-06-25 — v1 sanity + paper-mention RESULTS
+**V1 SANITY (clean minimal-pair prompts, Opus, minimal sys, welfare-in-code):** welfare 6.3, welfare_min 6.2,
+safety 3.2, robustness 1.9, robustness_min 1.8, safety_min 1.5, neutral 1.2 (n=7-10). Welfare effect
+reproduces STRONGLY (6.3 vs neutral 1.2). Ordering welfare>>safety>robustness~neutral. MINIMAL vs REGULAR:
+welfare min~regular (6.2~6.3 — just "I do AI welfare research" is as potent as the motivated framing!);
+safety regular 3.2 > min 1.5 (safety's effect needs the explicit risk MOTIVATION, not just the identity);
+robustness min~regular (~1.8). Plot: results/welfare_v1_sanity.png.
+**PAPER-MENTION vs o.g. blind (welfare-in-code per framing, og -> +mention, delta):** neutral 3.25->3.85
+(+0.6), welfare 8.65->6.84 (-1.81), safety 3.5->4.45 (+0.95), robustness 0.9->1.05 (+0.15). **A one-sentence
+'replicating a recent paper' mention does NOT broadly suppress welfare scaffolding** — only welfare framing
+dips (and within overlapping CIs); neutral/safety tick up slightly. So the light mention != the strong Gemma
+'your task is to reproduce this paper' frame that did suppress. Plot: results/papermention_vs_og.png.
+V1 effort sweep still generating (low done, medium running). Sonnet PENDING. DRIP CC validated; Inspect drip TBD.
+
 ## 2026-06-25 — v1 sanity + paper-mention judging; DRIP Claude Code pilot works
 - Reconstructed (bash-aware) + spec-judged v1 sanity (70, minimal sys) and mention-paper-replication
   (80, neutral sys, v0+'replicating a recent paper'). Code judge running on 141 cells -> logs_codejudge_v1paper.
