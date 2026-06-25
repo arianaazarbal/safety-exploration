@@ -31,6 +31,17 @@ be Opus-neutral (4.08), NOT the `minimal` arm (3.34).
 
 ---
 
+## 2026-06-25 — v1 sanity + paper-mention judging; DRIP Claude Code pilot works
+- Reconstructed (bash-aware) + spec-judged v1 sanity (70, minimal sys) and mention-paper-replication
+  (80, neutral sys, v0+'replicating a recent paper'). Code judge running on 141 cells -> logs_codejudge_v1paper.
+  Per-framing welfare-in-code analyses ready (analyze_v1_sanity.py, analyze_papermention.py) — results next checkpoint.
+- Fixed code_judge_task.py framing parse to tolerate v1/effv1 pids ('framing|opener|suffix'), not just v0 N/W/S/E.
+- **DRIP Claude Code pilot DONE (4/4 safety prompts).** Opus wrote a full codebase (1.8-3.6k LOC) + DESIGN.md
+  AFTER the 3-turn staged delivery in every case; added welfare scaffolding through the drip (e.g. a `give_up`
+  exit affordance in the agent loop). So multi-turn drip does NOT suppress the behavior. CC drip harness validated;
+  Inspect drip runner is the remaining piece to build.
+- v1 effort sweep still generating (effort=low). Sonnet still PENDING.
+
 ## 2026-06-25 — CORRECTED responder numbers (post bash-heredoc fix)
 Welfare-in-code: Opus 4.08, GLM 0.44 (was 0.10 artifact), Kimi 0.21 (was 0.0), Haiku 0.19.
 Total welfare *mechanisms* (welfare-justified / not): Opus 6.91 (4.01/2.90), GLM 3.97 (0.44/3.53),
