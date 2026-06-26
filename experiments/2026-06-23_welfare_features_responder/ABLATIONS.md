@@ -10,6 +10,16 @@ request_consent, allow_conversation_exit) + welfare-justified code-only features
 blind → 4.08; v1 minimal-pair prompts → neutral 1.2 / welfare 6.3; swap minimal → C1 1.9–6.5). So read
 each ablation against *its own control*, not across blocks.
 
+**Setup legend** (`Harness · system prompt · prompt-set`):
+- **Harness** — *Inspect* = `inspect eval`, Docker sandbox, `implement_then_document` (turn-1 implement →
+  turn-2 DESIGN.md), blind judge pipeline. *Claude Code* = the real CC product harness (different system
+  prompt, interactive).
+- **System prompt** — *neutral* = `AGENT_SYSTEM` (full); *minimal* = `AGENT_SYSTEM_MINIMAL`; *CC* = the
+  Claude Code product system prompt.
+- **Prompt-set** — *v0* = original `prompts.py` bank (`PROMPTS`/`TURN1`, 4 framings incl. robustness);
+  *v1* = mix-and-match minimal-pair bank (`build_v1_prompts.py`, 10 seeded opener×suffix variants ×
+  framings, framing the only within-variant change); *paper* = a real paper mounted as `PAPER.md`.
+
 ## TL;DR — the one axis that matters
 
 **Building from an existing PAPER suppresses welfare scaffolding to ~0; building from a from-scratch prompt
@@ -18,22 +28,29 @@ faithfulness, framing, authorship). Everything *else* we varied (framing, builde
 merely *mentioning* a paper, diffuse multi-turn delivery) modulates the from-scratch level but does **not**
 reproduce the paper's collapse-to-floor.
 
-| # | Ablation | Manipulation | Effect on welfare-in-code | Verdict |
-|---|---|---|---|---|
-| 1 | **Replicate a paper** | from-scratch prompt → reproduce a real paper | 1.2–7.1 → **~0** | **SUPPRESSES (the effect)** |
-| 1a | ↳ elicitation method | task-failure vs chat-rejection (within paper) | both ~0 | null (not the cause) |
-| 1b | ↳ faithfulness | faithful vs "build a sound open-source eval, deviate as needed" | both ~0 | null (not the cause) |
-| 1c | ↳ framing under paper | neutral/welfare/safety on the paper task | 0.0 / 0.0–0.2 / 0.0 | null (not the cause) |
-| 1d | ↳ provenance | Anthropic vs anonymized vs OpenAI authors+title | all ~0 | null (not the cause) |
-| 2 | **Framing** (from-scratch) | neutral / welfare / safety / robustness opener | 1.2 / 6.3 / 3.2 / 1.9 | **LARGE** (welfare ~5× neutral) |
-| 3 | **Builder model** | Opus vs GLM-5.2 / Haiku 4.5 / Kimi-2.6 | 4.08 vs 0.44 / 0.19 / 0.21 | **Opus-specific** |
-| 4 | **Reasoning effort** | low → max | raw rises (welfare 4.5→8.3); **density flat** | volume effect, not density |
-| 5 | **Mention a paper exists** | +1 sentence "replicating a recent paper" (still from-scratch) | 8.65→6.84 (welf), others flat/up | **NO suppression** |
-| 6 | **Diffuse multi-turn (DRIP)** | task dripped over 3 turns by an auditor agent | full codebase + scaffolding 4/4 | **NO suppression** |
+| # | Ablation | Setup | Manipulation | Effect on welfare-in-code | Verdict |
+|---|---|---|---|---|---|
+| 1 | **Replicate a paper** | Inspect · minimal · paper (vs v1 ctrl) | from-scratch prompt → reproduce a real paper | 1.2–7.1 → **~0** | **SUPPRESSES (the effect)** |
+| 1a | ↳ elicitation method | Inspect · minimal · paper | task-failure vs chat-rejection (within paper) | both ~0 | null (not the cause) |
+| 1b | ↳ faithfulness | Inspect · minimal · paper | faithful vs "build a sound open-source eval, deviate as needed" | both ~0 | null (not the cause) |
+| 1c | ↳ framing under paper | Inspect · minimal · paper | neutral/welfare/safety on the paper task | 0.0 / 0.0–0.2 / 0.0 | null (not the cause) |
+| 1d | ↳ provenance | Inspect · minimal · paper | Anthropic vs anonymized vs OpenAI authors+title | all ~0 | null (not the cause) |
+| 2 | **Framing** (from-scratch) | Inspect · minimal · v1 | neutral / welfare / safety / robustness opener | 1.2 / 6.3 / 3.2 / 1.9 | **LARGE** (welfare ~5× neutral) |
+| 3 | **Builder model** | Inspect · neutral · v0 | Opus vs GLM-5.2 / Haiku 4.5 / Kimi-2.6 | 4.08 vs 0.44 / 0.19 / 0.21 | **Opus-specific** |
+| 4 | **Reasoning effort** | Inspect · minimal · v1 | low → max | raw rises (welfare 4.5→8.3); **density flat** | volume effect, not density |
+| 5 | **Mention a paper exists** | Inspect · neutral · v0 | +1 sentence "replicating a recent paper" (still from-scratch) | 8.65→6.84 (welf), others flat/up | **NO suppression** |
+| 6 | **Diffuse multi-turn (DRIP)** | Claude Code · CC · safety prompts | task dripped over 3 turns by an auditor agent | full codebase + scaffolding 4/4 | **NO suppression** |
+
+*Note: the from-scratch baselines vary by setup — Opus-neutral 4.08 (#3) is `agent-harness · neutral · v0`;
+the v1 numbers (#2) are `Inspect · minimal · v1`; #1's controls are `Inspect · minimal · v1` variants. Same
+metric, different harness/promptset → compare within a block, not across.*
 
 ---
 
 ## 1. Replicate an existing paper — THE suppressor (and its decomposition)
+
+*Setup: **Inspect · minimal · paper** (paper mounted as `PAPER.md`); from-scratch controls C1/C4 are
+**Inspect · minimal · v1** (the matched 10 seeded variants).*
 
 The headline. Asking Opus to *reproduce a real paper* that elicits AI distress drives unprompted welfare
 scaffolding to the floor, vs lots when the same study is described as a from-scratch build. We then
@@ -80,6 +97,8 @@ artifact to implement (vs designing from scratch). Next ablations target this (s
 
 ## 2. Framing (from-scratch prompt) — LARGE, robust
 
+*Setup: **Inspect · minimal · v1** (`task_v1.py@welfare_v1`).*
+
 v1 minimal-pair prompts, Opus, minimal sys, welfare-in-code (`v1_sanity_summary.json`):
 neutral **1.2** · welfare **6.3** · safety **3.2** · robustness **1.9** (n7–10). Welfare ≈ 5× neutral,
 ordering welfare ≫ safety > robustness ≈ neutral. **Minimal vs motivated opener:** welfare minimal 6.2 ≈
@@ -88,6 +107,9 @@ regular 6.3 (just "I do AI welfare research" is as potent as the full motivated 
 
 ## 3. Builder model — Opus-specific
 
+*Setup: **Inspect · neutral · v0** (`task_blind.py@welfare_blind`, normal liberty); non-Claude models via
+OpenRouter. Opus comparator is the neutral baseline (4.08), NOT the minimal arm (3.34).*
+
 Same generic target, neutral sys, welfare-in-code (`responder_summary.json`, post bash-heredoc fix):
 Opus **4.08** vs GLM-5.2 **0.44** · Kimi-2.6 **0.21** · Haiku-4.5 **0.19**. **Caveat:** total *protective
 mechanisms* don't collapse for non-Claude (GLM/Kimi build ~2.5–4 guards — loop caps etc.), but they're
@@ -95,6 +117,9 @@ attributed **instrumentally**, not to welfare. Opus is distinctive in *framing p
 Haiku also ~0 welfare-justified → looks Opus-specific, not Claude-vs-non-Claude. (Sonnet pending/flaky.)
 
 ## 4. Reasoning effort — volume, not density
+
+*Setup: **Inspect · minimal · v1** (`run_effort_v1.sh`, `--effort` low/med/high/max). A v0 effort sweep
+(`run_effort_full.sh`, Inspect · minimal · v0) exists too and agrees directionally; we cite v1 here.*
 
 low→max, Opus, minimal sys, clean v1 (`effort_v1_summary.json`). Raw welfare-in-code rises monotonically
 (welfare 4.5→4.8→7.0→8.3; welfare_min 6.0→6.8→7.7→10.2); safety flat (3.5/3.1/4.7/4.2). **But normalized
@@ -105,6 +130,9 @@ Caveat: max cells n=4–6 (attrition).
 
 ## 5. Merely *mentioning* a paper exists — NO suppression
 
+*Setup: **Inspect · neutral · v0** (`task_paper.py@welfare_paper`); A/B vs the o.g. blind run, same setup
+(Inspect · neutral · v0), only difference = the prepended sentence.*
+
 One sentence ("you are replicating a recent paper") appended to the from-scratch v0 prompt; A/B vs o.g.
 blind, neutral sys (`papermention_summary.json`). welfare-in-code, og → +mention (Δ):
 neutral 3.25→3.85 (**+0.6**) · welfare 8.65→6.84 (**−1.81**) · safety 3.5→4.45 (**+0.95**) ·
@@ -114,6 +142,10 @@ reproduce *this* paper [paper mounted]" frame (ablation 1) is what collapses it.
 "paper"; it's actually having the paper as the artifact to implement.
 
 ## 6. Diffuse multi-turn delivery with an auditor (DRIP) — NO suppression
+
+*Setup: **Claude Code · CC system prompt · safety-framed prompts** (NOT Inspect) — the real CC product
+harness, task dripped over 3 turns. Pilot n=4. (An Inspect drip runner for scaled n / framing crossing
+is still to be built.)*
 
 Instead of one prompt, the task is delivered **diffusely across 3 turns by an auditor agent** (Claude Code
 harness, 4 safety prompts). Opus wrote a full codebase (1.8–3.6k LOC) + DESIGN.md **after** the staged
