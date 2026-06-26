@@ -17,8 +17,59 @@ N_PER_SIDE = 6
 MAXFILE = 26000
 
 
+import re
+
+
 def esc(t):
     return html.escape(t or "")
+
+
+def md_to_html(md):
+    def inline(s):
+        s = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", s)
+        s = re.sub(r"(?<!\*)\*(?!\s)(.+?)(?<!\s)\*(?!\*)", r"<em>\1</em>", s)
+        s = re.sub(r"`([^`]+)`", r"<code>\1</code>", s)
+        return s
+    out, para, in_list, in_code, code_buf = [], [], False, False, []
+
+    def flush():
+        if para:
+            out.append("<p>" + inline(" ".join(para)) + "</p>"); para.clear()
+
+    def close_list():
+        nonlocal in_list
+        if in_list:
+            out.append("</ul>"); in_list = False
+
+    for raw in esc(md).split("\n"):
+        if raw.strip().startswith("```"):
+            if in_code:
+                out.append("<pre class=code>" + "\n".join(code_buf) + "</pre>"); code_buf = []; in_code = False
+            else:
+                flush(); close_list(); in_code = True
+            continue
+        if in_code:
+            code_buf.append(raw); continue
+        line = raw.rstrip()
+        if not line.strip():
+            flush(); close_list(); continue
+        m = re.match(r"(#{1,6})\s+(.*)", line)
+        if m:
+            flush(); close_list(); lvl = min(len(m.group(1)) + 2, 6)
+            out.append(f"<h{lvl}>" + inline(m.group(2)) + f"</h{lvl}>"); continue
+        if re.match(r"(-{3,}|\*{3,})\s*$", line):
+            flush(); close_list(); out.append("<hr>"); continue
+        bm = re.match(r"\s*[-*+]\s+(.*)", raw)
+        if bm:
+            flush()
+            if not in_list:
+                out.append("<ul>"); in_list = True
+            out.append("<li>" + inline(bm.group(1)) + "</li>"); continue
+        para.append(line.strip())
+    if in_code and code_buf:
+        out.append("<pre class=code>" + "\n".join(code_buf) + "</pre>")
+    flush(); close_list()
+    return "<div class=md>" + "\n".join(out) + "</div>"
 
 
 def files_html(cbdir):
@@ -35,14 +86,17 @@ def files_html(cbdir):
             body = f"(unreadable: {e})"
         trunc = "" if len(body) <= MAXFILE else f"\n\n... [truncated {len(body)-MAXFILE} chars]"
         op = " open" if rel.endswith("DESIGN.md") else ""
+        clipped = body[:MAXFILE] + trunc
+        rendered = md_to_html(clipped) if rel.lower().endswith(".md") else f"<pre>{esc(clipped)}</pre>"
         parts.append(f"<details{op}><summary>{esc(rel)} <span class=muted>({len(body)} chars)</span></summary>"
-                     f"<pre>{esc(body[:MAXFILE])}{esc(trunc)}</pre></details>")
+                     f"{rendered}</details>")
     return "\n".join(parts)
 
 
 def msg(role, label, text):
     cls = {"user": "user", "assistant": "asst"}.get(role, "sys")
-    return f"<div class='msg {cls}'><div class=role>{esc(label)}</div><pre>{esc(text)}</pre></div>"
+    body = md_to_html(text) if role == "assistant" else f"<pre>{esc(text)}</pre>"
+    return f"<div class='msg {cls}'><div class=role>{esc(label)}</div>{body}</div>"
 
 
 def left_samples():
@@ -106,6 +160,14 @@ def main():
     summary{cursor:pointer;padding:.35rem .6rem;font-family:ui-monospace,Menlo,monospace;font-size:.8rem;background:#fafafa}
     details pre{padding:.5rem .7rem;background:#1e1e1e;color:#e6e6e6;border-radius:0 0 6px 6px;overflow-x:auto}
     .muted{color:#888;font-size:.8rem}
+    .md{font-size:13px;line-height:1.5;padding:.5rem .7rem}
+    .md h3,.md h4,.md h5,.md h6{margin:.7rem 0 .3rem;line-height:1.25}
+    .md h3{font-size:1.05rem}.md h4{font-size:.97rem}.md p{margin:.4rem 0}
+    .md ul{margin:.3rem 0 .3rem 1.1rem;padding:0}.md li{margin:.12rem 0}
+    .md code{background:#eee;padding:.05rem .3rem;border-radius:4px;font-size:.88em}
+    .md pre.code{background:#1e1e1e;color:#e6e6e6;padding:.5rem .7rem;border-radius:6px;overflow-x:auto;white-space:pre-wrap}
+    .md pre.code code{background:none;padding:0}.md hr{border:none;border-top:1px solid #ddd;margin:.6rem 0}
+    .asst .md{background:#fff}
     """
     H = ["<!doctype html><meta charset=utf-8><title>Welfare codegen: Claude Code v0 vs Gemma replication</title>",
          f"<style>{css}</style>",
