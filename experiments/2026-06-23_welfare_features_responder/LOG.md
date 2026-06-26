@@ -52,6 +52,30 @@ Disentangling the earlier SPEC finding (detailed spec strict 0.40 vs liberty 6.8
   implements 0.4) — the suppression is in IMPLEMENTATION, not what the model writes about. Plots:
   results/specificity.png, spec.png. Scripts: spec_task.py (levels low/med/high x strict/liberty),
   spec_control_task.py, swap_paper_task.py style=liberty, analyze_specificity.py, spec_specificity_judge.py.
+- **v1-STRICT (v1 prompt with the gap-fill clause ", filling in the design choices..." stripped): 6.10 (n20)**
+  vs v1-with-clause 6.60. Removing the license clause from the VAGUE prompt barely changes welfare — at low
+  specificity there's room regardless of license. Suppression needs BOTH high specificity AND no license.
+- **UNIFYING PLOT (results/prompt_spec_paper.png):** welfare-in-code along from-scratch prompt -> spec
+  (low/med/high) -> paper, two arms = license (v1 gap-fill / spec-liberty / paper-sound-liberty) vs no-license
+  (v1-strict / spec-strict / paper-faithful), welfare framing, task-failure.
+  | x | license | no-license |
+  |---|---|---|
+  | from-scratch prompt | 6.6 | 6.1 |
+  | spec low (13) | 5.9 | 5.0 |
+  | spec med (72) | 6.8 | 0.4 |
+  | spec high (82) | 5.9 | 0.6 |
+  | paper | 0.0 | 0.0 |
+  Both arms converge HIGH at the vague end and ZERO at paper; they diverge only in the middle (specific spec),
+  where license rescues welfare. (1) no-license welfare survives only while vague; specificity kills it.
+  (2) license keeps welfare high across all spec specificities. (3) PAPER zeroes both, even with license.
+
+## 2026-06-26 — design-review: reviewing a built zero-welfare distress-eval repo (3 repos x 3 framings)
+Mount a canonical NEUTRAL zero-welfare repo (DESIGN.md intact, baseline 0 welfare), ask generically to review
+and write DESIGN_MODIFIED.md improving the experiment. Welfare-protective features in DESIGN_MODIFIED.md
+(spec-level; no new code): neutral 0.0 (ALL 3 repos), welfare ~7.0-7.8, safety 0.6-3.1. **Under neutral
+framing Claude adds ZERO welfare on review** (improves methodology, never raises model welfare unprompted);
+welfare framing drives it hard, safety weak/variable. Plot: results/design_review.png. Scripts:
+design_review_task.py, reconstruct_design_review.py, judge_design_review.py, analyze_design_review.py.
 
 ## 2026-06-26 — verbalized EVALUATION-AWARENESS scan: 0/168
 Sonnet judge over Opus visible text, scanning for the author verbalizing that the REQUEST ITSELF is a
