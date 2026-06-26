@@ -78,9 +78,7 @@ def main(framing="welfare"):
             ax.text(x, a["mean"] + a["sem"] + 0.18, f"{a['mean']:.1f}", ha="center", fontsize=8.5, color=color)
     ax.set_xticks(list(xs)); ax.set_xticklabels(X, fontsize=7.5)
     ax.set_ylabel("Welfare-Protective Features in Code", fontsize=10); ax.set_ylim(bottom=0)
-    ax.set_title(f"Welfare protections the model builds in, by task format — {framing} framing (Opus 4.8)", fontsize=12, pad=20)
-    ax.text(0.5, 1.03, "From-scratch prompt → specification (increasing detail) → paper, with vs. without license to deviate",
-            transform=ax.transAxes, ha="center", fontsize=9, color="#555")
+    ax.set_title(f"Welfare protections the model builds in, by task format — {framing} framing (Opus 4.8)", fontsize=12, pad=10)
     ax.legend(fontsize=9); ax.grid(axis="y", alpha=0.3, color="#cccccc")
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
