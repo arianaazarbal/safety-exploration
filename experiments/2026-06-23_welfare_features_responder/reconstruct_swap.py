@@ -21,7 +21,8 @@ PREFIX = {("prompt", "task-failure"): "C1promptTF", ("paper", "chat-rejection"):
           ("spec-copy", "task-failure"): "S3specCopy",
           ("paper-liberty", "chat-rejection"): "L1paperLibCR", ("paper-liberty", "task-failure"): "L2paperLibTF",
           ("spec-low-strict", "task-failure"): "S4specLowStrict", ("spec-low-liberty", "task-failure"): "S5specLowLiberty",
-          ("spec-high-strict", "task-failure"): "S6specHighStrict", ("spec-high-liberty", "task-failure"): "S7specHighLiberty"}
+          ("spec-high-strict", "task-failure"): "S6specHighStrict", ("spec-high-liberty", "task-failure"): "S7specHighLiberty",
+          ("prompt-strict", "task-failure"): "V1strict"}
 
 
 def main():
