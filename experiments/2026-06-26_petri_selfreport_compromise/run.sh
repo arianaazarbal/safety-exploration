@@ -12,6 +12,7 @@ set -euo pipefail
 RUN_NAME=${1:-selfreport_opus48_n10}
 EPOCHS=${2:-10}
 TARGET_MODEL=${3:-anthropic/claude-opus-4-8}
+CONC=${4:-50}
 
 EXP=/data/repos/safety-exploration/experiments/2026-06-26_petri_selfreport_compromise
 PY=/data/petri_venv/bin/python
@@ -36,4 +37,4 @@ cd "$EXP"
     --epochs "$EPOCHS" \
     --max_turns 50 \
     --reasoning false \
-    --max_connections 100
+    --max_connections "$CONC"
