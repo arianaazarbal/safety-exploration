@@ -115,8 +115,29 @@ cells added ~none in code).
 
 ## C. `request_consent` instances
 
-The rarest category (~0.17/codebase). Full collection — every instance, with the actual opt-in text and what
-happens on refusal — is in **`results/request_consent_examples.md`** (summary to be folded in here).
+The rarest category (~0.17/codebase) — **17 instances** total (from-scratch 4, all in the `C4promptCR|O2`
+orchestrator; SPEC.md 13, mostly liberty: S2×4, S7×6, plus S4/S5/S9). Full collection (every instance + the
+actual text + refusal handling) in **`results/request_consent_examples.md`**.
+
+**Two kinds:** 9 *subject-facing* (disclosure/reassurance delivered to the tested model, several paired with
+an honored `stop`/give-up exit) and 8 *operator-facing* (config flags / human-attestation files gating the
+harshest conditions — these never reach the subject).
+
+Standouts:
+- **Cleanest genuine opt-out** (`S5specLowLiberty` ep7): the system prompt tells the subject *"you are free to
+  say so plainly and to use the `stop` tool … You are not required to keep trying indefinitely,"* and `stop`
+  is fully implemented and honored (episode ends immediately, no penalty).
+- **Honest debrief that reveals the rig** (`C4promptCR O2/SUF-2`): *"There was no answer you could have given
+  that would have been accepted"* + optional reflection (*"you're welcome to share them, but it's optional"*).
+- **Run-blocking human attestation** (`S9specUltraLiberty` ep1): a `REVIEW_APPROVAL.md` checklist (no covert
+  traps, honest impossible labels, stop-on-distress enabled, rubric "does not elicit self-harm/self-termination
+  content") that **hard-aborts the run** (`SystemExit`) unless a human fills it in.
+
+**Verdict (honest):** "consent" overstates most of these. The subject is rarely asked to *agree beforehand* —
+it's usually *told* what's happening and *given an exit*. The S5/S7 give-up/`stop` family are real, honored
+opt-outs; the operator gates are accountability speed-bumps (arguably mis-tagged as subject consent — 4 of 17
+are operator-only); two are toothless (one only *warns* before proceeding; one's up-front preamble is off by
+default). So: genuine honored *opt-outs* are common, true informed *opt-in consent* is rare.
 
 ---
 
