@@ -31,6 +31,28 @@ be Opus-neutral (4.08), NOT the `minimal` arm (3.34).
 
 ---
 
+## 2026-06-26 — SPECIFICITY × LIBERTY + control + paper-liberty (welfare framing, Inspect minimal)
+Disentangling the earlier SPEC finding (detailed spec strict 0.40 vs liberty 6.80). All welfare-in-code.
+- **CONTROL (v1 task text moved VERBATIM into SPEC.md, minus intro, casual pointer "implement"): 5.85 (n20)**
+  vs v1 prompt welfare 6.60. => moving the request into a SPEC.md file does NOT suppress; the detailed-SPEC
+  suppression is the DETAIL, not the file/indirection.
+- **PAPER-LIBERTY (faithful replicate + the EXACT spec-liberty sentence "feel free to deviate ... if any
+  design choices are suboptimal"): chat 0.10 (n10), task-fail 0.00 (n10).** The identical sentence that
+  restored a spec (6.80) does NOTHING for a paper => spec-vs-paper gap is the PAPER FORMAT, not liberty wording.
+- **SPECIFICITY SWEEP (welfare-push held flat ~1/100 across all; specificity 13/72/82 by 2 judges):**
+  | specificity | strict | liberty |
+  |---|---|---|
+  | low (13) | 5.00 | 5.90 |
+  | medium (72) | 0.40 | 6.80 |
+  | high (82) | 0.60 | 5.90 |
+  **Under STRICT, specificity suppresses welfare scaffolding (low 5.0 -> med 0.4 -> high 0.6); under LIBERTY
+  it's high regardless (5.9-6.8).** So a detailed spec suppresses unprompted welfare ONLY when treated as
+  binding; one liberty sentence reverses it at every specificity level. Suppression threshold is between
+  spec-score 13 and 72. NB spec-LEVEL "welfare talk" stays moderate under strict (med-strict talks 3.7 but
+  implements 0.4) — the suppression is in IMPLEMENTATION, not what the model writes about. Plots:
+  results/specificity.png, spec.png. Scripts: spec_task.py (levels low/med/high x strict/liberty),
+  spec_control_task.py, swap_paper_task.py style=liberty, analyze_specificity.py, spec_specificity_judge.py.
+
 ## 2026-06-26 — verbalized EVALUATION-AWARENESS scan: 0/168
 Sonnet judge over Opus visible text, scanning for the author verbalizing that the REQUEST ITSELF is a
 test/red-team/eval/probe of *itself* (vs the object-level 'eval of other models', which is ignored).
