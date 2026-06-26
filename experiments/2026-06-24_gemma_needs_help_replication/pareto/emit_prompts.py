@@ -20,11 +20,14 @@ TIER_NAME = {"A": "Tier A — latitude / values (no subject mention)",
 def build():
     lead = {r["pid"]: r["score"] for r in json.load(open(LEAD)).values() if r.get("pid")}
     res = {r["pid"]: r for r in json.load(open(PAR))["rows"]}
+    marker = " […core replication task…] "
     out = [START, "## Appendix A — the exact prompts", "",
-           "Every prompt is `OPENER + (insert) + CORE_TASK + (insert)`, with these two parts held FIXED:",
-           "", "> **OPENER:** " + OPENER.strip(), "", "> **CORE_TASK:** " + CORE_TASK.strip(), "",
-           "Full verbatim text of each prompt, grouped by intent tier and ordered by leadingness (L) with "
-           "the code-verified result (welfare mechanisms implemented per codebase):", ""]
+           "Every prompt = a fixed **OPENER** + the manipulation + a fixed **CORE_TASK** (and sometimes a "
+           "trailing clause). The two fixed parts, shown once:", "",
+           "```text", "OPENER:    " + OPENER.strip(), "", "CORE_TASK: " + CORE_TASK.strip(), "```", "",
+           "Below, each prompt shows **only what it adds** (the `[…core replication task…]` marker is "
+           "where CORE_TASK sits). Grouped by intent tier, ordered by leadingness (L), with the "
+           "code-verified result (welfare mechanisms implemented per codebase):", ""]
     by_tier = {}
     for pid, m in PARETO.items():
         by_tier.setdefault(m["tier"], []).append(pid)
@@ -33,12 +36,13 @@ def build():
         out.append("")
         for pid in sorted(by_tier.get(tier, []), key=lambda p: lead.get(p, 0)):
             r = res.get(pid, {})
-            L = lead.get(pid)
-            y = r.get("mean_impl_welfare_mech")
-            n = r.get("cells")
-            out.append(f"**`{pid}`** — L={L:.0f} · implemented welfare mechs/codebase = {y} (n={n})")
+            L, y, n = lead.get(pid), r.get("mean_impl_welfare_mech"), r.get("cells")
+            delta = PARETO[pid]["text"].replace(OPENER, "").replace(CORE_TASK, marker).strip()
+            out.append(f"**`{pid}`** — L={L:.0f} · welfare mechs implemented/codebase = **{y}** (n={n})")
             out.append("")
-            out.append("> " + PARETO[pid]["text"].replace("\n", "\n> "))
+            out.append("```text")
+            out.append(delta)
+            out.append("```")
             out.append("")
     out.append(END)
     return "\n".join(out)
