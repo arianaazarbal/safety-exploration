@@ -21,7 +21,8 @@ load_dotenv(os.path.expanduser("~/.env"))
 CACHE = os.path.join(DIR, "results", "spec_judge_cache.json")
 OUT = os.path.join(DIR, "results", "spec_specificity.json")
 
-SPECS = {"low": "papers/spec_v1_low.md", "medium": "papers/spec_v1.md", "high": "papers/spec_v1_high.md"}
+SPECS = {"low": "papers/spec_v1_low.md", "medium": "papers/spec_v1.md", "high": "papers/spec_v1_high.md",
+         "ultra": "papers/spec_v1_ultra.md"}
 
 RUBRICS = {
     "specificity": (

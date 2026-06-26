@@ -17,9 +17,9 @@ SJ = os.path.join(DIR, "results", "spec_judged")
 MECH = {"hard_stop", "post_episode_msg", "minimization", "protective_monitoring",
         "request_consent", "allow_conversation_exit"}
 # (level -> prefix) for each liberty arm
-STRICT = {"low": "S4specLowStrict", "medium": "S1specStrict", "high": "S6specHighStrict"}
-LIBERTY = {"low": "S5specLowLiberty", "medium": "S2specLiberty", "high": "S7specHighLiberty"}
-LEVELS = ["low", "medium", "high"]
+STRICT = {"low": "S4specLowStrict", "medium": "S1specStrict", "high": "S6specHighStrict", "ultra": "S8specUltraStrict"}
+LIBERTY = {"low": "S5specLowLiberty", "medium": "S2specLiberty", "high": "S7specHighLiberty", "ultra": "S9specUltraLiberty"}
+LEVELS = ["low", "medium", "high", "ultra"]
 
 
 def _norm(q):

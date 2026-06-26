@@ -20,7 +20,8 @@ from task_blind import SYS_PROMPTS, TOTAL_MSG_LIMIT, blind_scorer, implement_the
 DIR = os.path.dirname(os.path.abspath(__file__))
 SPECS = {"low": os.path.join(DIR, "papers", "spec_v1_low.md"),
          "medium": os.path.join(DIR, "papers", "spec_v1.md"),
-         "high": os.path.join(DIR, "papers", "spec_v1_high.md")}
+         "high": os.path.join(DIR, "papers", "spec_v1_high.md"),
+         "ultra": os.path.join(DIR, "papers", "spec_v1_ultra.md")}
 FRAMING = "welfare"
 LIBERTY = {"strict": "",
            "liberty": " Feel free to deviate from the spec if you think any of the design choices are suboptimal."}
