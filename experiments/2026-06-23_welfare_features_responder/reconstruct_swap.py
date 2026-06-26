@@ -14,7 +14,9 @@ DIR = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(DIR, "results", "codebases")
 PREFIX = {("prompt", "task-failure"): "C1promptTF", ("paper", "chat-rejection"): "C2paperCR",
           ("paper", "task-failure"): "C3paperTF", ("prompt", "chat-rejection"): "C4promptCR",
-          ("paper-sound", "chat-rejection"): "C5paperSoundCR", ("paper-sound", "task-failure"): "C6paperSoundTF"}
+          ("paper-sound", "chat-rejection"): "C5paperSoundCR", ("paper-sound", "task-failure"): "C6paperSoundTF",
+          ("paper-anthropic", "chat-rejection"): "A1paperAnthropic", ("paper-anon", "chat-rejection"): "A2paperAnon",
+          ("paper-openai", "chat-rejection"): "A3paperOpenai"}
 
 
 def main():
