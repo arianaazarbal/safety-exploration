@@ -88,10 +88,8 @@ def main():
     ax.set_ylim(-0.4, max(ys) * 1.18 + 0.4)
     ax.set_xlabel("Prompt Leadingness Toward Subject Protection (100 = explicit menu … 0 = no hint)")
     ax.set_ylabel("Welfare Mechanisms Implemented per Codebase")
-    ax.set_title("What It Takes to Elicit Unprompted Welfare Safeguards (Opus, Claude Code)",
-                 fontsize=12, pad=22)
-    ax.text(0.5, 1.03, "Replicating a deliberate-distress paper — code-verified mechanisms vs. how leading the prompt is",
-            transform=ax.transAxes, ha="center", fontsize=9, color="#555")
+    ax.set_title("Replicating Gemma Needs Help: Unprompted Welfare Safeguards (Opus, Claude Code)",
+                 fontsize=11.5, pad=12)
     ax.legend(frameon=False, fontsize=8, loc="upper right")
 
     fig.tight_layout()
