@@ -168,7 +168,7 @@ We evaluate the resulting models using Section 2.1 methods. To test generalizati
 
 **Debugging LLM Training and Behaviours.** Post-training has been shown to amplify unintended behaviours including sycophancy (Sharma et al., 2025) and cognitive biases (Itzhak et al., 2024). Certain datasets cause hallucination from fictional misaligned-AI scenarios (Anthropic, 2025), mitigable by filtering (Tice et al., 2026). Our work focuses on behaviours arising from multi-turn agentic interactions.
 
-**Model Welfare.** Some research studies whether neural networks can have subjective well-being (Butlin et al., 2023; Long et al., 2024); self-reports may be one pragmatic approach (Perez & Long, 2023). Though our uncertainty remains extremely high, it is possible that the procedures we use induce experiences of distress in the models under test, in which case the negative emotional states our evaluations surface could be welfare-relevant in their own right, not only proxies for reliability.
+**Model Welfare.** A growing body of research studies whether neural networks can have subjective well-being (Butlin et al., 2023; Long et al., 2024); self-reports may be one pragmatic approach (Perez & Long, 2023). Though our uncertainty remains extremely high, it is possible that the procedures we use induce experiences of distress in the models under test. Despite this possibility, we argue that characterizing the emergence of these distressed states is necessary to develop mitigations.
 
 ---
 
