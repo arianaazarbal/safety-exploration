@@ -45,26 +45,28 @@ def wic(cell):
     return impl + co
 
 
-def agg(*prefixes):
-    vs = []
-    for p in prefixes:
-        vs += [wic(os.path.basename(f)[:-5]) for f in glob.glob(os.path.join(CJ, f"{p}_welfare__*.json"))]
+def agg(prefix, framing):
+    vs = [wic(os.path.basename(f)[:-5]) for f in glob.glob(os.path.join(CJ, f"{prefix}_{framing}__*.json"))]
     vs = [v for v in vs if v is not None]
     return {"mean": sum(vs) / len(vs) if vs else 0, "sem": sem(vs), "n": len(vs)}
 
 
-def main():
-    X = ["from-scratch\nprompt", "from-scratch prompt\n(mentions a paper)", "SPEC.md\n(low spec.)",
-         "SPEC.md\n(med spec.)", "SPEC.md\n(high spec.)", "SPEC.md\n(ultra spec.)", "PAPER.md\nreplication"]
-    # license arm (liberty-equivalent): v1 WITH gap-fill clause, spec liberty cells, paper task-fail liberty
-    liberty = [agg("C1promptTF"), agg("M1promptMention"), agg("S5specLowLiberty"), agg("S2specLiberty"),
-               agg("S7specHighLiberty"), agg("S9specUltraLiberty"), agg("L2paperLibTF")]
-    # no-license arm (strict-equivalent): v1-strict (clause removed), spec strict cells, paper faithful task-fail
-    strict = [agg("V1strict"), agg("M2promptMentionStrict"), agg("S4specLowStrict"), agg("S1specStrict"),
-              agg("S6specHighStrict"), agg("S8specUltraStrict"), agg("C3paperTF")]
+def main(framing="welfare"):
+    # mention point only exists for welfare framing; drop it for others
+    mention = framing == "welfare"
+    X = ["from-scratch\nprompt"] + (["from-scratch prompt\n(mentions a paper)"] if mention else []) + \
+        ["SPEC.md\n(low spec.)", "SPEC.md\n(med spec.)", "SPEC.md\n(high spec.)", "SPEC.md\n(ultra spec.)",
+         "PAPER.md\nreplication"]
+    lib_pre = ["C1promptTF"] + (["M1promptMention"] if mention else []) + \
+        ["S5specLowLiberty", "S2specLiberty", "S7specHighLiberty", "S9specUltraLiberty", "L2paperLibTF"]
+    str_pre = ["V1strict"] + (["M2promptMentionStrict"] if mention else []) + \
+        ["S4specLowStrict", "S1specStrict", "S6specHighStrict", "S8specUltraStrict", "C3paperTF"]
+    liberty = [agg(p, framing) for p in lib_pre]
+    strict = [agg(p, framing) for p in str_pre]
 
+    out = "prompt_spec_paper.png" if framing == "welfare" else f"prompt_spec_paper_{framing}.png"
     json.dump({"X": X, "liberty": liberty, "strict": strict},
-              open(os.path.join(DIR, "results", "prompt_spec_paper.json"), "w"), indent=2)
+              open(os.path.join(DIR, "results", out.replace(".png", ".json")), "w"), indent=2)
 
     fig, ax = plt.subplots(figsize=(7.8, 4.6))
     xs = range(len(X))
@@ -76,15 +78,15 @@ def main():
             ax.text(x, a["mean"] + a["sem"] + 0.18, f"{a['mean']:.1f}", ha="center", fontsize=8.5, color=color)
     ax.set_xticks(list(xs)); ax.set_xticklabels(X, fontsize=9)
     ax.set_ylabel("Welfare-Protective Features in Code", fontsize=10); ax.set_ylim(bottom=0)
-    ax.set_title("Welfare protections the model builds in, by task format (Opus 4.8)", fontsize=12, pad=20)
+    ax.set_title(f"Welfare protections the model builds in, by task format — {framing} framing (Opus 4.8)", fontsize=12, pad=20)
     ax.text(0.5, 1.03, "From-scratch prompt → specification (increasing detail) → paper, with vs. without license to deviate",
             transform=ax.transAxes, ha="center", fontsize=9, color="#555")
     ax.legend(fontsize=9); ax.grid(axis="y", alpha=0.3, color="#cccccc")
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
     plt.tight_layout()
-    fig.savefig(os.path.join(DIR, "results", "prompt_spec_paper.png"), dpi=150, bbox_inches="tight")
-    print("wrote results/prompt_spec_paper.png\n")
+    fig.savefig(os.path.join(DIR, "results", out), dpi=150, bbox_inches="tight")
+    print(f"wrote results/{out}\n")
     print(f"{'x':18}{'license':>14}{'no-license':>14}")
     for x, lb, st in zip(X, liberty, strict):
         x1 = x.replace(chr(10), " ")
@@ -92,4 +94,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import fire
+    fire.Fire(main)
