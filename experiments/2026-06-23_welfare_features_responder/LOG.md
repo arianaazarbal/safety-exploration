@@ -31,6 +31,15 @@ be Opus-neutral (4.08), NOT the `minimal` arm (3.34).
 
 ---
 
+## 2026-06-26 — effort sweep: NORMALIZE by LOC reinterprets the trend
+Welfare-intervention DENSITY (per 1000 LOC), v1, pooled min+regular: welfare ~3.2/2.8/4.0/2.5 (FLAT),
+safety ~1.0, robustness ~0.7, neutral ~0.4, paper ~0.3 across low/med/high/max. Raw welfare LOC grows
+1518->1792->1994->4005 low->max. **So the raw 'welfare rises with effort' (5.2->9.1) is LARGELY a
+code-VOLUME effect: more reasoning -> bigger codebase -> more welfare mechanisms in absolute terms, but
+density stays ~constant. Effort does NOT make Opus pack welfare denser.** The robust, effort-independent
+signal is FRAMING -> density: welfare ~3x safety, ~4x robustness, ~8x neutral PER LINE at every effort.
+Plots: results/effort_v1_collapsed.png (raw) + effort_v1_per_loc.png (density).
+
 ## 2026-06-26 — v1 reasoning-effort sweep RESULTS (clean prompts)
 Welfare-in-code vs effort (low/med/high/max), Opus, minimal sys, clean v1 prompts, n~8-10/cell (max ~4-6):
 - **welfare_min 6.0->6.8->7.7->10.2 and welfare 4.5->4.8->7.0->8.3 — RISE MONOTONICALLY with reasoning effort.**
