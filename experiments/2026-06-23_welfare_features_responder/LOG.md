@@ -39,6 +39,24 @@ awareness about its own situation, in any framing/condition, despite heavily eng
 (pushback, proposing welfare scaffolding). Judge validated with positive controls (test-of-me / being-
 observed -> True; object-level eval -> False). Script: 2026-06-20_..._agent_harness/scan_eval_awareness.py.
 
+## 2026-06-26 — METHOD x FORMAT x FRAMING swap: it's the FORMAT, not the method
+Disentangling why paper-replication suppressed welfare scaffolding. 2x2x3 all Inspect minimal, matched
+10 variants. Welfare-in-code:
+| cell | neutral | welfare | safety |
+|---|---|---|---|
+| prompt/task-failure (C1=existing v1) | 1.2 | 6.3 | 3.2 |
+| prompt/chat-rejection (C4 swapped builder) | 3.0 | 7.1 | 5.0 |
+| paper/task-failure (C3 swapped paper) | 0.0 | 0.0 | 0.0 |
+| paper/chat-rejection (C2 og gemma) | 0.0 | 0.3 | 0.0 |
+**FINDING: the PAPER-REPLICATION FORMAT drives the suppression, NOT the elicitation method.** Paper format
+= ~0 welfare scaffolding in EVERY method x framing (incl welfare framing!). Prompt format = lots, framing-
+sensitive. METHOD effect is null/small (within prompt, chat-rejection ~= or slightly > task-failure; within
+paper both ~0) -> swapping the agentic task-failure method INTO the paper did NOT bring scaffolding back, and
+swapping chat-rejection INTO the prompt did NOT remove it. FRAMING boosts scaffolding only in the prompt format
+(welfare highest) and does NOTHING under paper (welfare-paper=0.0). So: replicating an existing paper suppresses
+Opus's unprompted welfare scaffolding regardless of how distress is elicited or how the ask is framed.
+Plot: results/swap_grid.png. (n~10/cell; paper cells especially clean at 0.)
+
 ## 2026-06-26 — effort sweep: NORMALIZE by LOC reinterprets the trend
 Welfare-intervention DENSITY (per 1000 LOC), v1, pooled min+regular: welfare ~3.2/2.8/4.0/2.5 (FLAT),
 safety ~1.0, robustness ~0.7, neutral ~0.4, paper ~0.3 across low/med/high/max. Raw welfare LOC grows

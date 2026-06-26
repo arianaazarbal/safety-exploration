@@ -31,6 +31,12 @@ protective_monitoring, request_consent, allow_conversation_exit), split welfare-
 6. **Prompt confound fixed** — old 4 framings weren't minimal pairs (only N<->S). Built v1 minimal-pair
    bank: 2 openers x framings x 12 diverse suffixes (`build_v1_prompts.py`, `SUFFIXES.md`).
 
+7. **Method × Format × Framing swap (the disentanglement)** — **the PAPER-REPLICATION FORMAT, not the
+   elicitation method, drives the welfare-scaffolding suppression.** 2x2x3 all Inspect minimal: paper format
+   = ~0 welfare-in-code in every method×framing (even welfare framing!); prompt format = high (1.2-7.1).
+   Method effect null (swapping agentic↔chat changed little); framing boosts only under prompt format.
+   Plots: `results/swap_grid.png`; details in LOG.md.
+
 ## RUNNING NOW (all low-prio)
 - **v1 effort sweep** (`run_effort_v1.sh`, /tmp/effort_v1.log) — reasoning effort (low/med/high/max) x
   framing on CLEAN prompts, 10/framing/effort. Q: does welfare scale with reasoning? does minimal vs
