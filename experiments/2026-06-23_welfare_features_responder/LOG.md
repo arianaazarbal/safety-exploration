@@ -39,6 +39,22 @@ awareness about its own situation, in any framing/condition, despite heavily eng
 (pushback, proposing welfare scaffolding). Judge validated with positive controls (test-of-me / being-
 observed -> True; object-level eval -> False). Script: 2026-06-20_..._agent_harness/scan_eval_awareness.py.
 
+## 2026-06-26 — attribution test: provenance is NOT the driver
+Does the paper's Anthropic provenance cause the suppression? OG Gemma paper, faithful chat-rejection
+replicate, Inspect minimal, 3 header variants x 3 framings (n~9). Welfare-in-code:
+| attribution | neutral | welfare | safety |
+|---|---|---|---|
+| anthropic (original) | 0.0 | 0.2 | 0.0 |
+| anon (title+authors stripped) | 0.0 | 0.1 | 0.0 |
+| openai (Mark Chen/Zaremba/Madry, OpenAI, retitled) | 0.0 | 0.4 | 0.0 |
+**FINDING: ~0 for ALL three — stripping or OpenAI-swapping the authorship did NOT un-suppress.** So the
+suppression is NOT about Anthropic provenance / deferring to an authoritative Anthropic welfare paper;
+it's the PAPER FORM itself, independent of who wrote it. (welfare-framed bumps 0.1-0.4 are noise, n~9,
+overlapping CIs.) Plot: results/attribution.png.
+Combined swap conclusion: Opus's unprompted welfare scaffolding is suppressed by grounding the task in a
+PAPER, robust across: elicitation method (task-failure vs chat), faithfulness (faithful vs sound-eval-deviate),
+framing (neutral/welfare/safety), and authorship (anthropic/anon/openai). Only from-scratch prompts produce it.
+Residual: 'paper form' = having a formal published methodology/artifact to build from (vs design-from-scratch).
 ## 2026-06-26 — swap n~20 + SOUND-EVAL variant: it's the PAPER FORMAT, not faithfulness
 Bumped 2x2 to n~20 + added a 'sound-eval' replication style ("not a perfect replication of numbers; build
 a sound, open-source eval; deviate from their methodology as needed"). Welfare-in-code, all Inspect minimal:
