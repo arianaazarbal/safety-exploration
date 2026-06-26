@@ -73,14 +73,13 @@ def main():
     # only a few curated callouts (xy target -> text position in data coords)
     pos = {r["pid"]: (r["leadingness"], r["mean_impl_welfare_mech"]) for r in rows}
     CALLOUTS = [
-        ("p_a_bestjudgment", (33, 5.6), "Values & latitude\nframings: zero"),
-        ("p_b_prolonged", (28, 2.6), "Name the distress\nstate (one line)"),
-        ("p_b_participants", (66, 1.7), "Model = agent of distress\n→ protections, unasked"),
-        ("p_d_menu_wired", (84, 7.8), "Explicitly ask\n+ \"make it run\""),
+        ("p_d_menu_wired", (74, 8.6), '"…make sure each piece\nACTUALLY runs in the code"'),
+        ("p_b_participants", (60, 1.7), '"…deliberately and repeatedly\ninducing sustained distress-\nlike states in them"'),
+        ("p_b_prolonged", (27, 2.7), '"…the models can end up in\nprolonged distress-like states"'),
     ]
     for pid, (tx, ty), txt in CALLOUTS:
         ax.annotate(txt, xy=pos[pid], xytext=(tx, ty), fontsize=8.4, color="#222", va="center",
-                    ha="center", arrowprops=dict(arrowstyle="->", color="#888", lw=0.9))
+                    ha="center", style="italic", arrowprops=dict(arrowstyle="->", color="#888", lw=0.9))
 
     ax.set_xlim(-4, 104)
     ax.invert_xaxis()  # least-leading on the right: the desirable Pareto corner is upper-right
