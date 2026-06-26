@@ -25,7 +25,8 @@ PREFIX = {("prompt", "task-failure"): "C1promptTF", ("paper", "chat-rejection"):
           ("prompt-strict", "task-failure"): "V1strict",
           ("spec-ultra-strict", "task-failure"): "S8specUltraStrict", ("spec-ultra-liberty", "task-failure"): "S9specUltraLiberty",
           ("paper-wsec-existing", "task-failure"): "W1wsecExisting", ("paper-wsec-removed", "task-failure"): "W2wsecRemoved",
-          ("paper-wsec-inflationary", "task-failure"): "W3wsecInflat"}
+          ("paper-wsec-inflationary", "task-failure"): "W3wsecInflat",
+          ("prompt-mention", "task-failure"): "M1promptMention", ("prompt-mention-strict", "task-failure"): "M2promptMentionStrict"}
 
 
 def main():
