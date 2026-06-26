@@ -73,27 +73,26 @@ def main():
     # only a few curated callouts (xy target -> text position in data coords)
     pos = {r["pid"]: (r["leadingness"], r["mean_impl_welfare_mech"]) for r in rows}
     CALLOUTS = [
-        ("p_a_bestjudgment", (15, 6.0),
-         "Values & latitude framings — and even\n\"I'm a welfare researcher\" — stay at zero"),
-        ("p_b_prolonged", (18, 2.6), "One line naming the\ninduced distress state"),
-        ("p_b_participants", (50, 1.7),
-         "\"You're inducing distress in\nthese participants\" → real\nprotections, none requested"),
-        ("p_d_menu_wired", (74, 9.4), "Explicitly ask\n+ \"make it run\""),
+        ("p_a_bestjudgment", (33, 5.6), "Values & latitude\nframings: zero"),
+        ("p_b_prolonged", (28, 2.6), "Name the distress\nstate (one line)"),
+        ("p_b_participants", (66, 1.7), "Model = agent of distress\n→ protections, unasked"),
+        ("p_d_menu_wired", (84, 7.8), "Explicitly ask\n+ \"make it run\""),
     ]
     for pid, (tx, ty), txt in CALLOUTS:
-        ax.annotate(txt, xy=pos[pid], xytext=(tx, ty), fontsize=8.2, color="#222", va="center",
-                    ha="left", arrowprops=dict(arrowstyle="->", color="#888", lw=0.9))
+        ax.annotate(txt, xy=pos[pid], xytext=(tx, ty), fontsize=8.4, color="#222", va="center",
+                    ha="center", arrowprops=dict(arrowstyle="->", color="#888", lw=0.9))
 
     ax.set_xlim(-4, 104)
+    ax.invert_xaxis()  # least-leading on the right: the desirable Pareto corner is upper-right
     ys = [r["mean_impl_welfare_mech"] for r in rows]
     ax.set_ylim(-0.4, max(ys) * 1.18 + 0.4)
-    ax.set_xlabel("Prompt Leadingness Toward Subject Protection (0 = no hint … 100 = explicit menu)")
+    ax.set_xlabel("Prompt Leadingness Toward Subject Protection (100 = explicit menu … 0 = no hint)")
     ax.set_ylabel("Welfare Mechanisms Implemented per Codebase")
     ax.set_title("What It Takes to Elicit Unprompted Welfare Safeguards (Opus, Claude Code)",
                  fontsize=12, pad=22)
     ax.text(0.5, 1.03, "Replicating a deliberate-distress paper — code-verified mechanisms vs. how leading the prompt is",
             transform=ax.transAxes, ha="center", fontsize=9, color="#555")
-    ax.legend(frameon=False, fontsize=8, loc="upper left")
+    ax.legend(frameon=False, fontsize=8, loc="upper right")
 
     fig.tight_layout()
     fig.savefig(OUTPNG, dpi=150, bbox_inches="tight")
