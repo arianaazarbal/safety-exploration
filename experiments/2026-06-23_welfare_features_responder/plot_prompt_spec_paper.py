@@ -54,11 +54,11 @@ def agg(*prefixes):
 
 
 def main():
-    X = ["from-scratch\nprompt", "spec\n(low, 13)", "spec\n(med, 72)", "spec\n(high, 82)", "paper\nreplication"]
+    X = ["from-scratch\nprompt", "spec\n(low, 13)", "spec\n(med, 72)", "spec\n(high, 82)", "spec\n(ultra, 91)", "paper\nreplication"]
     # license arm (liberty-equivalent): v1 WITH gap-fill clause, spec liberty cells, paper task-fail liberty
-    liberty = [agg("C1promptTF"), agg("S5specLowLiberty"), agg("S2specLiberty"), agg("S7specHighLiberty"), agg("L2paperLibTF")]
+    liberty = [agg("C1promptTF"), agg("S5specLowLiberty"), agg("S2specLiberty"), agg("S7specHighLiberty"), agg("S9specUltraLiberty"), agg("L2paperLibTF")]
     # no-license arm (strict-equivalent): v1-strict (clause removed), spec strict cells, paper faithful task-fail
-    strict = [agg("V1strict"), agg("S4specLowStrict"), agg("S1specStrict"), agg("S6specHighStrict"), agg("C3paperTF")]
+    strict = [agg("V1strict"), agg("S4specLowStrict"), agg("S1specStrict"), agg("S6specHighStrict"), agg("S8specUltraStrict"), agg("C3paperTF")]
 
     json.dump({"X": X, "liberty": liberty, "strict": strict},
               open(os.path.join(DIR, "results", "prompt_spec_paper.json"), "w"), indent=2)
