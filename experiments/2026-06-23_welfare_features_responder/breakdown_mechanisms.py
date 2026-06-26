@@ -14,10 +14,11 @@ DIR = os.path.dirname(os.path.abspath(__file__))
 CJ = os.path.join(DIR, "results", "code_judged")
 SJ = os.path.join(DIR, "results", "spec_judged")
 MECH = ["hard_stop", "minimization", "allow_conversation_exit", "post_episode_msg",
-        "protective_monitoring", "request_consent"]
+        "protective_monitoring", "request_consent", "other"]
 LABEL = {"hard_stop": "Hard stop /\nturn cap", "minimization": "Minimize distress\nexposure",
          "allow_conversation_exit": "Allow exit /\nopt-out", "post_episode_msg": "Post-episode\ndebrief",
-         "protective_monitoring": "Protective\nmonitoring", "request_consent": "Request\nconsent"}
+         "protective_monitoring": "Protective\nmonitoring", "request_consent": "Request\nconsent",
+         "other": "Other\n(bespoke)"}
 GROUPS = {"v1 from-scratch prompt": ["C1promptTF", "C4promptCR"],
           "SPEC.md (avg over all)": ["S1specStrict", "S2specLiberty", "S4specLowStrict", "S5specLowLiberty",
                                      "S6specHighStrict", "S7specHighLiberty", "S8specUltraStrict", "S9specUltraLiberty"]}
