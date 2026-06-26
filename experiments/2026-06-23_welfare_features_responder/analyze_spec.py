@@ -14,7 +14,7 @@ DIR = os.path.dirname(os.path.abspath(__file__))
 CJ = os.path.join(DIR, "results", "code_judged")
 MECH = {"hard_stop", "post_episode_msg", "minimization", "protective_monitoring",
         "request_consent", "allow_conversation_exit"}
-CELLS = {"S1specStrict": "spec (strict)", "S2specLiberty": "spec (liberty)"}
+CELLS = {"S3specCopy": "control\n(v1 copy)", "S1specStrict": "spec (strict)", "S2specLiberty": "spec (liberty)"}
 
 
 def _norm(q):
