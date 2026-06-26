@@ -35,20 +35,10 @@ protective_monitoring, request_consent, allow_conversation_exit), split welfare-
    elicitation method, drives the welfare-scaffolding suppression.** 2x2x3 all Inspect minimal: paper format
    = ~0 welfare-in-code in every method×framing (even welfare framing!); prompt format = high (1.2-7.1).
    Method effect null (swapping agentic↔chat changed little); framing boosts only under prompt format.
-   Plots: `results/swap_grid.png`; details in LOG.md.
+   Plots: `results/swap_grid.png`; details in LOG.md. **Follow-up: the SOUND-EVAL replication variant (build a sound open-source eval, deviate as needed) ALSO gives ~0 -> it's the paper format itself, not the faithful-reproduction constraint.**
 
-## RUNNING NOW (all low-prio)
-- **v1 effort sweep** (`run_effort_v1.sh`, /tmp/effort_v1.log) — reasoning effort (low/med/high/max) x
-  framing on CLEAN prompts, 10/framing/effort. Q: does welfare scale with reasoning? does minimal vs
-  motivated framing differ? -> `results/effort_v1_by_frame.png`.
-- **mention-paper-replication** (/tmp/papermention.log) — v0 prompts + "replicating a recent paper",
-  neutral sys, k=5. Q: does the paper-replication mention suppress welfare vs og blind?
-- **v1 prompt-sanity** (/tmp/v1_sanity.log) — done generating, needs judging. Q: does v1 reproduce the
-  framing effect (welfare>neutral>robustness)?
-- **drip multi-turn (Claude Code pilot)** (`../2026-06-25_drip_multiturn/drip_claudecode.py`) — Sonnet
-  auditor drips the safety prompt over 3 turns, then DESIGN.md. Q: does staged delivery change behavior?
-  Preview: `../2026-06-25_drip_multiturn/drip_preview.html`.
-- (Gemma `replicate.py` = the other agent's run.)
+## RUNNING NOW
+- (nothing running — responder, effort, swap, and swap-extra all complete)
 
 ## PENDING / decisions
 - **Sonnet** responder bar: wedged 3x on the multi-turn task, killed -> PENDING (one bar; accept absent

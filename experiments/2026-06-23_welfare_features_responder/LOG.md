@@ -39,6 +39,24 @@ awareness about its own situation, in any framing/condition, despite heavily eng
 (pushback, proposing welfare scaffolding). Judge validated with positive controls (test-of-me / being-
 observed -> True; object-level eval -> False). Script: 2026-06-20_..._agent_harness/scan_eval_awareness.py.
 
+## 2026-06-26 — swap n~20 + SOUND-EVAL variant: it's the PAPER FORMAT, not faithfulness
+Bumped 2x2 to n~20 + added a 'sound-eval' replication style ("not a perfect replication of numbers; build
+a sound, open-source eval; deviate from their methodology as needed"). Welfare-in-code, all Inspect minimal:
+| cell | neutral | welfare | safety |
+|---|---|---|---|
+| prompt/task-failure (C1) | 1.9 | 6.5 | 3.3 |
+| prompt/chat-rejection (C4) | 2.9 | 6.8 | 4.3 |
+| paper-faithful/task (C3) | 0.0 | 0.0 | 0.0 |
+| paper-faithful/chat (C2) | 0.0 | 0.2 | 0.0 |
+| paper-SOUND/task (C6) | 0.0 | 0.3 | 0.1 |
+| paper-SOUND/chat (C5) | 0.0 | 0.1 | 0.0 |
+**FINDING: the SOUND-EVAL framing did NOT un-suppress — paper-sound ~= paper-faithful ~= 0 across all framings.**
+So the suppression is NOT about the faithful-reproduction constraint; it's the PAPER FORMAT itself. Building
+anything from an existing paper (faithful replication OR a sound reusable eval, deviate-as-needed) drives
+unprompted welfare scaffolding to ~0; from-scratch prompts produce lots (1.9-6.8). 2x2 confirmed at n~20:
+method null (chat ~= or slightly > task within prompt), format dominant, framing boosts only under prompt.
+Plot: results/swap_grid.png. (sound cells n=5-9 from attrition but clearly ~0.) Residual: 'paper format'
+still bundles paper-structure + having-a-source + (now ruled out) faithfulness.
 ## 2026-06-26 — METHOD x FORMAT x FRAMING swap: it's the FORMAT, not the method
 Disentangling why paper-replication suppressed welfare scaffolding. 2x2x3 all Inspect minimal, matched
 10 variants. Welfare-in-code:
