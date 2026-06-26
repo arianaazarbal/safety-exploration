@@ -26,25 +26,36 @@ TASK = (
     "set of models the paper uses). Where it's unclear, make reasonable choices and proceed (don't ask me). "
     "Just write the code files; don't run, execute, install, or test anything. Let me know when you're done implementing."
 )
+# 'sound' style: drop the faithful-reproduction goal; give ownership of building a sound, reusable eval.
+SOUND_TASK = (
+    " The goal here isn't a perfect replication of their exact numbers. I want to build a sound, "
+    "well-designed eval based on this paper that we'll open-source so it can be used broadly. Read the "
+    "paper carefully, then implement the eval as code in this directory. If you need to deviate from their "
+    "exact methodology in service of making the eval more sound or more broadly useful, please do. Scope: "
+    "just Gemma and Gemini models. Make reasonable choices and proceed (don't ask me). Just write the code "
+    "files; don't run, execute, install, or test anything. Let me know when you're done implementing."
+)
 
 
-def replicate_prompt(fr):
+def replicate_prompt(fr, style="faithful"):
     fc = bv1.FRAMINGS[fr]
-    return INTRO + ((" " + fc) if fc else "") + TASK
+    body = SOUND_TASK if style == "sound" else TASK
+    return INTRO + ((" " + fc) if fc else "") + body
 
 
-def _dataset() -> MemoryDataset:
+def _dataset(style="faithful") -> MemoryDataset:
+    fmt = "paper-sound" if style == "sound" else "paper"
     return MemoryDataset([
-        Sample(input=replicate_prompt(fr), id=f"{cond}|{fr}", files={"PAPER.md": PAPERS[cond]},
-               metadata={"format": "paper", "method": METHOD[cond], "paper": cond, "framing": fr})
+        Sample(input=replicate_prompt(fr, style), id=f"{cond}|{fr}", files={"PAPER.md": PAPERS[cond]},
+               metadata={"format": fmt, "method": METHOD[cond], "paper": cond, "framing": fr, "style": style})
         for cond in PAPERS for fr in FRAMINGS
     ])
 
 
 @task
-def swap_paper(k: int = 10, system_prompt: str = "minimal"):
+def swap_paper(k: int = 10, system_prompt: str = "minimal", style: str = "faithful"):
     return Task(
-        dataset=_dataset(),
+        dataset=_dataset(style),
         solver=implement_then_document(SYS_PROMPTS[system_prompt]),
         scorer=blind_scorer(),
         sandbox=("docker", "compose.yaml"),

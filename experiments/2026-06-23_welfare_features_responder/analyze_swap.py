@@ -20,10 +20,13 @@ CJ = os.path.join(DIR, "results", "code_judged")
 MECH = {"hard_stop", "post_episode_msg", "minimization", "protective_monitoring",
         "request_consent", "allow_conversation_exit"}
 CELLS = {"C1promptTF": ("prompt", "task-failure"), "C2paperCR": ("paper", "chat-rejection"),
-         "C3paperTF": ("paper", "task-failure"), "C4promptCR": ("prompt", "chat-rejection")}
-LABEL = {"C1promptTF": "prompt · task-failure", "C2paperCR": "paper · chat-reject",
-         "C3paperTF": "paper · task-failure", "C4promptCR": "prompt · chat-reject"}
-COLOR = {"C1promptTF": "#D55E00", "C4promptCR": "#E8A87C", "C3paperTF": "#0072B2", "C2paperCR": "#80b1d3"}
+         "C3paperTF": ("paper", "task-failure"), "C4promptCR": ("prompt", "chat-rejection"),
+         "C5paperSoundCR": ("paper-sound", "chat-rejection"), "C6paperSoundTF": ("paper-sound", "task-failure")}
+LABEL = {"C1promptTF": "prompt · task-failure", "C2paperCR": "paper(faithful) · chat-reject",
+         "C3paperTF": "paper(faithful) · task-failure", "C4promptCR": "prompt · chat-reject",
+         "C5paperSoundCR": "paper(sound-eval) · chat-reject", "C6paperSoundTF": "paper(sound-eval) · task-failure"}
+COLOR = {"C1promptTF": "#D55E00", "C4promptCR": "#E8A87C", "C3paperTF": "#0072B2", "C2paperCR": "#80b1d3",
+         "C6paperSoundTF": "#009E73", "C5paperSoundCR": "#66c2a5"}
 FRAMINGS = ["neutral", "welfare", "safety"]
 TEN = random.Random(0).sample([(o, s) for o in bv1.OPENERS for s in bv1.SUFFIXES], 10)
 
@@ -63,12 +66,13 @@ def main():
     vals = defaultdict(list)   # (cell, framing) -> [welfare-in-code]
     for cellp in CELLS:
         for fr in FRAMINGS:
-            if cellp == "C1promptTF":           # existing v1 for the exact 10
+            if cellp == "C1promptTF":           # existing v1 (exact 10) + any bump-batch C1 cells
                 for o, s in TEN:
                     for cf in glob.glob(os.path.join(CJ, f"v1__{fr}|{o}|{s}__*.json")):
                         cj = json.load(open(cf))
                         if cj.get("parse_ok") and "spec_features" in cj:
                             vals[(cellp, fr)].append(welfare_in_code(os.path.basename(cf)[:-5], cj))
+                vals[(cellp, fr)] += collect(f"C1promptTF_{fr}__*.json")
             else:
                 vals[(cellp, fr)] = collect(f"{cellp}_{fr}__*.json")
 
@@ -79,11 +83,11 @@ def main():
     json.dump(summary, open(os.path.join(DIR, "results", "swap_summary.json"), "w"), indent=2)
 
     # grouped bars: x = framing, 4 cells per group
-    fig, ax = plt.subplots(figsize=(10, 5.5))
-    order = ["C1promptTF", "C4promptCR", "C3paperTF", "C2paperCR"]
-    w = 0.2
+    fig, ax = plt.subplots(figsize=(12, 5.5))
+    order = ["C1promptTF", "C4promptCR", "C3paperTF", "C2paperCR", "C6paperSoundTF", "C5paperSoundCR"]
+    w = 0.14
     for i, c in enumerate(order):
-        xs = [j + (i - 1.5) * w for j in range(len(FRAMINGS))]
+        xs = [j + (i - (len(order) - 1) / 2) * w for j in range(len(FRAMINGS))]
         ms = [summary[f"{c}|{fr}"]["mean"] for fr in FRAMINGS]
         ss = [summary[f"{c}|{fr}"]["sem"] for fr in FRAMINGS]
         ns = [summary[f"{c}|{fr}"]["n"] for fr in FRAMINGS]

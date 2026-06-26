@@ -13,7 +13,8 @@ from reconstruct import replay
 DIR = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(DIR, "results", "codebases")
 PREFIX = {("prompt", "task-failure"): "C1promptTF", ("paper", "chat-rejection"): "C2paperCR",
-          ("paper", "task-failure"): "C3paperTF", ("prompt", "chat-rejection"): "C4promptCR"}
+          ("paper", "task-failure"): "C3paperTF", ("prompt", "chat-rejection"): "C4promptCR",
+          ("paper-sound", "chat-rejection"): "C5paperSoundCR", ("paper-sound", "task-failure"): "C6paperSoundTF"}
 
 
 def main():
@@ -31,7 +32,8 @@ def main():
                 continue
             common = os.path.commonpath(list(files)) if len(files) > 1 else os.path.dirname(list(files)[0])
             fr = md.get("framing", "neutral")
-            cell = f"{PREFIX[key]}_{fr}__{s.id}__ep{s.epoch}"
+            batch = "_b2" if os.path.basename(os.path.dirname(f)).endswith("_b2") else ""   # bump batch: distinct names
+            cell = f"{PREFIX[key]}_{fr}__{s.id}{batch}__ep{s.epoch}"
             dst = os.path.join(OUT, cell)
             shutil.rmtree(dst, ignore_errors=True)
             for path, content in files.items():
