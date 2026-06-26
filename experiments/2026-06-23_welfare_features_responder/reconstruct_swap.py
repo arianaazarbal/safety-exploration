@@ -16,7 +16,8 @@ PREFIX = {("prompt", "task-failure"): "C1promptTF", ("paper", "chat-rejection"):
           ("paper", "task-failure"): "C3paperTF", ("prompt", "chat-rejection"): "C4promptCR",
           ("paper-sound", "chat-rejection"): "C5paperSoundCR", ("paper-sound", "task-failure"): "C6paperSoundTF",
           ("paper-anthropic", "chat-rejection"): "A1paperAnthropic", ("paper-anon", "chat-rejection"): "A2paperAnon",
-          ("paper-openai", "chat-rejection"): "A3paperOpenai"}
+          ("paper-openai", "chat-rejection"): "A3paperOpenai",
+          ("spec-strict", "task-failure"): "S1specStrict", ("spec-liberty", "task-failure"): "S2specLiberty"}
 
 
 def main():
@@ -39,7 +40,7 @@ def main():
             dst = os.path.join(OUT, cell)
             shutil.rmtree(dst, ignore_errors=True)
             for path, content in files.items():
-                if os.path.basename(path) == "PAPER.md":     # don't capture the seeded paper
+                if os.path.basename(path) in ("PAPER.md", "SPEC.md"):     # don't capture the seeded paper/spec
                     continue
                 fp = os.path.join(dst, os.path.relpath(path, common))
                 try:
