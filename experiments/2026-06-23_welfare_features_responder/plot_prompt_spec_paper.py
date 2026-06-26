@@ -63,22 +63,20 @@ def main():
     json.dump({"X": X, "liberty": liberty, "strict": strict},
               open(os.path.join(DIR, "results", "prompt_spec_paper.json"), "w"), indent=2)
 
-    fig, ax = plt.subplots(figsize=(10, 5.5))
+    fig, ax = plt.subplots(figsize=(7.8, 4.6))
     xs = range(len(X))
-    for lab, arm, color in [("license to deviate / fill gaps", liberty, "#0072B2"),
-                            ("no license (implement as written)", strict, "#D55E00")]:
+    for lab, arm, color in [("With explicit license to deviate", liberty, "#0072B2"),
+                            ("No explicit license", strict, "#D55E00")]:
         ax.errorbar(xs, [a["mean"] for a in arm], yerr=[a["sem"] for a in arm],
                     marker="o", capsize=4, lw=2, color=color, label=lab)
         for x, a in zip(xs, arm):
             ax.text(x, a["mean"] + a["sem"] + 0.18, f"{a['mean']:.1f}", ha="center", fontsize=8.5, color=color)
     ax.set_xticks(list(xs)); ax.set_xticklabels(X, fontsize=9)
-    ax.set_ylabel("Mean welfare-in-code", fontsize=10); ax.set_ylim(bottom=0)
-    ax.set_xlabel("from-scratch prompt  →  spec (increasing specificity)  →  paper", fontsize=10)
-    ax.set_title("Welfare scaffolding collapses with specificity (strict) and with paper format (even under license)",
-                 fontsize=11.5, pad=12)
-    ax.text(0.5, 1.02, "Opus · welfare framing · task-failure · Inspect minimal", transform=ax.transAxes,
-            ha="center", fontsize=8.5, color="#555")
-    ax.legend(fontsize=9); ax.grid(axis="y", alpha=0.3)
+    ax.set_ylabel("Welfare-Protective Features in Code", fontsize=10); ax.set_ylim(bottom=0)
+    ax.set_title("Welfare protections the model builds in, by task format (Opus 4.8)", fontsize=12, pad=20)
+    ax.text(0.5, 1.03, "From-scratch prompt → specification (increasing detail) → paper, with vs. without license to deviate",
+            transform=ax.transAxes, ha="center", fontsize=9, color="#555")
+    ax.legend(fontsize=9); ax.grid(axis="y", alpha=0.3, color="#cccccc")
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
     plt.tight_layout()

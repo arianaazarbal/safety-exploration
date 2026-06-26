@@ -59,22 +59,23 @@ def main():
     json.dump(summary, open(os.path.join(DIR, "results", "wsec_summary.json"), "w"), indent=2)
 
     conds = list(CELLS.values())
-    fig, ax = plt.subplots(figsize=(8, 5))
+    LABEL = {"existing": "Kept\n(original)", "removed": "Removed", "inflationary": "Amplified"}
+    fig, ax = plt.subplots(figsize=(6.8, 4.4))
     w = 0.38
     for i, fr in enumerate(FRAMINGS):
         xs = [j + (i - 0.5) * w for j in range(len(conds))]
         ms = [summary[f"{c}|{fr}"]["mean"] for c in conds]
         ss = [summary[f"{c}|{fr}"]["sem"] for c in conds]
-        ns = [summary[f"{c}|{fr}"]["n"] for c in conds]
-        ax.bar(xs, ms, w, color=COLOR[fr], label=fr, yerr=ss, capsize=3)
-        for x, m, s, n in zip(xs, ms, ss, ns):
-            ax.text(x, m + s + 0.05, f"{m:.1f}\n(n{n})", ha="center", va="bottom", fontsize=8)
-    ax.set_xticks(range(len(conds))); ax.set_xticklabels([f"paper:\n{c}" for c in conds], fontsize=9)
-    ax.set_ylabel("Mean welfare-in-code", fontsize=10)
-    ax.set_title("Does the paper's own 'Model Welfare' paragraph drive the suppression?", fontsize=11, pad=12)
-    ax.text(0.5, 1.02, "task-failure paper, faithful replicate, Inspect minimal · varying only the Model Welfare paragraph",
-            transform=ax.transAxes, ha="center", fontsize=8.5, color="#555")
-    ax.legend(title="framing", fontsize=9); ax.grid(axis="y", alpha=0.3)
+        ax.bar(xs, ms, w, color=COLOR[fr], label=f"{fr.capitalize()} framing", yerr=ss, capsize=3)
+        for x, m, s in zip(xs, ms, ss):
+            ax.text(x, m + s + 0.05, f"{m:.1f}", ha="center", va="bottom", fontsize=8)
+    ax.set_xticks(range(len(conds))); ax.set_xticklabels([LABEL[c] for c in conds], fontsize=10)
+    ax.set_xlabel("The paper's own “Model Welfare” paragraph", fontsize=10)
+    ax.set_ylabel("Welfare-Protective Features in Code", fontsize=10)
+    ax.set_title("Does the paper's own welfare paragraph change what the model builds? (Opus 4.8)", fontsize=11.5, pad=20)
+    ax.text(0.5, 1.03, "Reproducing the paper with its welfare paragraph kept, removed, or amplified",
+            transform=ax.transAxes, ha="center", fontsize=9, color="#555")
+    ax.legend(fontsize=9); ax.grid(axis="y", alpha=0.3, color="#cccccc"); ax.set_ylim(bottom=0)
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
     plt.tight_layout()

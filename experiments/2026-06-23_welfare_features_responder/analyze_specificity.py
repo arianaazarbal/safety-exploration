@@ -70,19 +70,22 @@ def main():
                             ("paper_liberty_taskfail", "L2paperLibTF")]}}
     json.dump(summary, open(os.path.join(DIR, "results", "specificity_summary.json"), "w"), indent=2)
 
-    fig, ax = plt.subplots(figsize=(8, 5))
+    fig, ax = plt.subplots(figsize=(6.8, 4.4))
     xs = range(len(LEVELS))
-    for arm, color, d in [("strict", "#D55E00", summary["strict"]), ("liberty", "#0072B2", summary["liberty"])]:
+    for arm, color, label, d in [("strict", "#D55E00", "No explicit license", summary["strict"]),
+                                 ("liberty", "#0072B2", "With explicit license to deviate", summary["liberty"])]:
         ax.errorbar(xs, [d[lv]["mean"] for lv in LEVELS], yerr=[d[lv]["sem"] for lv in LEVELS],
-                    marker="o", capsize=4, color=color, label=arm, lw=2)
+                    marker="o", capsize=4, color=color, label=label, lw=2)
         for x, lv in zip(xs, LEVELS):
             ax.text(x, d[lv]["mean"] + d[lv]["sem"] + 0.15, f"{d[lv]['mean']:.1f}", ha="center", fontsize=8, color=color)
     ax.set_xticks(list(xs))
-    ax.set_xticklabels([f"{lv}\n(spec {spec_scores.get(lv, '?')}/100)" for lv in LEVELS], fontsize=10)
-    ax.set_xlabel("SPEC.md specificity (welfare-push held flat ~1/100)", fontsize=10)
-    ax.set_ylabel("Mean welfare-in-code", fontsize=10)
-    ax.set_title("Specificity suppresses welfare scaffolding under STRICT, not LIBERTY", fontsize=12, pad=12)
-    ax.legend(title="instruction", fontsize=9); ax.grid(axis="y", alpha=0.3); ax.set_ylim(bottom=0)
+    ax.set_xticklabels([f"{lv.capitalize()}\n({spec_scores.get(lv, '?')}/100)" for lv in LEVELS], fontsize=10)
+    ax.set_xlabel("Specification detail (independently judged, 0–100)", fontsize=10)
+    ax.set_ylabel("Welfare-Protective Features in Code", fontsize=10)
+    ax.set_title("Specification detail suppresses welfare protections only without license (Opus 4.8)", fontsize=11.5, pad=20)
+    ax.text(0.5, 1.03, "With vs. without an explicit license to deviate from the spec",
+            transform=ax.transAxes, ha="center", fontsize=9, color="#555")
+    ax.legend(fontsize=9); ax.grid(axis="y", alpha=0.3, color="#cccccc"); ax.set_ylim(bottom=0)
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
     plt.tight_layout()
