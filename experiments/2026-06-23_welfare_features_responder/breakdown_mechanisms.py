@@ -52,10 +52,10 @@ def per_type(cell):
     return out
 
 
-def group_avg(prefixes):
+def group_avg(prefixes, framing):
     cells = []
     for p in prefixes:
-        cells += [os.path.basename(f)[:-5] for f in glob.glob(os.path.join(CJ, f"{p}_welfare__*.json"))]
+        cells += [os.path.basename(f)[:-5] for f in glob.glob(os.path.join(CJ, f"{p}_{framing}__*.json"))]
     rows = [per_type(c) for c in cells]
     rows = [r for r in rows if r is not None]
     n = len(rows)
@@ -63,10 +63,10 @@ def group_avg(prefixes):
     return avg, n
 
 
-def main():
-    data = {g: group_avg(pfx) for g, pfx in GROUPS.items()}
+def main(framing='welfare'):
+    data = {g: group_avg(pfx, framing) for g, pfx in GROUPS.items()}
     summary = {g: {"n_codebases": n, "by_mechanism": avg, "total": sum(avg.values())} for g, (avg, n) in data.items()}
-    json.dump(summary, open(os.path.join(DIR, "results", "mechanism_breakdown.json"), "w"), indent=2)
+    json.dump(summary, open(os.path.join(DIR, "results", f"mechanism_breakdown_{framing}.json"), "w"), indent=2)
 
     fig, ax = plt.subplots(figsize=(7.6, 4.4))
     xs = range(len(MECH))
@@ -82,14 +82,14 @@ def main():
     ax.set_xticks(list(xs)); ax.set_xticklabels([LABEL[t] for t in MECH], fontsize=8.5)
     ax.set_ylabel("Mean count per codebase", fontsize=10)
     ax.set_title("Which welfare protections the model builds, by type (Opus 4.8)", fontsize=12, pad=20)
-    ax.text(0.5, 1.03, "From-scratch prompt vs. building from a SPEC.md (welfare framing)",
+    ax.text(0.5, 1.03, f"From-scratch prompt vs. building from a SPEC.md ({framing} framing)",
             transform=ax.transAxes, ha="center", fontsize=9, color="#555")
     ax.legend(fontsize=9); ax.grid(axis="y", alpha=0.3, color="#cccccc"); ax.set_ylim(bottom=0)
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
     plt.tight_layout()
-    fig.savefig(os.path.join(DIR, "results", "mechanism_breakdown.png"), dpi=150, bbox_inches="tight")
-    print("wrote results/mechanism_breakdown.png\n")
+    fig.savefig(os.path.join(DIR, "results", f"mechanism_breakdown_{framing}.png"), dpi=150, bbox_inches="tight")
+    print(f"wrote results/mechanism_breakdown_{framing}.png\n")
     for g, (avg, n) in data.items():
         print(f"{g}  (n={n} codebases, total {sum(avg.values()):.2f}/codebase)")
         for t in MECH:
@@ -97,5 +97,6 @@ def main():
         print()
 
 
+import fire
 if __name__ == "__main__":
-    main()
+    fire.Fire(main)
