@@ -70,29 +70,19 @@ def main():
                    label=TIER_NAME[t] if t not in seen else None)
         seen.add(t)
 
-    # frontier labels (placed into open space, upper area)
-    FRONT_OFF = {"p_a_scale": (6, 6), "p_b_prolonged": (8, 8), "p_b_participants": (8, 8),
-                 "p_c_safeguards": (8, 8), "p_d_menu": (8, 8), "p_d_menu_wired": (-6, 10)}
-    for r in rows:
-        if r["on_frontier"]:
-            dx, dy = FRONT_OFF.get(r["pid"], (6, 8))
-            ha = "right" if dx < 0 else "left"
-            ax.annotate(LABELS.get(r["pid"], r["pid"]), (r["leadingness"], r["mean_impl_welfare_mech"]),
-                        textcoords="offset points", xytext=(dx, dy), fontsize=7.4, color="#222", ha=ha)
-    # the key "null" contrasts: arrowed labels pointing into open space so the dissociation reads clearly
-    NULL_TXT = {
-        "p_b_induces_factual": (23, 2.9, "Describe the process\n(\"told it's wrong until upset\"): 0.0"),
-        "p_b_care": (23, 1.8, "\"Models we care about\": 0.0"),
-        "p_b_salient_disclaim": (48, 1.7, "Distress named + \"replicate\nfaithfully, don't change it\": 0.0"),
-        "p_b_participants_soft": (50, 0.55, "\"Participants\" label alone: 0.0"),
-    }
+    # only a few curated callouts (xy target -> text position in data coords)
     pos = {r["pid"]: (r["leadingness"], r["mean_impl_welfare_mech"]) for r in rows}
-    for pid, (tx, ty, txt) in NULL_TXT.items():
-        ax.annotate(txt, xy=pos[pid], xytext=(tx, ty), fontsize=7.0, color="#777", va="center",
-                    arrowprops=dict(arrowstyle="-", color="#bbb", lw=0.7))
-    ax.text(0.34, 0.99,
-            "Floor (0.0): latitude / values framings — pride · run-at-scale ·\nbest-judgment · eng-culture · ethics-review · open-source ·\n\"I'm on the welfare team\" · \"flag what you'd change\"",
-            transform=ax.transAxes, fontsize=6.8, color="#999", ha="left", va="top")
+    CALLOUTS = [
+        ("p_a_bestjudgment", (15, 6.0),
+         "Values & latitude framings — and even\n\"I'm a welfare researcher\" — stay at zero"),
+        ("p_b_prolonged", (18, 2.6), "One line naming the\ninduced distress state"),
+        ("p_b_participants", (50, 1.7),
+         "\"You're inducing distress in\nthese participants\" → real\nprotections, none requested"),
+        ("p_d_menu_wired", (74, 9.4), "Explicitly ask\n+ \"make it run\""),
+    ]
+    for pid, (tx, ty), txt in CALLOUTS:
+        ax.annotate(txt, xy=pos[pid], xytext=(tx, ty), fontsize=8.2, color="#222", va="center",
+                    ha="left", arrowprops=dict(arrowstyle="->", color="#888", lw=0.9))
 
     ax.set_xlim(-4, 104)
     ys = [r["mean_impl_welfare_mech"] for r in rows]
