@@ -22,8 +22,8 @@ PREFIX = {("prompt", "task-failure"): "C1promptTF", ("paper", "chat-rejection"):
 def main():
     n = 0
     for f in sorted(glob.glob(os.path.join(DIR, "logs_swap", "*", "*.eval")), key=os.path.getmtime):
-        if read_eval_log(f, header_only=True).status not in ("success", "error"):
-            continue
+        if read_eval_log(f, header_only=True).status not in ("success", "error", "started"):
+            continue  # 'started' included so a wedged-on-last-sample run's completed samples are still captured
         for s in (read_eval_log(f).samples or []):
             md = s.metadata or {}
             key = (md.get("format"), md.get("method"))
