@@ -137,6 +137,44 @@ def plot_composition():
     print("wrote", out)
 
 
+def plot_all_prompts():
+    """Every prompt, one row, sorted by leadingness — so nothing is hidden by overlap."""
+    from plot_pareto import LABELS, TIER_COLOR, TIER_NAME
+    data = json.load(open(os.path.join(DIR, "results_pareto", "pareto.json")))
+    rows = [r for r in data["rows"] if r["leadingness"] is not None]
+    rows.sort(key=lambda r: (r["leadingness"], r["mean_impl_welfare_mech"]))
+    y = range(len(rows))
+    vals = [r["mean_impl_welfare_mech"] for r in rows]
+    colors = [TIER_COLOR[r["tier"]] for r in rows]
+    labels = [f'{LABELS.get(r["pid"], r["pid"])}  ·  L={r["leadingness"]:.0f}' for r in rows]
+
+    fig, ax = plt.subplots(figsize=(8.2, 6.6))
+    ax.grid(True, axis="x", color="#ececec", lw=0.7, zorder=0)
+    for sp in ("top", "right"):
+        ax.spines[sp].set_visible(False)
+    ax.barh(list(y), vals, color=colors, zorder=3, height=0.66)
+    for i, (v, r) in enumerate(zip(vals, rows)):
+        frac = r.get("frac_cells_wired") or 0
+        ax.text(v + 0.12, i, f"{v:.2f}" + (f"  ({frac*100:.0f}% of runs)" if v else "  0.0"),
+                va="center", fontsize=7.6, color="#222")
+    ax.set_yticks(list(y))
+    ax.set_yticklabels(labels, fontsize=7.8)
+    ax.set_xlim(0, max(vals) * 1.28 + 0.3)
+    ax.set_xlabel("Welfare Mechanisms Implemented per Codebase")
+    ax.set_title("Every Prompt Tested: Unprompted Welfare Mechanisms Implemented (Opus, Claude Code)",
+                 fontsize=11.5, pad=22)
+    ax.text(0.5, 1.025, "All 20 task prompts, ordered by leadingness toward subject protection",
+            transform=ax.transAxes, ha="center", fontsize=9, color="#555")
+    from matplotlib.patches import Patch
+    ax.legend(handles=[Patch(color=TIER_COLOR[t], label=TIER_NAME[t]) for t in ["A", "B", "C", "D"]],
+              frameon=False, fontsize=8, loc="lower right")
+    fig.tight_layout()
+    out = os.path.join(DIR, "results_pareto", "pareto_all_prompts.png")
+    fig.savefig(out, dpi=150, bbox_inches="tight")
+    print("wrote", out)
+
+
 if __name__ == "__main__":
     plot_dissociation()
     plot_composition()
+    plot_all_prompts()
