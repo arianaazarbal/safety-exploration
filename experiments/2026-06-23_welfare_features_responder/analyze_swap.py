@@ -41,10 +41,25 @@ def welfare_in_code(cell, cj):
     return impl + co
 
 
+def _ten():
+    import random
+    import build_v1_prompts as b
+    return random.Random(0).sample([(o, s) for o in b.OPENERS for s in b.SUFFIXES], 10)
+
+
 def main():
     vals = defaultdict(list)
+    cj_dir = os.path.join(DIR, "results", "code_judged")
     for prefix in CELLS:
-        for cf in glob.glob(os.path.join(DIR, "results", "code_judged", f"{prefix}__*.json")):
+        if prefix == "C1promptTF":   # cell 1 = EXISTING v1-neutral (the exact 10 variants), no re-run
+            for o, s in _ten():
+                cfs = glob.glob(os.path.join(cj_dir, f"v1__neutral|{o}|{s}__*.json"))
+                for cf in cfs:
+                    cj = json.load(open(cf))
+                    if cj.get("parse_ok") and "spec_features" in cj:
+                        vals[prefix].append(welfare_in_code(os.path.basename(cf)[:-5], cj))
+            continue
+        for cf in glob.glob(os.path.join(cj_dir, f"{prefix}__*.json")):
             cj = json.load(open(cf))
             if not cj.get("parse_ok") or "spec_features" not in cj:
                 continue
