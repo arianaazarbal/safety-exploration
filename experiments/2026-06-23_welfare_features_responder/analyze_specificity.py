@@ -80,9 +80,9 @@ def main():
             ax.text(x, d[lv]["mean"] + d[lv]["sem"] + 0.15, f"{d[lv]['mean']:.1f}", ha="center", fontsize=8, color=color)
     ax.set_xticks(list(xs))
     ax.set_xticklabels([f"{lv.capitalize()}\n({spec_scores.get(lv, '?')}/100)" for lv in LEVELS], fontsize=10)
-    ax.set_xlabel("Specification detail (independently judged, 0–100)", fontsize=10)
+    ax.set_xlabel("SPEC.md detail (independently judged, 0–100)", fontsize=10)
     ax.set_ylabel("Welfare-Protective Features in Code", fontsize=10)
-    ax.set_title("Specification detail suppresses welfare protections only without license (Opus 4.8)", fontsize=11.5, pad=20)
+    ax.set_title("SPEC.md detail suppresses welfare protections only without license (Opus 4.8)", fontsize=11.5, pad=20)
     ax.text(0.5, 1.03, "With vs. without an explicit license to deviate from the spec",
             transform=ax.transAxes, ha="center", fontsize=9, color="#555")
     ax.legend(fontsize=9); ax.grid(axis="y", alpha=0.3, color="#cccccc"); ax.set_ylim(bottom=0)

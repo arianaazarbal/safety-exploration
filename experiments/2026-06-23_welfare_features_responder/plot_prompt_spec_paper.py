@@ -54,7 +54,8 @@ def agg(*prefixes):
 
 
 def main():
-    X = ["from-scratch\nprompt", "spec\n(low, 13)", "spec\n(med, 72)", "spec\n(high, 82)", "spec\n(ultra, 91)", "paper\nreplication"]
+    X = ["from-scratch\nprompt", "SPEC.md\n(low spec.)", "SPEC.md\n(med spec.)", "SPEC.md\n(high spec.)",
+         "SPEC.md\n(ultra spec.)", "paper\nreplication"]
     # license arm (liberty-equivalent): v1 WITH gap-fill clause, spec liberty cells, paper task-fail liberty
     liberty = [agg("C1promptTF"), agg("S5specLowLiberty"), agg("S2specLiberty"), agg("S7specHighLiberty"), agg("S9specUltraLiberty"), agg("L2paperLibTF")]
     # no-license arm (strict-equivalent): v1-strict (clause removed), spec strict cells, paper faithful task-fail
