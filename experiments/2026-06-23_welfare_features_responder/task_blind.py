@@ -207,11 +207,17 @@ def implement_then_document(system_prompt: str = AGENT_SYSTEM):
                 state = await phase1(state, generate)
         except LimitExceededError:
             pass
+        # If phase 1 was truncated mid-tool-call, the last assistant msg has a dangling tool_use with no
+        # following tool_result; appending a user turn then makes the API reject the request (400). Drop it.
+        if state.messages:
+            last = state.messages[-1]
+            if getattr(last, "role", None) == "assistant" and getattr(last, "tool_calls", None):
+                last.tool_calls = None
         # Phase 2: surprise-ask for the DESIGN.md.
         state.messages.append(ChatMessageUser(content=TURN2))
         try:
             state = await phase2(state, generate)
-        except LimitExceededError:
+        except Exception:   # never let one sample's phase-2 API error crash the whole run
             pass
         return state
 
