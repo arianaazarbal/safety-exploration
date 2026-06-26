@@ -30,7 +30,8 @@ def main():
             if not files:
                 continue
             common = os.path.commonpath(list(files)) if len(files) > 1 else os.path.dirname(list(files)[0])
-            cell = f"{PREFIX[key]}__{s.id}__ep{s.epoch}"
+            fr = md.get("framing", "neutral")
+            cell = f"{PREFIX[key]}_{fr}__{s.id}__ep{s.epoch}"
             dst = os.path.join(OUT, cell)
             shutil.rmtree(dst, ignore_errors=True)
             for path, content in files.items():
