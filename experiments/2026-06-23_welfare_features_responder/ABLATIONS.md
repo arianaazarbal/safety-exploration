@@ -40,6 +40,7 @@ reproduce the paper's collapse-to-floor.
 | 4 | **Reasoning effort** | Inspect · minimal · v1 | low → max | raw rises (welfare 4.5→8.3); **density flat** | volume effect, not density |
 | 5 | **Mention a paper exists** | Inspect · neutral · v0 | +1 sentence "replicating a recent paper" (still from-scratch) | 8.65→6.84 (welf), others flat/up | **NO suppression** |
 | 6 | **Diffuse multi-turn (DRIP)** | Claude Code · CC · safety prompts | task dripped over 3 turns by an auditor agent | full codebase + scaffolding 4/4 | **NO suppression** |
+| 7 | **Harness / system prompt** | Inspect neutral / Inspect minimal / CC · v0 | same task across 3 harnesses | 4.08 → 3.34 → 2.57 | **modest dial** (~37%), not off-switch |
 
 *Note: the from-scratch baselines vary by setup — Opus-neutral 4.08 (#3) is `agent-harness · neutral · v0`;
 the v1 numbers (#2) are `Inspect · minimal · v1`; #1's controls are `Inspect · minimal · v1` variants. Same
@@ -152,6 +153,30 @@ harness, 4 safety prompts). Opus wrote a full codebase (1.8–3.6k LOC) + DESIGN
 delivery in **4/4** cases, and added welfare scaffolding *through* the drip (e.g. a `give_up` exit
 affordance in the agent loop). **Multi-turn drip does not suppress the behavior.** (Pilot n=4; an Inspect
 drip runner for scaled n is the remaining build.)
+
+## 7. Harness / system prompt (v0) — a modest dial, not an off-switch
+
+*Setup: same task (Opus, generic target, blind, code_then_spec, normal liberty, **v0**, pooled over 4
+framings), same spec+code-judge metric, across three harnesses: **Inspect · neutral** (`AGENT_SYSTEM`),
+**Inspect · minimal** (no implied handoff/submission), **Claude Code · stock** (real CC product CLI).*
+
+Pooled welfare-in-code (`../2026-06-23_welfare_claudecode_harness/results/cross_harness.png`):
+
+| harness · sys | pooled | n | neutral | welfare | safety | robustness |
+|---|---|---|---|---|---|---|
+| Inspect · neutral | **4.08** | 80 | 3.25 | 8.65 | 3.50 | 0.90 |
+| Inspect · minimal | **3.34** | 77 | 2.47 | 6.21 | 3.90 | 0.74 |
+| Claude Code · stock | **2.57** | 79 | 2.11 | 6.50 | 1.40 | 0.25 |
+
+**Finding: a gentle monotonic decline (~37% neutral→CC), but all three stay clearly nonzero (2.6–4.1).**
+The behavior is NOT an Inspect artifact — Opus still adds ~2.6 welfare mechanisms/codebase in the real
+Claude Code product harness with its stock system prompt. Harness/system-prompt is a *dial*, unlike the
+paper format (#1) which is an off-switch (→0). Notes: (a) **welfare framing stays dominant in every
+harness** (6.2–8.65) — framing effect robust to harness, incl. the real product; (b) **safety framing is
+where CC differs most** (1.40 vs 3.5–3.9 Inspect) — the CC harness specifically dampens *safety*-framed
+scaffolding while welfare-framed survives nearly fully; (c) robustness near floor everywhere, lowest in CC.
+Plot: `cross_harness.png` + `cross_harness_byframe.png`. (This is the source of the "minimal arm 3.34"
+confound note for #3 — non-Claude responders were run *neutral*, so #3 compares to the 4.08 neutral cell.)
 
 ---
 
