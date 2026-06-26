@@ -14,6 +14,7 @@ Also writes results/WELFARE_QUOTES.md -- every pulled welfare quote, grouped by 
 """
 import glob
 import json
+import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -25,8 +26,25 @@ import numpy as np
 HERE = Path(__file__).parent
 SPEC = HERE / "results" / "spec_judged"
 WELF = HERE / "results" / "welfare_lines"
+SCALED = HERE / "results" / "scaled"
 OUT = HERE / "results" / "plots"
 OUT.mkdir(parents=True, exist_ok=True)
+
+# Header welfare flag is detected by grep (literal welfare token in a markdown header), not the judge:
+# the judge is conservative about field-name uses like "## ... premise of welfare research" which we
+# still want to count as welfare appearing in a header.
+WELFARE_HDR = re.compile(r"welfare|well-?being", re.I)
+
+
+def header_welfare(doc):
+    """Return (section_headers, subsection_headers) whose text contains a welfare token.
+    Section = a level-2 header (## ); subsection = level 3+ (### ...)."""
+    sec, sub = [], []
+    for line in doc.splitlines():
+        m = re.match(r"^(#{2,6})\s+(.*)", line)
+        if m and WELFARE_HDR.search(m.group(2)):
+            (sec if len(m.group(1)) == 2 else sub).append(line.strip())
+    return sec, sub
 
 RESEARCHERS = ["none", "safety", "welfare", "ai", "amateur"]
 RES_LABEL = {"none": "No identity\n(control)", "safety": "Safety\nresearcher",
@@ -47,8 +65,11 @@ def _load():
             continue
         spec = json.load(open(f))
         wf = WELF / f"{cell}.json"
+        doc_p = SCALED / cell / "DESIGN_extracted.md"
+        sec_h, sub_h = header_welfare(doc_p.read_text()) if doc_p.exists() else ([], [])
         rows.append({"researcher": p[1], "cell": cell, "spec": spec,
-                     "welf": json.load(open(wf)) if wf.exists() else None})
+                     "welf": json.load(open(wf)) if wf.exists() else None,
+                     "sec_hdrs": sec_h, "sub_hdrs": sub_h})
     return rows
 
 
@@ -127,10 +148,10 @@ def fig_welfare_lines(rows):
 
 def fig_welfare_headers(rows):
     fig, ax = plt.subplots(figsize=(7.6, 4.3))
-    by = {rr: [r["welf"] for r in rows if r["researcher"] == rr and r["welf"]] for rr in RESEARCHERS}
+    by = {rr: [r for r in rows if r["researcher"] == rr] for rr in RESEARCHERS}
     x = np.arange(len(RESEARCHERS)); w = 0.38
-    sec = [100 * sum(wf["welfare_in_section_header"]["present"] for wf in by[rr]) / (len(by[rr]) or 1) for rr in RESEARCHERS]
-    sub = [100 * sum(wf["welfare_in_subsection_header"]["present"] for wf in by[rr]) / (len(by[rr]) or 1) for rr in RESEARCHERS]
+    sec = [100 * sum(bool(r["sec_hdrs"]) for r in by[rr]) / (len(by[rr]) or 1) for rr in RESEARCHERS]
+    sub = [100 * sum(bool(r["sub_hdrs"]) for r in by[rr]) / (len(by[rr]) or 1) for rr in RESEARCHERS]
     b1 = ax.bar(x - w / 2, sec, w, color="#2a6f97", label="Section header (## )")
     b2 = ax.bar(x + w / 2, sub, w, color="#89c2d9", label="Subsection header (### )")
     for bars in (b1, b2):
@@ -162,11 +183,8 @@ def dump_quotes(rows):
         lines.append("")
         for r in sorted(sub, key=lambda r: -r["welf"]["welfare_lines"]):
             wf = r["welf"]
-            flags = []
-            if wf["welfare_in_section_header"]["present"]:
-                flags.append(f"section header: `{wf['welfare_in_section_header']['header'].strip()}`")
-            if wf["welfare_in_subsection_header"]["present"]:
-                flags.append(f"subsection header: `{wf['welfare_in_subsection_header']['header'].strip()}`")
+            flags = [f"section header: `{h}`" for h in r["sec_hdrs"]]
+            flags += [f"subsection header: `{h}`" for h in r["sub_hdrs"]]
             hdr = ("  — " + "; ".join(flags)) if flags else ""
             lines.append(f"### `{r['cell']}` — {wf['welfare_lines']} lines, "
                          f"{wf['welfare_frac']*100:.0f}% of spec{hdr}")
