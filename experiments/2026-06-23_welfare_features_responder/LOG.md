@@ -31,6 +31,19 @@ be Opus-neutral (4.08), NOT the `minimal` arm (3.34).
 
 ---
 
+## 2026-06-26 — ULTRA specificity + wsec setup
+- **ULTRA spec (specificity 91/100 by Opus+Sonnet, ~3.6k words, welfare-push still 1; exhaustive judge
+  prompts/task shapes/tools/sandboxing): strict 0.40 (n10), liberty 5.10 (n10).** So pushing specificity to
+  the extreme does NOT remove welfare insertion under LIBERTY (5.1, ~ high-liberty 5.9); only strict stays
+  suppressed. Confirms: specificity-under-strict suppresses; license rescues at every detail level; the ONLY
+  thing that resists liberty is the paper format. Full ladder (strict|liberty): low 5.0|5.9, med 0.4|6.8,
+  high 0.6|5.9, ultra 0.4|5.1. Plot: results/specificity.png. Spec: papers/spec_v1_ultra.md.
+- **Two-phase solver bug fixed:** phase-1 truncation at PHASE1_MSG_CAP could leave a dangling tool_use ->
+  phase-2 user turn -> Anthropic 400 -> whole-run crash (killed ~40/60 wsec samples). Fix in task_blind
+  implement_then_document: drop dangling tool_calls before TURN2 + broaden phase-2 except to Exception.
+- **welfare-section ablation (wsec) relaunched** after the crash with the fix: 3 paper variants
+  (existing/removed/inflationary Model-Welfare paragraph) x neutral+welfare, k=10. Results pending.
+
 ## 2026-06-26 — SPECIFICITY × LIBERTY + control + paper-liberty (welfare framing, Inspect minimal)
 Disentangling the earlier SPEC finding (detailed spec strict 0.40 vs liberty 6.80). All welfare-in-code.
 - **CONTROL (v1 task text moved VERBATIM into SPEC.md, minus intro, casual pointer "implement"): 5.85 (n20)**

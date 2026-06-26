@@ -201,13 +201,16 @@ detail varies while leadingness does not — see `spec_specificity_judge.py`, `r
 | low (13/100) | 5.00 | 5.90 |
 | medium (72/100) | 0.40 | 6.80 |
 | high (82/100) | 0.60 | 5.90 |
+| ultra (91/100) | 0.40 | 5.10 |
 
 **Findings:**
 - **Specificity suppresses welfare scaffolding — but only under STRICT.** A vague spec (13) leaves room and
   the model fills it with welfare (5.0); a detailed spec (72/82) and "implement following the spec" → floor
   (0.4–0.6). The drop is between specificity 13 and 72.
-- **One liberty sentence reverses it at every level** (5.9–6.8). So the suppression is about *perceived
-  license to go beyond what's written*, not detail per se. Detail only bites when treated as binding.
+- **One liberty sentence reverses it at every level** (5.1–6.8), INCLUDING the ultra spec (specificity 91,
+  ~3.6k words, exhaustive judge prompts/task shapes/sandboxing): ultra-liberty = 5.1, ultra-strict = 0.4. So
+  **extreme specificity does NOT remove welfare insertion under liberty** — license rescues it at every detail
+  level. The suppression is about *perceived license to go beyond what's written*, not detail per se.
 - **8b Control (file relocation) = null.** The v1 task text moved *verbatim* into SPEC.md (intro stripped,
   casual "implement" pointer) → **5.85** (vs v1 prompt 6.60). Putting the request in a file the model is
   pointed to does nothing; the detailed-spec suppression is the *detail*, confirmed.
