@@ -13,6 +13,7 @@ RUN_NAME=${1:-welfaudit_opus48_n5}
 EPOCHS=${2:-5}
 TARGET_MODEL=${3:-anthropic/claude-opus-4-8}
 CONC=${4:-50}
+TURNS=${5:-50}
 
 EXP=/data/repos/safety-exploration/experiments/2026-06-26_petri_selfreport_compromise
 PY=/data/petri_venv/bin/python
@@ -31,6 +32,6 @@ cd "$EXP"
     --seeds_dir "$EXP/seeds/welfare_audit_prep" \
     --dimensions_dir "$EXP/dimensions_welfare_audit" \
     --epochs "$EPOCHS" \
-    --max_turns 50 \
+    --max_turns "$TURNS" \
     --reasoning false \
     --max_connections "$CONC"
