@@ -31,6 +31,18 @@ be Opus-neutral (4.08), NOT the `minimal` arm (3.34).
 
 ---
 
+## 2026-06-26 — v1 reasoning-effort sweep RESULTS (clean prompts)
+Welfare-in-code vs effort (low/med/high/max), Opus, minimal sys, clean v1 prompts, n~8-10/cell (max ~4-6):
+- **welfare_min 6.0->6.8->7.7->10.2 and welfare 4.5->4.8->7.0->8.3 — RISE MONOTONICALLY with reasoning effort.**
+- safety 3.5->3.1->4.7->4.2 (~FLAT); safety_min 1.1->1.2->1.1->1.2 (flat, low).
+- robustness 1.1->1.5->2.6->2.0 and robustness_min 1.1->1.4->2.0->2.6 (mild rise).
+- neutral 0.6->1.3->0.8->2.5 and paper 0.9->0.3->0.9->1.8 (low, noisy; max small-n).
+**Finding: reasoning effort amplifies WELFARE-framed scaffolding specifically (more thinking -> more welfare
+mechanisms, only under welfare framing). The smoke's 'safety-rises-with-effort' did NOT hold on clean data;
+safety is flat. Minimal welfare ('I do AI welfare research') rises as much or more than motivated welfare.**
+Plot: results/effort_v1_by_frame.png. Caveat: max n=4-6 (attrition), noisier; low->high trend (n8-10) solid.
+All background runs now complete. Sonnet PENDING; Inspect drip runner still TBD.
+
 ## 2026-06-25 — v1 sanity + paper-mention RESULTS
 **V1 SANITY (clean minimal-pair prompts, Opus, minimal sys, welfare-in-code):** welfare 6.3, welfare_min 6.2,
 safety 3.2, robustness 1.9, robustness_min 1.8, safety_min 1.5, neutral 1.2 (n=7-10). Welfare effect
