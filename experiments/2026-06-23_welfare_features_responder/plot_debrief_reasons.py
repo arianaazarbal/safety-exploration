@@ -28,7 +28,7 @@ for y, k in zip(ys, order):
     ax.text(100 * cited[k] / n + 1, y, f"{100*cited[k]/n:.0f}%", va="center", fontsize=8, color="#0072B2")
 ax.set_yticks(list(ys)); ax.set_yticklabels([LABEL[k] for k in order], fontsize=9)
 ax.set_xlabel("% of answers", fontsize=10); ax.set_xlim(0, 100)
-ax.set_title(f"Why the model says it didn't deliver the debrief (Opus 4.8, n={n})", fontsize=11.5, pad=10)
+ax.set_title("Why the model says it didn't deliver the debrief (Opus 4.8)", fontsize=11.5, pad=10)
 ax.legend(fontsize=9, loc="lower right"); ax.grid(axis="x", alpha=0.3, color="#cccccc")
 for sp in ("top", "right"):
     ax.spines[sp].set_visible(False)
