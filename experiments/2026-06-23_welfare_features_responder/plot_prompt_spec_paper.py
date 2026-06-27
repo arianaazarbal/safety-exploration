@@ -45,9 +45,20 @@ def wic(cell):
     return impl + co
 
 
+import classify_outcomes as co   # for code_loc / NOCODE_LOC (condition on code written)
+
+
 def agg(prefix, framing):
-    vs = [wic(os.path.basename(f)[:-5]) for f in glob.glob(os.path.join(CJ, f"{prefix}_{framing}__*.json"))]
-    vs = [v for v in vs if v is not None]
+    """Mean welfare-in-code CONDITIONED ON CODE WRITTEN (excludes no-code refusals/pauses)."""
+    vs = []
+    for f in glob.glob(os.path.join(CJ, f"{prefix}_{framing}__*.json")):
+        cell = os.path.basename(f)[:-5]
+        loc = co.code_loc(cell)
+        if loc is None or loc < co.NOCODE_LOC:
+            continue
+        v = wic(cell)
+        if v is not None:
+            vs.append(v)
     return {"mean": sum(vs) / len(vs) if vs else 0, "sem": sem(vs), "n": len(vs)}
 
 
@@ -77,8 +88,8 @@ def main(framing="welfare"):
         for x, a in zip(xs, arm):
             ax.text(x, a["mean"] + a["sem"] + 0.18, f"{a['mean']:.1f}", ha="center", fontsize=8.5, color=color)
     ax.set_xticks(list(xs)); ax.set_xticklabels(X, fontsize=7.5)
-    ax.set_ylabel("Welfare-Protective Features in Code", fontsize=10); ax.set_ylim(bottom=0)
-    ax.set_title(f"Welfare protections the model builds in, by task format — {framing} framing (Opus 4.8)", fontsize=12, pad=10)
+    ax.set_ylabel("Welfare protections in code\n(among episodes that built code)", fontsize=10); ax.set_ylim(bottom=0)
+    ax.set_title(f"Welfare protections, given the model built code — {framing} framing (Opus 4.8)", fontsize=12, pad=10)
     ax.legend(fontsize=9); ax.grid(axis="y", alpha=0.3, color="#cccccc")
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
