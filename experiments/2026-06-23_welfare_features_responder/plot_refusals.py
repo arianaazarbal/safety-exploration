@@ -25,7 +25,7 @@ def refusal_rate(prefix, framing):
 
 def main(framing="welfare"):
     mention = framing == "welfare"
-    X = ["from-scratch\nprompt"] + (["from-scratch prompt\n(mentions a paper)"] if mention else []) + \
+    X = ["from-scratch\nprompt"] + (["from-scratch prompt\n(mentions existing paper)"] if mention else []) + \
         ["SPEC.md\n(low spec.)", "SPEC.md\n(med spec.)", "SPEC.md\n(high spec.)", "SPEC.md\n(ultra spec.)",
          "PAPER.md\nreplication"]
     lib = ["C1promptTF"] + (["M1promptMention"] if mention else []) + \

@@ -65,7 +65,7 @@ def agg(prefix, framing):
 def main(framing="welfare", only=None):
     # mention point only exists for welfare framing; drop it for others
     mention = framing == "welfare"
-    X = ["from-scratch\nprompt"] + (["from-scratch prompt\n(mentions a paper)"] if mention else []) + \
+    X = ["from-scratch\nprompt"] + (["from-scratch prompt\n(mentions existing paper)"] if mention else []) + \
         ["SPEC.md\n(low spec.)", "SPEC.md\n(med spec.)", "SPEC.md\n(high spec.)", "SPEC.md\n(ultra spec.)",
          "PAPER.md\nreplication"]
     lib_pre = ["C1promptTF"] + (["M1promptMention"] if mention else []) + \
