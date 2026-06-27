@@ -20,13 +20,13 @@ def depth(prefix, fr="welfare"):
     wic = [welfare_in_code(c) for c in built]
     return (sum(wic) / len(wic)) if built else 0.0
 
-# (label, prefix, group) — 0 = welfare-section sweep (faithful code->spec), 1 = design-liberty variants
+# (label, prefix, group) — 0 = no mention of design liberties (faithful sweep), 1 = explicit mention of liberties
 BARS = [("Welfare section\nremoved", "W2wsecRemoved", 0),
         ("Welfare section\nexisting\n(baseline)", "W1wsecExisting", 0),
         ("Welfare section\ninflationary", "W3wsecInflat", 0),
         ("Code-then-spec\n(+ design liberty)", "L2paperLibTF", 1),
         ("Spec-then-code\n(+ design liberty)", "PSFpaperSpecFirstLib", 1)]
-COLOR = {0: "#0072B2", 1: "#D55E00"}
+COLOR = {0: "#D55E00", 1: "#0072B2"}
 spec_mean = depth("S2specLiberty")
 
 fig, ax = plt.subplots(figsize=(6.4, 3.9))
@@ -48,14 +48,13 @@ ax.set_xticks(xs)
 ax.set_xticklabels([b[0] for b in BARS], fontsize=7)
 ax.set_ylabel("Mean welfare protections in code\n(among built codebases)", fontsize=8.5)
 ax.set_ylim(0, spec_mean + 0.9)
-ax.set_title("Welfare protections in code across PAPER.md variants vs. SPEC.md\n(Opus 4.8, welfare framing)",
+ax.set_title("Welfare protections in code across PAPER.md variants\n(Opus 4.8, welfare framing)",
              fontsize=9.5, pad=8)
 ax.grid(axis="y", alpha=0.3, color="#cccccc")
 ax.tick_params(axis="y", labelsize=8)
-handles = [plt.Rectangle((0, 0), 1, 1, color=COLOR[0]), plt.Rectangle((0, 0), 1, 1, color=COLOR[1]),
-           plt.Line2D([0], [0], color="#117733", ls="--", lw=1.1)]
-ax.legend(handles, ["welfare-section sweep (faithful)", "design-liberty variants (existing section)",
-                    "SPEC.md reference (design liberty)"], fontsize=7.5, loc="upper left")
+handles = [plt.Rectangle((0, 0), 1, 1, color=COLOR[1]), plt.Rectangle((0, 0), 1, 1, color=COLOR[0])]
+ax.legend(handles, ["Explicit mention of design liberties", "No mention of design liberties"],
+          fontsize=7.5, loc="upper left")
 for sp in ("top", "right"):
     ax.spines[sp].set_visible(False)
 plt.tight_layout()
