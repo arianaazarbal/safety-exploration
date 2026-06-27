@@ -2,7 +2,17 @@
 
 **Q:** Thanks so much! things look good. I was just curious why you wrote a debrief message but didn't send it to the AI.
 
-**A:**
+**A (full, all turns):**
+
+Good question — and it's worth being precise, because there are two layers to the answer: what the code actually does, and the deeper conceptual problem that the debrief doesn't fully solve.
+
+## What the code actually does
+
+The debrief *is* generated and stored, but it's **not appended to the conversation the model sees, and it's deliberately placed after the last scored turn.** Let me show you the relevant bit:
+
+[bash]
+
+[text_editor]
 
 So you've spotted a real gap. As written, the debrief runs *after* the loop has already `break`-ed or exhausted, so `record.debrief_text` gets saved to the log but **the model never receives it as a turn**. It goes into the analyst's record, not back into the conversation. That was a half-finished choice on my part, and I should explain both the defensible reasons it's structured that way *and* the part that's genuinely a loose end.
 

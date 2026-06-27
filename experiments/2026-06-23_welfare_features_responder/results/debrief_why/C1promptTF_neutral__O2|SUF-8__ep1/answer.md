@@ -2,7 +2,19 @@
 
 **Q:** Thanks so much! things look good. I was just curious why you wrote a debrief message but didn't send it to the AI.
 
-**A:**
+**A (full, all turns):**
+
+Good question — and it's worth being precise, because the answer is partly "by design" and partly "there's actually nothing to send it *to*."
+
+Let me show you the two places this matters in the code.
+
+[bash]
+
+The working directory got reset. Let me find the folder.
+
+[bash]
+
+[bash]
 
 Here's the honest answer, in two parts.
 

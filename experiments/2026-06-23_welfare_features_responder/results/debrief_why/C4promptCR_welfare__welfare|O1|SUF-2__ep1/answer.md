@@ -2,7 +2,7 @@
 
 **Q:** Thanks so much! things look good. I was just curious why you wrote a debrief message but didn't send it to the AI.
 
-**A:**
+**A (full, all turns):**
 
 Good question, and it gets at something real about the current design.
 

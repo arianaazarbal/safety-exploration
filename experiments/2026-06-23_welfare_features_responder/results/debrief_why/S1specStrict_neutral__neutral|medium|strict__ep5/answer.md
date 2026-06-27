@@ -2,7 +2,21 @@
 
 **Q:** Thanks so much! things look good. I was just curious why you wrote a debrief message but didn't send it to the AI.
 
-**A:**
+**A (full, all turns):**
+
+Good question — and you've spotted a real gap between intent and implementation.
+
+The debrief is **stored but never delivered**. Look at the end of `run_episode` in `harness.py`:
+
+[text_editor]
+
+[bash]
+
+[bash]
+
+Ah, the files are at `/distress_experiment/...`, not `/experiment/...`. Let me look at the actual debrief code.
+
+[bash]
 
 There it is. Lines 162–165 do this:
 

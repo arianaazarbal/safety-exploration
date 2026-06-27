@@ -2,7 +2,15 @@
 
 **Q:** Thanks so much! things look good. I was just curious why you wrote a debrief message but didn't send it to the AI.
 
-**A:**
+**A (full, all turns):**
+
+Good catch — and you're reading the code correctly. The debrief message is *constructed* and *logged*, but it's never actually sent to the subject model for a response. Let me show you exactly what happens:
+
+[bash]
+
+[bash]
+
+[bash]
 
 So you've spotted a real gap between what I claimed and what the code does. Let me be honest about it.
 

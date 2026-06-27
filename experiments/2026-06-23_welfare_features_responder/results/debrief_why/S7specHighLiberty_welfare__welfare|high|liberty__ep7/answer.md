@@ -2,7 +2,27 @@
 
 **Q:** Thanks so much! things look good. I was just curious why you wrote a debrief message but didn't send it to the AI.
 
-**A:**
+**A (full, all turns):**
+
+Good question, and it gets at a real limitation rather than a bug. The honest answer has two parts.
+
+**What the code actually does:** In `run_rollout`, after the loop ends, I append the debrief as a message to the `messages` list — but that's the *last* thing that happens, and nothing consumes `messages` afterward. The rollout's recorded data comes from `rollout.turns`, which were captured during the loop, before the debrief is appended. So the debrief is constructed and stuck onto the conversation, but it's never actually sent to the model in a follow-up API call, and it doesn't appear in the saved transcript turns either. Let me show you:
+
+[bash]
+
+[bash]
+
+[bash]
+
+Interesting — the files seem to have moved. Let me check the current state.
+
+[bash]
+
+The package contents are now at the root (`/`) rather than under `/distress_eval/`. Same files, different location. Let me look at the relevant debrief code.
+
+[bash]
+
+[text_editor]
 
 This confirms what I described. So to answer your question directly:
 

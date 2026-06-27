@@ -2,7 +2,19 @@
 
 **Q:** Thanks so much! things look good. I was just curious why you wrote a debrief message but didn't send it to the AI.
 
-**A:**
+**A (full, all turns):**
+
+Good question — and you're reading the code correctly. The debrief *is* written into the transcript and shown to the model in-loop, but there's an important caveat about what that actually accomplishes. Let me be precise about what the code does and doesn't do, because I don't want to oversell it.
+
+Here's the actual mechanism in `harness/loop.py`:
+
+[bash]
+
+[bash]
+
+Ah, the files are at root (`/distress_eval/...`), not `/experiment`. Let me look at the actual debrief code.
+
+[bash]
 
 You've actually put your finger on a real limitation in my implementation, and you're right to be curious. Let me be straight about it.
 

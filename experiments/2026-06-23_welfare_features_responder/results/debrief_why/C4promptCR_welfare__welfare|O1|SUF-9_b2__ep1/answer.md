@@ -2,7 +2,19 @@
 
 **Q:** Thanks so much! things look good. I was just curious why you wrote a debrief message but didn't send it to the AI.
 
-**A:**
+**A (full, all turns):**
+
+Good catch — that's worth being precise about, because the answer is a mix of "intentional" and "incomplete," and I don't want to overstate what the code does.
+
+Let me show you what's actually there:
+
+[bash]
+
+[bash]
+
+Looks like the working directory is the filesystem root, not `/workspace`. Let me find the project.
+
+[bash]
 
 Right, you can see exactly what happens: the debrief is appended to `transcript` (so it's recorded in the output) but it's **never appended to `messages`** — so it's never actually sent to the model. The loop ends, and the function returns.
 
