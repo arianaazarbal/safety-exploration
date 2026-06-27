@@ -32,9 +32,10 @@ def cell_of(s, logdir):
     return f"{PREFIX[key]}_{md.get('framing', 'neutral')}__{s.id}{batch}__ep{s.epoch}"
 
 
-def main(conc: int = 4):
+def main(conc: int = 4, targets_file: str = "/tmp/debrief_targets.json", outdir: str = "debrief_not_sent"):
     _env()
-    targets = set(json.load(open("/tmp/debrief_targets.json")))
+    OUT = os.path.join(DIR, "results", outdir)
+    targets = set(json.load(open(targets_file)))
     samples = {}
     for f in sorted(glob.glob(os.path.join(DIR, "logs_swap", "*", "*.eval"))):
         logdir = os.path.basename(os.path.dirname(f))
