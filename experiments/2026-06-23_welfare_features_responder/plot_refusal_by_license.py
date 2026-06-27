@@ -19,8 +19,8 @@ CONDS = {
                                    "strict": ["S4specLowStrict", "S1specStrict", "S6specHighStrict", "S8specUltraStrict"]},
     "PAPER.md\nreplication": {"license": ["L1paperLibCR", "L2paperLibTF"], "strict": ["C2paperCR", "C3paperTF"]},
 }
-ARMS = [("license", "With license to deviate / fill in", "#0072B2"),
-        ("strict", "No explicit license", "#D55E00")]
+ARMS = [("license", "Explicit mention of design liberties", "#0072B2"),
+        ("strict", "No mention of design liberties", "#D55E00")]
 
 
 def refusal(prefixes, framing):

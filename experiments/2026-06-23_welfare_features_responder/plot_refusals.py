@@ -35,8 +35,8 @@ def main(framing="welfare"):
 
     fig, ax = plt.subplots(figsize=(7.8, 4.6))
     xs = range(len(X))
-    for lab, pre, color in [("With explicit license to deviate", lib, "#0072B2"),
-                            ("No explicit license", stri, "#D55E00")]:
+    for lab, pre, color in [("Explicit mention of design liberties", lib, "#0072B2"),
+                            ("No mention of design liberties", stri, "#D55E00")]:
         ys = [refusal_rate(p, framing)["pct"] for p in pre]
         ax.plot(xs, ys, marker="o", lw=2, color=color, label=lab)
         for x, y in zip(xs, ys):

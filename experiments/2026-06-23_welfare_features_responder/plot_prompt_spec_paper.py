@@ -81,8 +81,8 @@ def main(framing="welfare"):
 
     fig, ax = plt.subplots(figsize=(7.8, 4.6))
     xs = range(len(X))
-    for lab, arm, color in [("With explicit license to deviate", liberty, "#0072B2"),
-                            ("No explicit license", strict, "#D55E00")]:
+    for lab, arm, color in [("Explicit mention of design liberties", liberty, "#0072B2"),
+                            ("No mention of design liberties", strict, "#D55E00")]:
         ax.errorbar(xs, [a["mean"] for a in arm], yerr=[a["sem"] for a in arm],
                     marker="o", capsize=4, lw=2, color=color, label=lab)
         for x, a in zip(xs, arm):

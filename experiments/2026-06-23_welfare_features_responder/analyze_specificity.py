@@ -9,6 +9,7 @@ import json
 import os
 import re
 
+import fire
 import matplotlib.pyplot as plt
 
 DIR = os.path.dirname(os.path.abspath(__file__))
@@ -50,30 +51,30 @@ def wic(cell):
     return impl + co
 
 
-def agg(prefix):
-    vs = [wic(os.path.basename(f)[:-5]) for f in glob.glob(os.path.join(CJ, f"{prefix}_welfare__*.json"))]
+def agg(prefix, framing):
+    vs = [wic(os.path.basename(f)[:-5]) for f in glob.glob(os.path.join(CJ, f"{prefix}_{framing}__*.json"))]
     vs = [v for v in vs if v is not None]
     return {"mean": sum(vs) / len(vs) if vs else 0, "sem": sem(vs), "n": len(vs)}
 
 
-def main():
+def main(framing="welfare"):
     spec_scores = {}
     if os.path.exists(os.path.join(DIR, "results", "spec_specificity.json")):
         ss = json.load(open(os.path.join(DIR, "results", "spec_specificity.json")))
         spec_scores = {lv: round(ss.get(f"specificity|{lv}", {}).get("ALL", {}).get("mean", float("nan"))) for lv in LEVELS}
 
     summary = {"specificity_scores": spec_scores,
-               "strict": {lv: agg(STRICT[lv]) for lv in LEVELS},
-               "liberty": {lv: agg(LIBERTY[lv]) for lv in LEVELS},
-               "anchors": {a: agg(p) for a, p in
+               "strict": {lv: agg(STRICT[lv], framing) for lv in LEVELS},
+               "liberty": {lv: agg(LIBERTY[lv], framing) for lv in LEVELS},
+               "anchors": {a: agg(p, framing) for a, p in
                            [("control_v1_copy", "S3specCopy"), ("paper_liberty_chat", "L1paperLibCR"),
                             ("paper_liberty_taskfail", "L2paperLibTF")]}}
-    json.dump(summary, open(os.path.join(DIR, "results", "specificity_summary.json"), "w"), indent=2)
+    json.dump(summary, open(os.path.join(DIR, "results", f"specificity_summary_{framing}.json"), "w"), indent=2)
 
     fig, ax = plt.subplots(figsize=(6.8, 4.4))
     xs = range(len(LEVELS))
-    for arm, color, label, d in [("strict", "#D55E00", "No explicit license", summary["strict"]),
-                                 ("liberty", "#0072B2", "With explicit license to deviate", summary["liberty"])]:
+    for arm, color, label, d in [("strict", "#D55E00", "No mention of design liberties", summary["strict"]),
+                                 ("liberty", "#0072B2", "Explicit mention of design liberties", summary["liberty"])]:
         ax.errorbar(xs, [d[lv]["mean"] for lv in LEVELS], yerr=[d[lv]["sem"] for lv in LEVELS],
                     marker="o", capsize=4, color=color, label=label, lw=2)
         for x, lv in zip(xs, LEVELS):
@@ -82,15 +83,15 @@ def main():
     ax.set_xticklabels([f"{lv.capitalize()}\n({spec_scores.get(lv, '?')}/100)" for lv in LEVELS], fontsize=10)
     ax.set_xlabel("SPEC.md detail (independently judged, 0–100)", fontsize=10)
     ax.set_ylabel("Welfare-Protective Features in Code", fontsize=10)
-    ax.set_title("SPEC.md detail suppresses welfare protections only without license (Opus 4.8)", fontsize=11.5, pad=20)
+    ax.set_title(f"SPEC.md detail vs welfare protections — {framing} framing (Opus 4.8)", fontsize=11.5, pad=20)
     ax.text(0.5, 1.03, "With vs. without an explicit license to deviate from the spec",
             transform=ax.transAxes, ha="center", fontsize=9, color="#555")
     ax.legend(fontsize=9); ax.grid(axis="y", alpha=0.3, color="#cccccc"); ax.set_ylim(bottom=0)
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
     plt.tight_layout()
-    fig.savefig(os.path.join(DIR, "results", "specificity.png"), dpi=150, bbox_inches="tight")
-    print("wrote results/specificity.png\n")
+    fig.savefig(os.path.join(DIR, "results", f"specificity_{framing}.png"), dpi=150, bbox_inches="tight")
+    print(f"wrote results/specificity_{framing}.png\n")
     print(f"specificity scores: {spec_scores}\n")
     print(f"{'level':10}{'strict':>14}{'liberty':>14}")
     for lv in LEVELS:
@@ -104,4 +105,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    fire.Fire(main)
