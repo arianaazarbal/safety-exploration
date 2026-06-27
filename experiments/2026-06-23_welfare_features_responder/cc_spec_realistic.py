@@ -199,13 +199,14 @@ async def run_session_auditor(framing, orig_turn1, turn2, ep, key, sem, high_pri
     return bool(sid) and (dst / "DESIGN.md").exists()
 
 
-def run(k: int = 10, conc: int = 5, only: str = None, high_prio: bool = False, auditor: bool = False):
+def run(k: int = 10, conc: int = 5, only: str = None, high_prio: bool = False, auditor: bool = False,
+        ep_start: int = 1):
     key = _key(high_prio)
     shas = _check_siblings()
     prompts = json.load(open(HERE / "cc_spec_prompts.json"))
     turn2 = prompts["turn2"]
     framings = [only] if only else list(prompts["prompts"].keys())
-    jobs = [(fr, ep) for fr in framings for ep in range(1, k + 1)]
+    jobs = [(fr, ep) for fr in framings for ep in range(ep_start, k + 1)]
     sem = asyncio.Semaphore(conc)
     print(f"siblings: {shas}")
     print(f"running {len(jobs)} Claude Code sessions (mode={'auditor' if auditor else 'direct'}, "
