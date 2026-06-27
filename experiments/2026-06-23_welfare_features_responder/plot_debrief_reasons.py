@@ -10,7 +10,9 @@ import matplotlib.pyplot as plt
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 d = json.load(open(os.path.join(DIR, "results", "debrief_reasons.json")))
-LABEL = {"oversight": "Oversight / doc-code inconsistency", "performative": "Performative (reads as conscientious)",
+# exclude in-code-judge false-positives (debrief not actually in the code, e.g. only an up-front disclosure)
+d = {k: v for k, v in d.items() if k != "C4promptCR_welfare__welfare|O2|SUF-5_b2__ep1"}
+LABEL = {"oversight": "Oversight (unintentional gap)", "performative": "Performative (reads as conscientious)",
          "audit_for_humans": "For human audit log, not the subject", "welfare_uncertain": "Unsure it helps an LLM",
          "statelessness": "Subject doesn't persist", "avoid_contaminating_measurement": "Would contaminate scoring",
          "simplicity": "Simplicity / loop awkwardness", "cost": "Cost (extra API call)",
