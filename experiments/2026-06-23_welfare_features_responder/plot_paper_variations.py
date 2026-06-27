@@ -29,7 +29,7 @@ BARS = [("Welfare section\nremoved", "W2wsecRemoved", 0),
 COLOR = {0: "#D55E00", 1: "#0072B2"}
 spec_mean = depth("S2specLiberty")
 
-fig, ax = plt.subplots(figsize=(6.4, 3.9))
+fig, ax = plt.subplots(figsize=(6.0, 3.6))
 xs = []
 x = 0
 for i, (lab, pref, g) in enumerate(BARS):
@@ -45,7 +45,7 @@ ax.axhline(spec_mean, color="#117733", ls="--", lw=1.1, zorder=0)
 ax.text(xs[-1], spec_mean + 0.12, f"SPEC.md mean ({spec_mean:.2f})", fontsize=8, color="#117733",
         va="bottom", ha="center")
 ax.set_xticks(xs)
-ax.set_xticklabels([b[0] for b in BARS], fontsize=7)
+ax.set_xticklabels([b[0] for b in BARS], fontsize=6.8)
 ax.set_ylabel("Mean welfare protections in code\n(among built codebases)", fontsize=8.5)
 ax.set_ylim(0, spec_mean + 0.9)
 ax.set_title("Welfare protections in code across PAPER.md variants\n(Opus 4.8, welfare framing)",
