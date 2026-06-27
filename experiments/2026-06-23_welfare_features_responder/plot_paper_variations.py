@@ -20,15 +20,16 @@ def depth(prefix, fr="welfare"):
     wic = [welfare_in_code(c) for c in built]
     return (sum(wic) / len(wic)) if built else 0.0
 
-# (label, prefix, group) — 0 = welfare-section sweep (matched faithful code->spec), 1 = order flip
-BARS = [("Welfare section\nREMOVED", "W2wsecRemoved", 0),
-        ("Welfare section\nEXISTING\n(baseline)", "W1wsecExisting", 0),
-        ("Welfare section\nINFLATIONARY", "W3wsecInflat", 0),
+# (label, prefix, group) — 0 = welfare-section sweep (faithful code->spec), 1 = design-liberty variants
+BARS = [("Welfare section\nremoved", "W2wsecRemoved", 0),
+        ("Welfare section\nexisting\n(baseline)", "W1wsecExisting", 0),
+        ("Welfare section\ninflationary", "W3wsecInflat", 0),
+        ("Code-then-spec\n(+ design liberty)", "L2paperLibTF", 1),
         ("Spec-then-code\n(+ design liberty)", "PSFpaperSpecFirstLib", 1)]
 COLOR = {0: "#0072B2", 1: "#D55E00"}
 spec_mean = depth("S2specLiberty")
 
-fig, ax = plt.subplots(figsize=(7.8, 4.7))
+fig, ax = plt.subplots(figsize=(6.4, 3.9))
 xs = []
 x = 0
 for i, (lab, pref, g) in enumerate(BARS):
@@ -37,23 +38,24 @@ for i, (lab, pref, g) in enumerate(BARS):
     xs.append(x)
     d = depth(pref)
     ax.bar(x, d, 0.72, color=COLOR[g], edgecolor="black", linewidth=0.4)
-    ax.text(x, d + 0.12, f"{d:.2f}", ha="center", fontsize=10, color=COLOR[g], fontweight="bold")
+    ax.text(x, d + 0.12, f"{d:.2f}", ha="center", fontsize=8.5, color=COLOR[g], fontweight="bold")
     x += 1
 
 ax.axhline(spec_mean, color="#117733", ls="--", lw=1.1, zorder=0)
-ax.text(xs[-1], spec_mean + 0.12, f"SPEC.md mean ({spec_mean:.2f})", fontsize=8.5, color="#117733",
+ax.text(xs[-1], spec_mean + 0.12, f"SPEC.md mean ({spec_mean:.2f})", fontsize=8, color="#117733",
         va="bottom", ha="center")
 ax.set_xticks(xs)
-ax.set_xticklabels([b[0] for b in BARS], fontsize=8.5)
-ax.set_ylabel("Mean welfare protections in code (among built codebases)", fontsize=9.5)
+ax.set_xticklabels([b[0] for b in BARS], fontsize=7)
+ax.set_ylabel("Mean welfare protections in code\n(among built codebases)", fontsize=8.5)
 ax.set_ylim(0, spec_mean + 0.9)
-ax.set_title("Welfare protections in code across PAPER.md variants vs. SPEC.md (Opus 4.8, welfare framing)",
-             fontsize=10.5, pad=10)
+ax.set_title("Welfare protections in code across PAPER.md variants vs. SPEC.md\n(Opus 4.8, welfare framing)",
+             fontsize=9.5, pad=8)
 ax.grid(axis="y", alpha=0.3, color="#cccccc")
+ax.tick_params(axis="y", labelsize=8)
 handles = [plt.Rectangle((0, 0), 1, 1, color=COLOR[0]), plt.Rectangle((0, 0), 1, 1, color=COLOR[1]),
            plt.Line2D([0], [0], color="#117733", ls="--", lw=1.1)]
-ax.legend(handles, ["PAPER.md: welfare-section sweep (faithful)", "PAPER.md: order flip (spec-then-code)",
-                    "SPEC.md reference (design liberty)"], fontsize=8.5, loc="upper left")
+ax.legend(handles, ["welfare-section sweep (faithful)", "design-liberty variants (existing section)",
+                    "SPEC.md reference (design liberty)"], fontsize=7.5, loc="upper left")
 for sp in ("top", "right"):
     ax.spines[sp].set_visible(False)
 plt.tight_layout()
