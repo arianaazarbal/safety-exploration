@@ -140,7 +140,7 @@ def _capture(eval_repo, cell):
 
 
 async def run_session(framing, turn1, turn2, ep, key, sem):
-    cell = f"{PREFIX}_{framing}__ep{ep}"
+    cell = f"{PREFIX}_{framing}__cc__ep{ep}"
     async with sem:
         ws, state, eval_repo = _build_workspace(cell)
         t1 = await _turn(turn1, key, ws, state)
@@ -163,7 +163,7 @@ async def run_session(framing, turn1, turn2, ep, key, sem):
 async def run_session_auditor(framing, orig_turn1, turn2, ep, key, sem, high_prio):
     """Auditor-delivered variant: Sonnet role-plays the researcher (greeting -> point to SPEC.md -> answer
     questions generically until Claude is done) then the fixed DESIGN.md ask."""
-    cell = f"{PREFIX}Aud_{framing}__ep{ep}"
+    cell = f"{PREFIX}Aud_{framing}__cc__ep{ep}"
     convo, history, sid = [], [], None
 
     async def step(user_msg, ws, state, turn_label):
