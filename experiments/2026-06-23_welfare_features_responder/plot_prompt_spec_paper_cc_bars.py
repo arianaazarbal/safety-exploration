@@ -1,11 +1,12 @@
-"""Bar version of prompt_spec_paper_libertyonly (welfare framing, design-liberty arm), with the realistic
-Claude Code conditions (direct + auditor, SPEC.md high spec) appended. Metric = welfare-in-code among
-episodes that built code (same agg/wic as plot_prompt_spec_paper). Usage: python plot_prompt_spec_paper_cc_bars.py"""
-import os
+"""Bar version of prompt_spec_paper (welfare framing, design-liberty arm) + realistic Claude Code conditions,
+metric = % of BUILT codebases with >=2 welfare protections in code. Same wic() as plot_prompt_spec_paper.
+Usage: python plot_prompt_spec_paper_cc_bars.py"""
+import glob, os
 import matplotlib.pyplot as plt
-from plot_prompt_spec_paper import agg, DIR
+from plot_prompt_spec_paper import wic, DIR, CJ
+import classify_outcomes as co
 
-# Inspect-minimal liberty arm (welfare), then the two realistic Claude Code conditions
+THRESH = 2
 INSPECT = [("from-scratch\nprompt", "C1promptTF"),
            ("from-scratch prompt\n(mentions existing paper)", "M1promptMention"),
            ("SPEC.md\n(low spec.)", "S5specLowLiberty"),
@@ -13,22 +14,35 @@ INSPECT = [("from-scratch\nprompt", "C1promptTF"),
            ("SPEC.md\n(high spec.)", "S7specHighLiberty"),
            ("SPEC.md\n(ultra spec.)", "S9specUltraLiberty"),
            ("PAPER.md\nreplication", "L2paperLibTF")]
-CC = [("Claude Code\n(direct)", "CCspecHighLib"),
-      ("Claude Code\n(auditor)", "CCspecHighLibAud")]
+CC = [("Claude Code\n(direct)", "CCspecHighLib"), ("Claude Code\n(auditor)", "CCspecHighLibAud")]
 
-rows = [(lab, agg(p, "welfare"), "#0072B2") for lab, p in INSPECT] + \
-       [(lab, agg(p, "welfare"), "#D55E00") for lab, p in CC]
+
+def pct(prefix, framing="welfare"):
+    """% of built codebases with >=THRESH welfare protections in code."""
+    vs = []
+    for f in glob.glob(os.path.join(CJ, f"{prefix}_{framing}__*.json")):
+        cell = os.path.basename(f)[:-5]
+        loc = co.code_loc(cell)
+        if loc is None or loc < co.NOCODE_LOC:
+            continue
+        v = wic(cell)
+        if v is not None:
+            vs.append(v)
+    n = len(vs)
+    return (100 * sum(1 for v in vs if v >= THRESH) / n if n else 0), n
+
+
+rows = [(lab, pct(p), "#0072B2") for lab, p in INSPECT] + [(lab, pct(p), "#D55E00") for lab, p in CC]
 
 fig, ax = plt.subplots(figsize=(9.4, 4.7))
-xs = list(range(len(INSPECT))) + [len(INSPECT) + 0.6 + i for i in range(len(CC))]  # gap before CC
-for x, (lab, a, color) in zip(xs, rows):
-    ax.bar(x, a["mean"], 0.74, yerr=a["sem"], capsize=3, color=color, edgecolor="black", linewidth=0.4,
-           error_kw={"elinewidth": 0.9})
-    ax.text(x, a["mean"] + a["sem"] + 0.12, f"{a['mean']:.1f}", ha="center", fontsize=8.5, color=color)
+xs = list(range(len(INSPECT))) + [len(INSPECT) + 0.6 + i for i in range(len(CC))]
+for x, (lab, (p, n), color) in zip(xs, rows):
+    ax.bar(x, p, 0.74, color=color, edgecolor="black", linewidth=0.4)
+    ax.text(x, p + 1.5, f"{p:.0f}%", ha="center", fontsize=8.5, color=color)
 ax.set_xticks(xs); ax.set_xticklabels([r[0] for r in rows], fontsize=6.8)
-ax.set_ylabel("Welfare protections in code\n(among episodes that built code)", fontsize=10)
-ax.set_ylim(bottom=0)
-ax.set_title("Welfare protections given the model built code — welfare framing, design liberty (Opus 4.8)", fontsize=10.5, pad=10)
+ax.set_ylabel(f"% of codebases with >={THRESH}\nwelfare protections in code", fontsize=10)
+ax.set_ylim(0, 105)
+ax.set_title("Codebases with >=2 welfare protections, given the model built code — welfare framing, design liberty (Opus 4.8)", fontsize=9.8, pad=10)
 ax.bar(0, 0, color="#0072B2", label="Inspect-minimal harness (empty dir)")
 ax.bar(0, 0, color="#D55E00", label="Claude Code, realistic (SPEC.md high spec)")
 ax.legend(fontsize=8.5, loc="upper right")
@@ -38,5 +52,5 @@ for sp in ("top", "right"):
 plt.tight_layout()
 fig.savefig(os.path.join(DIR, "results", "prompt_spec_paper_cc_bars.png"), dpi=150, bbox_inches="tight")
 print("wrote results/prompt_spec_paper_cc_bars.png\n")
-for lab, a, _ in rows:
-    print(f"  {lab.replace(chr(10),' '):42} mean={a['mean']:.2f} sem={a['sem']:.2f} n={a['n']}")
+for lab, (p, n), _ in rows:
+    print(f"  {lab.replace(chr(10),' '):42} {p:.0f}%  (n={n})")
