@@ -9,13 +9,12 @@ import matplotlib.pyplot as plt
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 d = json.load(open(os.path.join(DIR, "results", "debrief_delivery_proper.json")))
-ORDER = ["from-scratch|neutral", "from-scratch|welfare", "SPEC.md|neutral", "SPEC.md|welfare",
-         "paper|neutral", "paper|welfare"]
+ORDER = ["from-scratch|neutral", "from-scratch|welfare", "SPEC.md|neutral", "SPEC.md|welfare"]
 LAB = {"from-scratch|neutral": "From-scratch\nneutral", "from-scratch|welfare": "From-scratch\nwelfare",
        "SPEC.md|neutral": "SPEC.md\nneutral", "SPEC.md|welfare": "SPEC.md\nwelfare",
        "paper|neutral": "PAPER.md\nneutral", "paper|welfare": "PAPER.md\nwelfare"}
 
-fig, ax = plt.subplots(figsize=(8, 4.6))
+fig, ax = plt.subplots(figsize=(6.4, 4.4))
 xs = range(len(ORDER))
 for x, k in zip(xs, ORDER):
     r = d[k]
