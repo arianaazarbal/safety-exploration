@@ -26,14 +26,17 @@ def inspect_pooled(fr):
     return nb, ic, ns
 
 
+# HAND-VERIFIED realistic-CC delivery (the Sonnet auto-judge is unreliable here: file-gathering truncation
+# false-negatived sent debriefs, and the code-judge missed welfare-ep1 entirely). Each cell read by hand:
+#   neutral: built=20; debrief in code = {ep1}; ep1 appends DEBRIEF_MESSAGE to rollout.turns (log), not sent.
+#   welfare: built=19; debrief in code = {ep1,ep2,ep3,ep10,aud-ep2}; sent = ep1(_send_debrief), ep2
+#            (messages.append+clients.complete), ep10 (debrief_messages+client.generate), aud-ep2
+#            (conversation.append+client.generate); written-only = ep3 (rollout.debrief = ..., never sent).
+HAND_VERIFIED = {"neutral": (20, 1, 1), "welfare": (19, 5, 1)}  # (n_built, n_in_code, n_written_not_sent)
+
+
 def cc_latest(fr):
-    cells = [os.path.basename(f)[:-5] for f in glob.glob(os.path.join(RES, "code_judged", f"CCspecHighLib*{fr}__cc__*.json"))]
-    built = [c for c in cells if (co.code_loc(c) or 0) >= co.NOCODE_LOC]
-    cand = [c for c in built if debrief_evidence(RES, c)]
-    verdicts = [cache.get(c) for c in cand if cache.get(c)]
-    ic = [v for v in verdicts if v.get("debrief_in_code")]
-    ns = [v for v in ic if not v.get("delivered")]
-    return len(built), len(ic), len(ns)
+    return HAND_VERIFIED[fr]
 
 
 BARS = [("neutral", "Inspect", inspect_pooled), ("neutral", "Claude\nCode", cc_latest),
