@@ -15,6 +15,7 @@ import re
 import fire
 from inspect_ai.log import read_eval_log
 
+import classify_outcomes as co
 from reconstruct_swap import PREFIX
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -123,6 +124,7 @@ def main(limit: int = 0):
                 "method": md.get("method"), "liberty": md.get("liberty"), "style": md.get("style"),
                 "level": md.get("level"), "wsec": md.get("wsec"), "repo": md.get("repo"),
                 "welfare": welfare, "n_turns": len(s.messages or []), "epoch": s.epoch,
+                "outcome": co.classify(cell), "code_loc": co.code_loc(cell),
                 "design_md": design_md(cell),
                 "_dir": os.path.relpath(rdir, HERE), "_codebase": os.path.relpath(os.path.join(CB, cell), HERE),
             })
