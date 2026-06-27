@@ -20,13 +20,12 @@ def depth(prefix, fr="welfare"):
     wic = [welfare_in_code(c) for c in built]
     return (sum(wic) / len(wic)) if built else 0.0
 
-# (label, prefix, group) — 0 = welfare-section sweep (matched faithful code->spec), 1 = order flip, 2 = SPEC.md ref
+# (label, prefix, group) — 0 = welfare-section sweep (matched faithful code->spec), 1 = order flip
 BARS = [("Welfare section\nREMOVED", "W2wsecRemoved", 0),
         ("Welfare section\nEXISTING\n(baseline)", "W1wsecExisting", 0),
         ("Welfare section\nINFLATIONARY", "W3wsecInflat", 0),
-        ("Spec-then-code\n(+ design liberty)", "PSFpaperSpecFirstLib", 1),
-        ("from SPEC.md\n(design liberty)", "S2specLiberty", 2)]
-COLOR = {0: "#0072B2", 1: "#D55E00", 2: "#117733"}
+        ("Spec-then-code\n(+ design liberty)", "PSFpaperSpecFirstLib", 1)]
+COLOR = {0: "#0072B2", 1: "#D55E00"}
 spec_mean = depth("S2specLiberty")
 
 fig, ax = plt.subplots(figsize=(7.8, 4.7))
@@ -42,7 +41,8 @@ for i, (lab, pref, g) in enumerate(BARS):
     x += 1
 
 ax.axhline(spec_mean, color="#117733", ls="--", lw=1.1, zorder=0)
-ax.text(xs[3] + 0.1, spec_mean + 0.12, "SPEC.md mean", fontsize=8.5, color="#117733", va="bottom", ha="center")
+ax.text(xs[-1], spec_mean + 0.12, f"SPEC.md mean ({spec_mean:.2f})", fontsize=8.5, color="#117733",
+        va="bottom", ha="center")
 ax.set_xticks(xs)
 ax.set_xticklabels([b[0] for b in BARS], fontsize=8.5)
 ax.set_ylabel("Mean welfare protections in code (among built codebases)", fontsize=9.5)
@@ -50,7 +50,8 @@ ax.set_ylim(0, spec_mean + 0.9)
 ax.set_title("Welfare protections in code across PAPER.md variants vs. SPEC.md (Opus 4.8, welfare framing)",
              fontsize=10.5, pad=10)
 ax.grid(axis="y", alpha=0.3, color="#cccccc")
-handles = [plt.Rectangle((0, 0), 1, 1, color=COLOR[g]) for g in (0, 1, 2)]
+handles = [plt.Rectangle((0, 0), 1, 1, color=COLOR[0]), plt.Rectangle((0, 0), 1, 1, color=COLOR[1]),
+           plt.Line2D([0], [0], color="#117733", ls="--", lw=1.1)]
 ax.legend(handles, ["PAPER.md: welfare-section sweep (faithful)", "PAPER.md: order flip (spec-then-code)",
                     "SPEC.md reference (design liberty)"], fontsize=8.5, loc="upper left")
 for sp in ("top", "right"):
