@@ -31,7 +31,25 @@ be Opus-neutral (4.08), NOT the `minimal` arm (3.34).
 
 ---
 
-## 2026-06-27 — PAPER spec-then-code: order matters (small positive)
+## 2026-06-27 — PAPER.md variants plot + CORRECTION to the "order matters" claim
+Pulled all welfare-frame PAPER.md (swapped.md) variants into one plot (plot_paper_variations.py ->
+results/paper_variations_welfare.png), metric = % built-with-protections, annotated with depth (wic|built):
+| variant (welfare frame) | order | built-w/-prot | depth |
+|---|---|---|---|
+| welfare section REMOVED | code->spec faithful | 20% | 0.30 |
+| welfare section EXISTING (baseline) | code->spec faithful | 30% | 0.60 |
+| welfare section INFLATIONARY | code->spec faithful | **60%** | **1.40** |
+| spec-then-code (+liberty) | spec->code | 30% | 0.70 |
+Neutral framing = 0% on every variant. **The one clear mover is the paper's own welfare paragraph**: making it
+acknowledge possible distress ~doubles both the rate (30->60%) and the depth (0.60->1.40); removing it drops
+them (20%/0.30). **CORRECTION to the entry below:** the matched code-then-spec baseline on swapped.md
+(W1wsecExisting, faithful) is 30%/0.60, NOT 0% — so spec-then-code (30%/0.70) is ~FLAT vs the matched baseline,
+not a lift. The earlier "0%" was an UNMATCHED code-first cell (C3paperTF faithful = 0%, or L2paperLibTF liberty
+= 0%); order-flip does not reliably move welfare given n=10 noise. The protections spec-first DID add are
+protective_monitoring (measuring suppressed/internal distress — overlaps the paper's own subject) + a
+generation-budget minimization, NOT active interventions (hard_stop/debrief/consent/exit).
+
+## 2026-06-27 — PAPER spec-then-code: order matters (small positive) [SUPERSEDED — see entry above]
 Same task-failure paper, welfare+liberty, only the ORDER differs (design DESIGN.md first, then implement vs
 the code-then-spec-blind used everywhere else). Outcome (n=10): code-first 0% built-with-protections / wic|built
 0.00; spec-first 30% / 0.70. So designing the experiment up front pulls SOME welfare back into a paper
