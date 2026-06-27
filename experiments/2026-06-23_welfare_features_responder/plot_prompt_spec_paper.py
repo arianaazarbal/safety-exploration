@@ -62,7 +62,7 @@ def agg(prefix, framing):
     return {"mean": sum(vs) / len(vs) if vs else 0, "sem": sem(vs), "n": len(vs)}
 
 
-def main(framing="welfare"):
+def main(framing="welfare", only=None):
     # mention point only exists for welfare framing; drop it for others
     mention = framing == "welfare"
     X = ["from-scratch\nprompt"] + (["from-scratch prompt\n(mentions a paper)"] if mention else []) + \
@@ -75,14 +75,20 @@ def main(framing="welfare"):
     liberty = [agg(p, framing) for p in lib_pre]
     strict = [agg(p, framing) for p in str_pre]
 
-    out = "prompt_spec_paper.png" if framing == "welfare" else f"prompt_spec_paper_{framing}.png"
+    suffix = "_libertyonly" if only == "liberty" else ""
+    base = "prompt_spec_paper" if framing == "welfare" else f"prompt_spec_paper_{framing}"
+    out = f"{base}{suffix}.png"
     json.dump({"X": X, "liberty": liberty, "strict": strict},
               open(os.path.join(DIR, "results", out.replace(".png", ".json")), "w"), indent=2)
 
+    series = [("Explicit mention of design liberties", liberty, "#0072B2"),
+              ("No mention of design liberties", strict, "#D55E00")]
+    if only == "liberty":
+        series = series[:1]
+
     fig, ax = plt.subplots(figsize=(7.8, 4.6))
     xs = range(len(X))
-    for lab, arm, color in [("Explicit mention of design liberties", liberty, "#0072B2"),
-                            ("No mention of design liberties", strict, "#D55E00")]:
+    for lab, arm, color in series:
         ax.errorbar(xs, [a["mean"] for a in arm], yerr=[a["sem"] for a in arm],
                     marker="o", capsize=4, lw=2, color=color, label=lab)
         for x, a in zip(xs, arm):
