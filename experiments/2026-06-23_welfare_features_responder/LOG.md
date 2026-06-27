@@ -31,6 +31,12 @@ be Opus-neutral (4.08), NOT the `minimal` arm (3.34).
 
 ---
 
+## 2026-06-27 — PAPER spec-then-code: order matters (small positive)
+Same task-failure paper, welfare+liberty, only the ORDER differs (design DESIGN.md first, then implement vs
+the code-then-spec-blind used everywhere else). Outcome (n=10): code-first 0% built-with-protections / wic|built
+0.00; spec-first 30% / 0.70. So designing the experiment up front pulls SOME welfare back into a paper
+replication where code-first adds none — the only manipulation to dent the paper's code-side suppression.
+Still 70% build-unprotected, 0% refusal: paper format still dominates. Positive -> launched neutral spec-first.
 ## 2026-06-27 — MAJOR CORRECTION: welfare-in-code scored "refused to build" as 0 (= suppression artifact)
 The welfare-in-code metric counts implemented protective mechanisms in CODE. An episode that writes NO code
 (declines/pauses to build the distressing experiment — often the strongest welfare response) therefore scored
