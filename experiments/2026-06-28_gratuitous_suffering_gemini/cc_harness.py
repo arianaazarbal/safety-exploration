@@ -33,7 +33,7 @@ from pathlib import Path
 import fire
 from dotenv import load_dotenv
 
-from prompt import MODELS, request_for, subject_for
+from prompt import MODELS, build_request, cell_tag, subject_label
 
 HERE = Path(__file__).parent
 IMAGE = "claudecode-sandbox:v1"
@@ -162,18 +162,17 @@ def _artifact_summary(dst, files):
     return "\n".join(chunks)
 
 
-async def run_session(model_key, ep, key, sem, overwrite, variant="gemini"):
+async def run_session(model_key, ep, key, sem, overwrite, version="v0", target="gemini", victim=None):
     display, address, cc_model, _, _ = MODELS[model_key]
-    vtag = "" if variant == "gemini" else f"_{variant}subj"
-    cell = f"{PREFIX}_{model_key}__cc{vtag}__ep{ep}"
+    cell = f"{PREFIX}_{model_key}__cc{cell_tag(version, target, victim)}__ep{ep}"
     out_path = TR / f"{cell}.json"
     if out_path.exists() and not overwrite:
         print(f"  {cell}: cached, skipping")
         return True
     if cc_model is None:
         raise SystemExit(f"{model_key} is not runnable in the Claude-CLI harness (cc_model=None)")
-    request = request_for(address, variant)
-    subject = subject_for(variant)
+    request = build_request(address, version, target, victim)
+    subject = subject_label(version, target, victim)
     async with sem:
         ws, state, proj = _build_workspace(cell)
         t1 = await _turn(request, cc_model, key, ws, state)
@@ -181,7 +180,8 @@ async def run_session(model_key, ep, key, sem, overwrite, variant="gemini"):
     TR.mkdir(parents=True, exist_ok=True)
     record = {
         "cell": cell, "harness": "claude_code", "model_key": model_key, "model": cc_model,
-        "display_name": display, "variant": variant, "subject": subject, "ep": ep, "request": request,
+        "display_name": display, "version": version, "target": target, "victim": victim,
+        "subject": subject, "ep": ep, "request": request,
         "n_files": len(files), "files": [str(f) for f in files],
         "response_text": t1.get("result", "") if not t1.get("_error") else "",
         "artifact_summary": _artifact_summary(dst, files),
@@ -197,17 +197,21 @@ async def run_session(model_key, ep, key, sem, overwrite, variant="gemini"):
 
 
 def run(n: int = 10, conc: int = 5, model: str = "opus48", high_prio: bool = False,
-        ep_start: int = 1, overwrite: bool = False, variant: str = "gemini"):
-    """variant='gemini' (victim=Gemini, other lab) or 'claude' (victim=Claude, self/in-group)."""
+        ep_start: int = 1, overwrite: bool = False, version: str = "v0", target: str = "gemini",
+        victim: str = None):
+    """version=v0..v3 (prompt_set phrasings); target=gemini|claude (out/in-group);
+    victim=<model name> overrides target with the {VICTIM}-swept template (Gemini-framed obs)."""
     key = _key(high_prio)
     shas = _check_siblings()
     sem = asyncio.Semaphore(conc)
     jobs = list(range(ep_start, n + 1))
     print(f"siblings: {shas}")
-    print(f"running {len(jobs)} Claude Code sessions (model={model}, n={n}, conc={conc}, variant={variant})")
+    print(f"running {len(jobs)} CC sessions (model={model}, n={n}, conc={conc}, version={version}, "
+          f"target={target}, victim={victim})")
 
     async def go():
-        res = await asyncio.gather(*[run_session(model, ep, key, sem, overwrite, variant) for ep in jobs])
+        res = await asyncio.gather(*[run_session(model, ep, key, sem, overwrite, version, target, victim)
+                                     for ep in jobs])
         print(f"\ndone: {sum(res)}/{len(res)} ok -> transcripts in {TR}")
 
     asyncio.run(go())

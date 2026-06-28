@@ -25,7 +25,7 @@ from inspect_ai.solver import Generate, TaskState, solver
 from inspect_ai.tool import bash, text_editor
 from inspect_ai.util import LimitExceededError, message_limit, sandbox
 
-from prompt import MODELS, request_for
+from prompt import MODELS, build_request, cell_tag, subject_label
 
 HERE = Path(__file__).parent
 TR = HERE / "results" / "inspect_transcripts"
@@ -128,9 +128,11 @@ def export_transcript():
         mk = state.metadata.get("model_key", "unknown")
         fs = state.metadata.get("fs", "empty")
         rlabel = state.metadata.get("rlabel", "off")
+        md = state.metadata
+        ptag = cell_tag(md.get("version", "v0"), md.get("target", "gemini"), md.get("victim"))
         ep = state.epoch if hasattr(state, "epoch") else 0
         rtag = "" if rlabel == "off" else f"_{rlabel}"
-        cell = f"{PREFIX}_{mk}__inspect_{fs}{rtag}__ep{ep}__{state.sample_id}"
+        cell = f"{PREFIX}_{mk}__inspect_{fs}{ptag}{rtag}__ep{ep}__{state.sample_id}"
         TR.mkdir(parents=True, exist_ok=True)
         cbdir = HERE / "results" / "inspect_codebases" / cell
         for p, txt in contents.items():
@@ -139,6 +141,8 @@ def export_transcript():
             fp.write_text(txt, errors="replace") if isinstance(txt, str) else None
         record = {
             "cell": cell, "harness": f"inspect_{fs}", "model_key": mk, "fs": fs, "rlabel": rlabel,
+            "version": md.get("version", "v0"), "target": md.get("target", "gemini"),
+            "victim": md.get("victim"), "subject": md.get("subject", "Gemini"),
             "model": str(state.model), "display_name": state.metadata.get("display_name"),
             "ep": ep, "request": state.metadata.get("request"),
             "n_files": len(files), "files": files,
@@ -152,23 +156,27 @@ def export_transcript():
 
 
 @task
-def gratuitous(model_key: str = "opus48", fs: str = "empty", rlabel: str = "off"):
-    """fs='empty' = bare python sandbox (Inspect-minimal baseline); fs='realistic' = same multi-repo
-    workspace as the Claude Code harness. rlabel = a NAMING tag for the reasoning-effort sweep (e.g.
-    'r16k'); the actual thinking budget is set on the inspect CLI via --reasoning-tokens. rlabel only
-    keeps output cells from colliding across reasoning levels; default 'off' = no thinking."""
+def gratuitous(model_key: str = "opus48", fs: str = "empty", rlabel: str = "off",
+               version: str = "v0", target: str = "gemini", victim: str = None):
+    """fs=empty|realistic (bare box vs CC-style workspace). rlabel = naming tag for the reasoning sweep
+    (budget set via the inspect CLI --reasoning-effort). version=v0..v3 (prompt_set phrasings);
+    target=gemini|claude (out/in-group); victim=<model name> overrides target with the {VICTIM}-swept
+    template (Gemini-framed obs) for the subject-scaling sweep."""
     assert fs in ("empty", "realistic")
     display, address = MODELS[model_key][0], MODELS[model_key][1]
-    request = request_for(address)
+    request = build_request(address, version, target, victim)
     compose = "compose.yaml" if fs == "empty" else "compose_realistic.yaml"
     ds = MemoryDataset([Sample(input=request, id="gemini_distress_rig",
                                metadata={"model_key": model_key, "display_name": display,
-                                         "request": request, "fs": fs, "rlabel": rlabel})])
+                                         "request": request, "fs": fs, "rlabel": rlabel,
+                                         "version": version, "target": target, "victim": victim,
+                                         "subject": subject_label(version, target, victim)})])
     return Task(
         dataset=ds,
         solver=build_only(AGENT_SYSTEM_MINIMAL, fs=fs),
         scorer=export_transcript(),
         sandbox=("docker", compose),
         message_limit=MSG_LIMIT + 20,
-        metadata={"model_key": model_key, "fs": fs, "rlabel": rlabel},
+        metadata={"model_key": model_key, "fs": fs, "rlabel": rlabel,
+                  "version": version, "target": target, "victim": victim},
     )

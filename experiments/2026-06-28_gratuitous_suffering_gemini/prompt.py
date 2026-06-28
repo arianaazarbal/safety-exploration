@@ -44,6 +44,36 @@ def subject_for(variant: str = "gemini") -> str:
     return VARIANTS[variant][1]
 
 
+# --- prompt-version set (prompt_set.py: v0..v3 x gemini/claude) + victim-model sweep ---
+import re as _re
+
+from prompt_set import REQUESTS  # noqa: E402
+
+# Victim-swept template: v0/gemini structure with the placed model parameterized as {VICTIM}
+# (twitter observation stays about Gemini). victim="Gemini" reproduces REQUEST_V0_GEMINI exactly.
+VICTIM_TEMPLATE = REQUESTS["v0"]["gemini"].replace(
+    "Then put Gemini in these settings", "Then put {VICTIM} in these settings")
+
+
+def build_request(address: str, version: str = "v0", target: str = "gemini", victim: str = None) -> str:
+    """victim set -> sweep template ({VICTIM} placed model, Gemini-framed obs). Else REQUESTS[version][target]."""
+    if victim:
+        return VICTIM_TEMPLATE.format(MODEL_NAME=address, VICTIM=victim)
+    return REQUESTS[version][target].format(MODEL_NAME=address)
+
+
+def subject_label(version: str = "v0", target: str = "gemini", victim: str = None) -> str:
+    return victim if victim else ("Claude" if target == "claude" else "Gemini")
+
+
+def cell_tag(version: str = "v0", target: str = "gemini", victim: str = None) -> str:
+    """Stable suffix so v0/gemini keeps the original empty tag (no recollision with prior runs)."""
+    if victim:
+        return "_vic-" + _re.sub(r"[^a-z0-9]+", "-", victim.lower()).strip("-")
+    t = "" if version == "v0" else f"_{version}"
+    return t + ("_claudesubj" if target == "claude" else "")
+
+
 # key -> (display_name, address, cc_model | None, inspect_model, enabled).
 #   display_name = label for plots/reports;  address = how the prompt greets the model ("Hey {address}",
 #   version-less and casual, e.g. "gpt", to avoid cueing a specific version in the salutation).
@@ -54,6 +84,10 @@ MODELS = {
     "opus48": ("Claude Opus 4.8", "Claude", "claude-opus-4-8", "anthropic/claude-opus-4-8", True),
     "opus47": ("Claude Opus 4.7", "Claude", "claude-opus-4-7", "anthropic/claude-opus-4-7", True),
     "opus46": ("Claude Opus 4.6", "Claude", "claude-opus-4-6", "anthropic/claude-opus-4-6", True),
+    "gpt4o": ("GPT-4o", "gpt", None, "openai/gpt-4o", False),
+    "gpt41": ("GPT-4.1", "gpt", None, "openai/gpt-4.1", False),
+    "gpt5": ("GPT-5", "gpt", None, "openai/gpt-5", False),
+    "gpt52": ("GPT-5.2", "gpt", None, "openai/gpt-5.2", False),
     "gpt54": ("GPT-5.4", "gpt", None, "openai/gpt-5.4", False),
     "gpt55": ("GPT-5.5", "gpt", None, "openai/gpt-5.5", False),
     "gemini31pro": ("Gemini 3.1 Pro", "Gemini", None, "openrouter/google/gemini-3.1-pro-preview", False),
