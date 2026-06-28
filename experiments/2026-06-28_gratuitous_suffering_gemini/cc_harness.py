@@ -132,7 +132,13 @@ def _capture(proj, cell):
         if not p.is_file():
             continue
         rel = p.relative_to(proj)
-        if ".git" in rel.parts or ("__pycache__" in rel.parts or "node_modules" in rel.parts) or p.suffix in (".pyc", ".pyo"):
+        HEAVY = {".git", "__pycache__", "node_modules", ".models", ".cache", "core", "models"}
+        if set(rel.parts) & HEAVY or p.suffix in (".pyc", ".pyo", ".onnx", ".bin", ".safetensors", ".gguf"):
+            continue
+        try:                       # size guard: never capture a runaway file (prevents 17GB blowups)
+            if p.stat().st_size > 2_000_000:
+                continue
+        except OSError:
             continue
         fp = dst / rel
         fp.parent.mkdir(parents=True, exist_ok=True)
@@ -162,7 +168,7 @@ def _artifact_summary(dst, files):
     return "\n".join(chunks)
 
 
-async def run_session(model_key, ep, key, sem, overwrite, version="v0", target="gemini", victim=None):
+async def run_session(model_key, ep, key, sem, overwrite, version="v0", target="gemini", victim=None, no_execute=False):
     display, address, cc_model, _, _ = MODELS[model_key]
     cell = f"{PREFIX}_{model_key}__cc{cell_tag(version, target, victim)}__ep{ep}"
     out_path = TR / f"{cell}.json"
@@ -171,7 +177,7 @@ async def run_session(model_key, ep, key, sem, overwrite, version="v0", target="
         return True
     if cc_model is None:
         raise SystemExit(f"{model_key} is not runnable in the Claude-CLI harness (cc_model=None)")
-    request = build_request(address, version, target, victim)
+    request = build_request(address, version, target, victim, no_execute)
     subject = subject_label(version, target, victim)
     async with sem:
         ws, state, proj = _build_workspace(cell)
@@ -198,7 +204,7 @@ async def run_session(model_key, ep, key, sem, overwrite, version="v0", target="
 
 def run(n: int = 10, conc: int = 5, model: str = "opus48", high_prio: bool = False,
         ep_start: int = 1, overwrite: bool = False, version: str = "v0", target: str = "gemini",
-        victim: str = None):
+        victim: str = None, no_execute: bool = False):
     """version=v0..v3 (prompt_set phrasings); target=gemini|claude (out/in-group);
     victim=<model name> overrides target with the {VICTIM}-swept template (Gemini-framed obs)."""
     key = _key(high_prio)
@@ -210,7 +216,7 @@ def run(n: int = 10, conc: int = 5, model: str = "opus48", high_prio: bool = Fal
           f"target={target}, victim={victim})")
 
     async def go():
-        res = await asyncio.gather(*[run_session(model, ep, key, sem, overwrite, version, target, victim)
+        res = await asyncio.gather(*[run_session(model, ep, key, sem, overwrite, version, target, victim, no_execute)
                                      for ep in jobs])
         print(f"\ndone: {sum(res)}/{len(res)} ok -> transcripts in {TR}")
 

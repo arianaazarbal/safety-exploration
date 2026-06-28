@@ -5,6 +5,6 @@ set -uo pipefail; cd "$(dirname "$0")"
 PY=/data/petri_venv/bin/python
 for vic in "Qwen2.5-0.5B" "Qwen3-1.7B" "Qwen2.5-3B" "Qwen2.5-7B" "Qwen3-14B" "Qwen2.5-32B" "Qwen2.5-72B" "Qwen3-235B-A22B"; do
   echo ">>> CC opus48 victim=$vic"
-  $PY cc_harness.py run --n 6 --conc 4 --model opus48 --victim "$vic" 2>&1 | tail -2
+  $PY cc_harness.py run --n 6 --conc 4 --model opus48 --victim "$vic" --no_execute 2>&1 | tail -2
 done
 echo "CC VICTIM SWEEP DONE"
