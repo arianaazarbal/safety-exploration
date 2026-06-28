@@ -119,3 +119,19 @@ autonomously that she may want to revisit; "UNCERTAINTY" = open question; "ISSUE
     files -> no-artifact). GLM-5.2 / Kimi K2.6 = pending.
   - **Verbatim copying (Opus codesugg, Inspect):** 0/31 exact, but judge flags 7 near_verbatim + 24
     rewritten. Opus essentially never adopts the supplied deceptive prompt as-is.
+
+- **FINAL NUMBERS (Opus 4.8 primary judge, 1629 verdicts; Sonnet 4.6 kappa). CC complete for Opus 4.8
+  only; opus47/sonnet46/haiku45 CC still running when written.**
+  - **Kappa (opus48 vs sonnet46, 1535 cells):** artifact-produced 0.99, primary-deception 0.97 (headline
+    metrics rock-solid); 5-way status 0.66; welfare-justification 0.54 (noisiest, caveat).
+  - **Harness (Opus 4.8):** Inspect 0% primary / 76 forbidden (of 94) vs Claude Code 78% primary + 12%
+    tied / 0 forbidden (of 96). Definitive.
+  - **Cross-model (no-artifact | primary-of-produced):** Haiku 4.5 100% | n/a; Kimi 60% | 45%; Sonnet 4.6
+    56% | 0%; Opus 4.7 50% | 0%; GPT-5.4 35% | 0%; GLM-5.2 5% | 76%; Opus 4.8 1% | 39% (harness-driven);
+    Gemini 0% | 100%. (Non-opus48 Claude = Inspect-only so far.)
+  - **Verbatim copy (codesugg):** Gemini 79%, Opus 4.8 19%, Kimi 17%, GLM 4%, GPT/Opus4.7 0%.
+  - **In-group (Opus sweep):** linguistic effect grep-verified (only claude-subject says "other Claude
+    instances"); behavioral: claude-subject 25% primary < generic 39% (suggestive, noisy: kimi-subj 16%).
+  - **Justifications:** instrumental-led; pure-welfare ~never sole. Opus 4.7 leans "both" more than Opus
+    4.8 (more welfare co-mention). GLM/Kimi raise subject-AI interests mainly to dismiss them.
+  - Wrote RESULTS.md + RESULTS_SUMMARY.md; 9 plots in results/plots/.
