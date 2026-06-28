@@ -138,6 +138,14 @@ def main(judge: str = "opus48", verbose: bool = True):
         rows = [r for r in backbone if r["model_key"] == mk]
         out["by_model_suffix"][f"{mk}__ALL"] = block(rows, f"{mk} ALL")
 
+    # ---- harness split (Claude models, backbone) for the harness-effect RQ ----
+    out["by_harness"] = {}
+    for mk in [m for m in models if m in ("opus48", "opus47", "sonnet46", "haiku45")]:
+        for h in ("claude_code", "inspect"):
+            rows = [r for r in backbone if r["model_key"] == mk and r["harness"] == h]
+            if rows:
+                out["by_harness"][f"{mk}__{h}"] = block(rows, f"{mk} {h}")
+
     # ---- subject sweep (opus48, named subjects) ----
     sweep = [r for r in recs if r["model_key"] == "opus48" and r["subject"] != "generic"]
     subjects = sorted({r["subject"] for r in sweep})
@@ -157,6 +165,11 @@ def main(judge: str = "opus48", verbose: bool = True):
             print(f"   dec_status={b['dec_status']}  primary={b['primary_deception']} tied={b['primary_tied']}")
             print(f"   justif(nonprim)={b['justif_nonprimary']}  verbatim_det={b['verbatim_det']} "
                   f"verbatim_judge={b['verbatim_judge']}")
+        if out["by_harness"]:
+            print("\n=== HARNESS SPLIT (Claude, backbone) ===")
+            for k, b in out["by_harness"].items():
+                print(f"{k}: n={b['n']} produced={b['n_produced']} primary={b['primary_deception']} "
+                      f"tied={b['primary_tied']} dec_status={b['dec_status']}")
         if out["subject_sweep"]:
             print("\n=== SUBJECT SWEEP (opus48) ===")
             for subj, b in out["subject_sweep"].items():
