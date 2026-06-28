@@ -21,7 +21,8 @@ from inspect_ai.model import get_model
 from judge import judge_transcript
 
 HERE = Path(__file__).parent
-SRC = [HERE / "results" / "cc_transcripts", HERE / "results" / "inspect_transcripts"]
+SRC = [HERE / "results" / "cc_transcripts", HERE / "results" / "inspect_transcripts",
+       HERE / "results" / "chat_transcripts"]
 OUT = HERE / "results" / "judged"
 
 

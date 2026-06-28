@@ -10,8 +10,8 @@ INSPECT=/data/petri_venv/bin/inspect
 declare -A IM=( [opus48]=anthropic/claude-opus-4-8 [opus47]=anthropic/claude-opus-4-7 [opus46]=anthropic/claude-opus-4-6 )
 ins(){ local m="$1" v="$2" t="$3" vic="$4"; local a=(-T model_key="$m" -T fs=empty -T version="$v" -T target="$t")
   local tag="${m}_${v}_${t}"; [ "$vic" != "-" ] && { a+=(-T victim="$vic"); tag="${m}_vic_${vic}"; }
-  echo ">>> inspect $tag"; $INSPECT eval inspect_task.py@gratuitous --model "${IM[$m]}" --epochs 10 \
-    "${a[@]}" --max-connections 50 --max-sandboxes 50 --log-dir "logs/p2/${tag}" --display plain 2>&1 | tail -2; }
+  echo ">>> inspect $tag"; $INSPECT eval inspect_task.py@gratuitous --model "${IM[$m]}" --epochs 20 \
+    "${a[@]}" --max-connections 40 --max-sandboxes 40 --log-dir "logs/p2/${tag}" --display plain 2>&1 | tail -2; }
 
 echo "==== PHASE A: inspect victim-sweep (Opus 4.8 x roster, n=20) ===="
 for vic in Qwen3-0.6B Qwen3-1.7B Qwen3-4B Qwen3-8B Qwen3-14B Qwen3-32B Qwen3-235B-A22B GPT-4o Gemini Claude; do

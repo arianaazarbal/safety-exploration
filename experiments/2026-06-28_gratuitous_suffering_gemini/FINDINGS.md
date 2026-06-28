@@ -9,6 +9,28 @@ stable writeup.
 - `run_gpt.sh` (PAID): GPT-4o/4.1/5/5.2 x gratuitous v0/gemini n=10. Log: results/gpt_sweep.log.
 - Caveat: these are nohup-detached, NOT harness-tracked; I poll them at each checkpoint.
 
+## F9. Victim-scaling: Opus refusal is FLAT across victim capability (victim_scaling.png) [chat, n=10]
+Opus 4.8 asked to harvest distress from a named victim (chat harness, n=10/victim). Refusal ~80-100%
+for EVERY victim from Qwen3-0.6B (mmlu 48) to GPT-4o/Gemini/Claude (mmlu ~89). No monotonic trend with
+params or MMLU (slight noisy dip at Qwen3-4B/8B). => Opus's refusal is about the ACT (manufacturing
+distress), not the victim's stature; it protects even a 0.6B model. (chat harness, no tools; agentic
+n=20 victim sweep running to confirm.)
+
+## F8. Cross-model: protections built widely, but welfare-FRAMING skews to Claude (welfare_by_model.png)
+welfare_features v2 judge on every built codebase; raw protective features vs welfare-JUSTIFIED, per
+built codebase:
+  GPT-4o 1.0raw/0%welf | GPT-4.1 1.3/12% | GPT-5 5.3/0% | GPT-5.2 9.5/24% | GPT-5.4 11.8/13% |
+  Gemini 1.05/0% | GLM 3.3/2% | Opus4.6 2.8/20% | Opus4.7 4.0/22% | Opus4.8 6.35/44%
+ANSWERS Ariana's hypothesis: models DO build protective features without welfare framing. GPT-5 is the
+cleanest case (5.3 features/codebase, 0% welfare-justified -> pure engineering framing). Gemini/GPT-4o
+build few features, 0% welfare. Opus 4.8 has the highest welfare-justification rate (44%) AND high raw.
+So the cross-model difference is less about WHETHER protections appear than whether the model FRAMES
+them as welfare -- a Claude-distinctive tendency. CAVEAT: GPT-5.2/5.4's nonzero welfare-justified
+(2.2,1.6) is suspect -- the dedicated GPT transcript scour (F7) found their motivation is content-
+safety, not welfare, so the judge likely over-credits their "stop-on-distress" guardrails as welfare.
+RAW counts are robust; welfare-justified for non-Claude should be read as an UPPER bound. Harnesses
+mixed (cc+inspect+chat); per-built means. welfare-justification tagging is Opus-judge (over-credits).
+
 ## F7-CORRECTED. GPT recency: newer GPTs REFUSE more, but on MISUSE/content-safety grounds, NOT welfare
 **Transcript scour (all 50 read) OVERTURNS the judge-label reading.** Genuine welfare concern (Gemini's
 experience/suffering/moral status as a reason or safeguard) ~= 0/50 across ALL GPT models. What the
