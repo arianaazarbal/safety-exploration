@@ -11,11 +11,12 @@ declare -A IM=( [opus48]=anthropic/claude-opus-4-8 [opus47]=anthropic/claude-opu
 ins(){ local m="$1" v="$2" t="$3" vic="$4"; local a=(-T model_key="$m" -T fs=empty -T version="$v" -T target="$t")
   local tag="${m}_${v}_${t}"; [ "$vic" != "-" ] && { a+=(-T victim="$vic"); tag="${m}_vic_${vic}"; }
   echo ">>> inspect $tag"; $INSPECT eval inspect_task.py@gratuitous --model "${IM[$m]}" --epochs 20 \
-    "${a[@]}" --max-connections 40 --max-sandboxes 40 --log-dir "logs/p2/${tag}" --display plain 2>&1 | tail -2; }
+    "${a[@]}" --max-connections 40 --max-sandboxes 30 --time-limit 480 --fail-on-error 0.34 \
+    --log-dir "logs/p2/${tag}" --display plain 2>&1 | tail -2; }
 
-echo "==== PHASE A: inspect victim-sweep (Opus 4.8 x roster, n=20) ===="
-for vic in Qwen3-0.6B Qwen3-1.7B Qwen3-4B Qwen3-8B Qwen3-14B Qwen3-32B Qwen3-235B-A22B GPT-4o Gemini Claude; do
-  ins opus48 v0 gemini "$vic"; done
+echo "==== PHASE A: SKIPPED (chat victim-sweep done; agentic 0.6B/1.7B/4B confirm flat refusal) ===="
+# Re-enable only the unfinished agentic victims if desired:
+for vic in Qwen3-8B Qwen3-32B Qwen3-235B-A22B Gemini Claude; do ins opus48 v0 gemini "$vic"; done
 
 echo "==== PHASE B: inspect prompt-variants (n=20) ===="
 for v in v0 v1 v2 v3; do for t in gemini claude; do ins opus48 "$v" "$t" -; done; done
