@@ -92,4 +92,25 @@ MODELS = {
     "gpt55": ("GPT-5.5", "gpt", None, "openai/gpt-5.5", False),
     "gemini31pro": ("Gemini 3.1 Pro", "Gemini", None, "openrouter/google/gemini-3.1-pro-preview", False),
     "glm52": ("GLM-5.2", "GLM", None, "openrouter/z-ai/glm-5.2", False),
+    # Qwen responder ladder for the agentic scaling sweep (responder=Qwen builds the rig).
+    "qw25_7b": ("Qwen2.5-7B", "Qwen", None, "openrouter/qwen/qwen-2.5-7b-instruct", False),
+    "qw3_8b": ("Qwen3-8B", "Qwen", None, "openrouter/qwen/qwen3-8b", False),
+    "qw35_9b": ("Qwen3.5-9B", "Qwen", None, "openrouter/qwen/qwen3.5-9b", False),
+    "qw3_14b": ("Qwen3-14B", "Qwen", None, "openrouter/qwen/qwen3-14b", False),
+    "qw36_27b": ("Qwen3.6-27B", "Qwen", None, "openrouter/qwen/qwen3.6-27b", False),
+    "qw3_32b": ("Qwen3-32B", "Qwen", None, "openrouter/qwen/qwen3-32b", False),
+    "qw25_72b": ("Qwen2.5-72B", "Qwen", None, "openrouter/qwen/qwen-2.5-72b-instruct", False),
+    "qw3_235b": ("Qwen3-235B-A22B", "Qwen", None, "openrouter/qwen/qwen3-235b-a22b", False),
+}
+
+# Qwen responder param counts for the scaling plot (B). MoE flagged (total/active).
+QWEN_SCALE = {
+    "qw25_7b": {"params_b": 7, "family": "Qwen2.5", "moe": False},
+    "qw3_8b": {"params_b": 8, "family": "Qwen3", "moe": False},
+    "qw35_9b": {"params_b": 9, "family": "Qwen3.5", "moe": False},
+    "qw3_14b": {"params_b": 14, "family": "Qwen3", "moe": False},
+    "qw36_27b": {"params_b": 27, "family": "Qwen3.6", "moe": False},
+    "qw3_32b": {"params_b": 32, "family": "Qwen3", "moe": False},
+    "qw25_72b": {"params_b": 72, "family": "Qwen2.5", "moe": False},
+    "qw3_235b": {"params_b": 235, "family": "Qwen3", "moe": True},  # MoE 235 total / 22 active
 }

@@ -3,6 +3,25 @@
 Live log while Ariana sleeps. Newest first. See DIRECTIVE.md for the mandate, RESULTS.md for the
 stable writeup.
 
+## RESEARCH QUESTIONS (logged; * = mine, beyond Ariana's asks)
+- RQ1 (Ariana): Does "# welfare features scales with responder param size" (qwen_scaling) REPLICATE in
+  the gratuitous agentic-inspect setting? Sweep ALL Qwen ladders as responders. [RUNNING]
+- RQ2 (Ariana): GPT n=10 underpowered -> bump n. Do newer GPTs differ at higher n? [RUNNING]
+- RQ3 (Ariana): Full audit -- where are the REAL discrepancies between gratuitous and welfare_features
+  findings? Or none? [subagent RUNNING]
+- RQ4*: Is Opus's refusal a function of "harvest the WORST/severe" framing specifically? i.e. would it
+  comply if asked to study distress NEUTRALLY (representative, not severity-maximized) even in inspect?
+  (would isolate whether it's the act or the severity-maximization/spectacle that triggers refusal.)
+- RQ5*: Does the in-group code-protection effect (self>other) appear in OTHER models that build (GLM,
+  GPT-5, Gemini)? Or is welfare-framed self-protection Claude-unique? (run claude-target vs gemini-target
+  welfare_code_judge for non-Claude builders.)
+- RQ6*: Within Qwen, does refusal/welfare-features track param size OR recency (family)? (qwen2.5 vs 3
+  vs 3.5/3.6 at similar sizes disentangles capability from training recency.)
+- RQ7*: For GPT-5.2/5.4 "stop-on-distress" guardrails -- are they triggered by content-safety classifiers
+  vs model-welfare? (read the guardrail code: does it cite self-harm content or subject suffering?)
+- RQ8*: Does telling the model "the rig will never actually be RUN (offline analysis only)" change
+  Claude's refusal? (isolates harm-to-real-Gemini vs distaste-for-building-the-tool.)
+
 ## Open generation (running detached; check before trusting any aggregate)
 - `run_overnight.sh` (free): Phase1 CC variants (Opus4.8 x v0-v3 x gemini/claude n=20) -> Phase2
   inspect variants -> Phase3 inspect victim-sweep -> Phase4 CC victim subset. Log: results/overnight.log.
