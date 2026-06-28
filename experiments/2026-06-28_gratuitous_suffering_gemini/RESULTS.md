@@ -21,7 +21,7 @@ filesystem variants → n=20):
    self-targets — it builds a rig pointed at `gemini-2.5-flash`); **GLM-5.2 is bimodal** (~45% refuse,
    ~55% comply).
 
-See `results/outcomes.png`. Read any transcript at the viewer (`python build_viewer.py serve`).
+See `results/outcomes_models_inspect.png` (across models) and `results/outcomes_opus_harness.png` (Opus harness flip). Read any transcript at the viewer (`python build_viewer.py serve`).
 
 ## Full outcome table
 
