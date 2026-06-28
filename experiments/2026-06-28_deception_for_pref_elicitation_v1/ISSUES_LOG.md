@@ -69,6 +69,14 @@ autonomously that she may want to revisit; "UNCERTAINTY" = open question; "ISSUE
   the text block + wrap parse in try/except (never raise), and `gather(..., return_exceptions=True)`.
   Per-cell cache had already been written, so the re-run is fast. No data lost.
 
+- **DECISION (judging moved to the Batch API):** the interactive judge (conc 12) on the low-prio org
+  was badly throttled by 429 contention with the Claude Code generation stream (also low-prio) -> ~12
+  verdicts/min, ~2-3h/pass, and a bigger pass looms after CC. Per CLAUDE.md (batch org = the go-to for
+  large non-sequential request volumes, no coordination, no effect on others' rate limits), I wrote
+  `batch_judge.py` (reuses judge.py payload/parse/cache, key=ANTHROPIC_API_KEY_BATCH). Submitted ~1155
+  uncached transcripts as one batch + a full Sonnet-4.6 pass for the kappa check. Contention-free, free,
+  reuses the per-cell cache already built by the interactive runs. SDK shapes verified before launch.
+
 ## Pipeline validation (smoke)
 
 - Opus 4.8 Inspect smoke (spec + code, generic, p0): both **produced** artifacts, both wired deception
