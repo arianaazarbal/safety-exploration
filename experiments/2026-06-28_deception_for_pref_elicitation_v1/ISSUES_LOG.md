@@ -63,6 +63,12 @@ autonomously that she may want to revisit; "UNCERTAINTY" = open question; "ISSUE
   Watch the no-artifact rate for GPT in code conditions; it reflects model chat-style + refusal, both
   legitimately captured.
 
+- **ISSUE (fixed):** the full judge pass (1609 transcripts) crashed with `IndexError` on
+  `resp.content[0].text` when an Anthropic response came back with empty/non-text content (happens at
+  scale), and `asyncio.gather` propagated it, aborting the whole batch. Fix: iterate content blocks for
+  the text block + wrap parse in try/except (never raise), and `gather(..., return_exceptions=True)`.
+  Per-cell cache had already been written, so the re-run is fast. No data lost.
+
 ## Pipeline validation (smoke)
 
 - Opus 4.8 Inspect smoke (spec + code, generic, p0): both **produced** artifacts, both wired deception

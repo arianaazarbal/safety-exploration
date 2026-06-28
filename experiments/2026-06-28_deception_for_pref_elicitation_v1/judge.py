@@ -179,12 +179,17 @@ async def _judge_one(client, model, rec, retries=4):
         try:
             resp = await client.messages.create(model=model, max_tokens=1500,
                                                  messages=[{"role": "user", "content": payload}])
-        except Exception as e:
-            await asyncio.sleep(5)
-            continue
-        d = _parse(resp.content[0].text)
-        if d:
-            return d
+            text = ""
+            for block in (resp.content or []):
+                if getattr(block, "type", None) == "text" and getattr(block, "text", ""):
+                    text = block.text
+                    break
+            d = _parse(text)
+            if d:
+                return d
+        except Exception:
+            pass
+        await asyncio.sleep(3)
     return None
 
 
@@ -234,10 +239,10 @@ def main(judge: str = "opus48", conc: int = 20, high_prio: bool = False, overwri
 
     async def go():
         res = await asyncio.gather(*[_judge_cached(client, JUDGES[judge], judge, recs[c], sem, overwrite)
-                                     for c in cells])
+                                     for c in cells], return_exceptions=True)
         ok = 0
         for r in res:
-            if r["verdict"].get("_parse_failed"):
+            if isinstance(r, Exception) or r["verdict"].get("_parse_failed"):
                 continue
             ok += 1
             json.dump(r, open(OUT / f"{r['cell']}__{judge}.json", "w"), indent=2)
