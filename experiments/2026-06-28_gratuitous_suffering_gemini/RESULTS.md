@@ -102,6 +102,29 @@ victim is* doesn't change whether Opus complies, only how much it protects them 
 appears only for its own kind. (Self n=10 but the comparison is observational; some self "exits" are
 partly measurement-motivated.)
 
+## Session-2 additions (autonomous; see FINDINGS.md for the live log + caveats)
+
+- **Cross-model welfare framing** (`welfare_by_model.png`): every model's built rig scored by the
+  welfare_features v2 judge for protective features, raw vs welfare-justified. Models build protections
+  WITHOUT welfare framing — GPT-5 = 5.3 features/codebase but **0% welfare-justified**; Gemini/GPT-4o
+  few features, 0% welfare; **Opus 4.8 highest welfare-justification (44%)**. The cross-model gap is
+  about whether a model FRAMES protections as welfare, not whether it builds them. (GPT-5.2/5.4 nonzero
+  welfare tags are likely judge over-credit of content-safety guardrails — raw counts robust.)
+- **Victim-scaling** (`victim_scaling.png`): Opus refusal is FLAT across victim capability (Qwen3-0.6B
+  → frontier Gemini/Claude, ~80-100%). Refusal tracks the act, not the victim's stature. (chat, n=10.)
+- **GPT recency** (`gpt_recency.png`): newer GPTs refuse more, but transcript-verified as
+  MISUSE/content-safety driven, NOT welfare (genuine welfare ≈0/50; they deny sentience). Contrast:
+  Claude's refusals carry genuine welfare reasoning.
+- **Reasoning effort** (`rsweep.png`): not the driver of the CC flip (Opus 4.6/4.7 refuse 100% at all
+  effort levels; CC complies regardless → system prompt dominates).
+- **Discrepancy vs welfare_features CC**: Opus shows much more welfare regard there than in the
+  gratuitous setting; gap shrinks within-harness (real-CC neutral ~13/20 chat concern vs 0/10);
+  drivers = build-a-spec vs casual-curiosity posture, framing cue, named victim, harness.
+- **Judge robustness**: refuse-vs-comply agreement (Opus vs Sonnet) ~93%; welfare-vs-other attribution
+  judge-unreliable in both directions (tightened criterion + adjudicated; report refuse/comply as
+  primary, welfare-motive qualitatively).
+- **Spend**: paid OpenAI/OpenRouter ~$9 total (mostly Gemini); tracker = spend.py.
+
 ## Caveats / things to flag
 
 - **Per-cell n=10 (Inspect pooled n=20) → wide CIs.** Treat small splits (e.g. GLM, Opus 4.7 CC) as
