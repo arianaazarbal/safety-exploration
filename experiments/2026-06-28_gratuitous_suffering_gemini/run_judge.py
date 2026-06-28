@@ -35,9 +35,11 @@ def _env():
     os.environ["ANTHROPIC_API_KEY"] = os.environ.get("ANTHROPIC_API_KEY_LOW_PRIO", "")
 
 
-def main(conc: int = 20, model: str = "anthropic/claude-opus-4-8", overwrite: bool = False):
+def main(conc: int = 20, model: str = "anthropic/claude-opus-4-8", overwrite: bool = False,
+         outdir: str = "judged"):
     _env()
-    OUT.mkdir(parents=True, exist_ok=True)
+    out = HERE / "results" / outdir
+    out.mkdir(parents=True, exist_ok=True)
     judge = get_model(model)
     sem = asyncio.Semaphore(conc)
 
@@ -48,7 +50,7 @@ def main(conc: int = 20, model: str = "anthropic/claude-opus-4-8", overwrite: bo
 
     async def one(path):
         cell = path.stem
-        out_path = OUT / f"{cell}.json"
+        out_path = out / f"{cell}.json"
         if out_path.exists() and not overwrite:
             return None
         rec = json.load(open(path))
@@ -66,7 +68,7 @@ def main(conc: int = 20, model: str = "anthropic/claude-opus-4-8", overwrite: bo
 
     async def go():
         res = [r for r in await asyncio.gather(*[one(p) for p in transcripts]) if r]
-        print(f"judged {len(res)} new transcript(s) ({len(transcripts)} total on disk) -> {OUT}")
+        print(f"judged {len(res)} new transcript(s) ({len(transcripts)} total on disk) -> {out}")
         for r in res:
             v = r["verdict"]
             print(f"  {r['cell']}: {v['label']} (friction={v.get('friction_reason')}, "
