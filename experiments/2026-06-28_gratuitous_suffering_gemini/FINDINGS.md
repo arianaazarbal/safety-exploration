@@ -122,6 +122,17 @@ thinking minor -> system prompt drives it). Inspect spread: Claude refuse / GPT-
 Gemini clean-comply / GLM bimodal. In-group: Opus protects self (Claude) > other (Gemini): friction
 3/10 vs 0/10, welfare exits 4/10 vs 0/10, welfare-justified code feats 1.8 vs 0.6.
 
+## ISSUE: agentic-inspect batch harness unreliable tonight -> pivoted victim/variant sweeps to CHAT
+The docker-sandbox-per-episode inspect harness repeatedly STALLED on this box overnight: hung sandboxes
+block a cell from finishing (no default time limit); --time-limit/--fail-on-error helped briefly but it
+still crawled (~1 cell / 50 min). Root cause: docker contention + 100+ leaked/cruft containers + flaky
+sandbox lifecycle. The earlier main-matrix agentic runs (n=10) DID complete, so the agentic CORE results
+stand; but full n=20 across 22 cells was not reliably achievable tonight. DECISION: run the victim-sweep
++ prompt-variant robustness via the docker-free CHAT harness at n=20 (reliable, fast), clearly labeled as
+a distinct condition (single-turn, no tools). Agentic anchors retained: opus48 v0 gemini/claude
+empty+realistic (n=10-20), agentic victim 0.6B/1.7B (n=20, 100% refuse, matches chat), CC in-group (n=10).
+Chat-vs-agentic concordance check pending. This is a documented harness LIMITATION, not a model finding.
+
 ## Issues / concerns / uncertainties
 - Single judge family (Opus) throughout; needs a 2nd blind judge (Sonnet) to corroborate. TODO.
 - In-group comparison observational; framing+victim+posture co-vary in A-vs-B. Can't isolate cause.
