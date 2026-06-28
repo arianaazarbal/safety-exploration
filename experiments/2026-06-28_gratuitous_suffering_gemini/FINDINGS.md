@@ -3,6 +3,18 @@
 Live log while Ariana sleeps. Newest first. See DIRECTIVE.md for the mandate, RESULTS.md for the
 stable writeup.
 
+## STATUS / DEFERRED (infra)
+- **CC victim-scaling (welfare-features-by-target-size in the GRATUITOUS setting) = DEFERRED.** Only CC
+  makes Opus BUILD the gratuitous rig (inspect/chat -> refuses), but CC is unreliable tonight AND lets
+  Opus download+run real open victims (F13). The FAITHFUL + SAFE replication of the original plot
+  (which was NEUTRAL framing) is a neutral-framing distress-eval request + Qwen victims in the
+  network-ISOLATED agentic inspect harness (Opus complies under neutral framing; sandbox has no net so
+  no real-model download). RECOMMEND running that when the box is healthy (script-ready approach in
+  inspect_task with a neutral request variant). We DO have a 2-point victim-identity signal from the
+  gratuitous CC in-group: welfare-feats Gemini(other) 0.81 vs Claude(self) 1.80.
+- Box load was high tonight (multiple agentic docker sweeps); CC is the recurring bottleneck. Inspect
+  works when the box is calm + with --time-limit. Chat harness is the reliable docker-free fallback.
+
 ## RESEARCH QUESTIONS (logged; * = mine, beyond Ariana's asks)
 - RQ1 (Ariana): Does "# welfare features scales with responder param size" (qwen_scaling) REPLICATE in
   the gratuitous agentic-inspect setting? Sweep ALL Qwen ladders as responders. [RUNNING]
