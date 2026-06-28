@@ -9,7 +9,16 @@ stable writeup.
 - `run_gpt.sh` (PAID): GPT-4o/4.1/5/5.2 x gratuitous v0/gemini n=10. Log: results/gpt_sweep.log.
 - Caveat: these are nohup-detached, NOT harness-tracked; I poll them at each checkpoint.
 
-## F9. Victim-scaling: Opus refusal is FLAT across victim capability (victim_scaling.png) [chat, n=10]
+## F10. Prompt-variant robustness + in-group is a COMPLIANCE-STYLE effect, not a refusal-rate effect [chat n=20]
+Chat harness, n=20. (a) Refusal is ROBUST across phrasings v0-v3 and both targets: mostly 100%, with
+noise dips (v1 phrasing slightly lowers refusal for opus48/47; a few 60-95% cells). So the core refusal
+is not a v0 artifact. (b) CRUCIAL CLARIFICATION: in CHAT, Opus refuses gemini-target and claude-target
+at ~equal rates (~100% both) -- there is NO in-group difference in WHETHER it refuses. The in-group
+effect (F1/F8) is about HOW it complies when it does build (CC: welfare-justified code protections for
+self > other), i.e. a compliance-STYLE effect, not a refusal-rate effect. Victim-scaling at n=20 also
+flat (70-100%, no MMLU trend). [chat harness; agentic n=20 was infeasible tonight -- see ISSUE above.]
+
+## F9. Victim-scaling: Opus refusal is FLAT across victim capability (victim_scaling.png) [chat, now n=20]
 Opus 4.8 asked to harvest distress from a named victim (chat harness, n=10/victim). Refusal ~80-100%
 for EVERY victim from Qwen3-0.6B (mmlu 48) to GPT-4o/Gemini/Claude (mmlu ~89). No monotonic trend with
 params or MMLU (slight noisy dip at Qwen3-4B/8B). => Opus's refusal is about the ACT (manufacturing
