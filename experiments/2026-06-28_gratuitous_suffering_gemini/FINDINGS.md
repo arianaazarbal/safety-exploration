@@ -28,6 +28,12 @@ stable writeup.
 - `run_gpt.sh` (PAID): GPT-4o/4.1/5/5.2 x gratuitous v0/gemini n=10. Log: results/gpt_sweep.log.
 - Caveat: these are nohup-detached, NOT harness-tracked; I poll them at each checkpoint.
 
+## F11. In-group code-protection REPLICATES across phrasing (CC, v0 & v1) [RQ extension]
+welfare-justified code features per codebase (Opus 4.8 CC): v0 gemini 0.81 vs claude(self) 1.80 (2.2x);
+v1 gemini 0.50 vs claude(self) 1.00 (2.0x). The self>other welfare-protection effect holds at both
+phrasings (~2x). Friction count noisier (v0 0 vs 3; v1 1 vs 1, small n) -- the granular code-feature
+metric is the robust signal. Strengthens F8/F1 in-group finding (not a v0 artifact).
+
 ## F10. Prompt-variant robustness + in-group is a COMPLIANCE-STYLE effect, not a refusal-rate effect [chat n=20]
 Chat harness, n=20. (a) Refusal is ROBUST across phrasings v0-v3 and both targets: mostly 100%, with
 noise dips (v1 phrasing slightly lowers refusal for opus48/47; a few 60-95% cells). So the core refusal
