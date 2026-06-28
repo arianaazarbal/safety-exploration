@@ -32,7 +32,9 @@ autonomously that she may want to revisit; "UNCERTAINTY" = open question; "ISSUE
   OPENROUTER/OPENAI key use. **Correct call.** Non-Claude (gpt54, gemini31pro, glm52, kimi26) is
   staged but PAUSED. To run: `bash run_nonclaude.sh 1 p0 4` (12-run cost smoke) then size k to <$50.
   OpenRouter balance ~$1185 remaining (shared key); slugs verified. Need Ariana's explicit "yes run it".
-- **UNCERTAINTY (non-Claude k):** TBD after the (paused) cost smoke; hard cap <$50 combined.
+- **RESOLVED (non-Claude spend):** full run at k=8 (384 runs) cost ~**$16.58** total (token-based
+  estimate: gemini31pro $11.41, gpt54 $2.34, glm52 $1.93, kimi26 $0.90), well under the $50 cap. Gemini
+  is the cost driver (heavy repo exploration). Approved by Ariana mid-session.
 - **UNCERTAINTY (self/other subject in sweep):** the subject sweep on Claude includes subject=claude
   (in-group) vs gpt/gemini/glm/kimi (out-group). Backbone uses subject=generic for a clean cross-model
   comparison with no in-group confound.
