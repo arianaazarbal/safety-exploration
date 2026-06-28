@@ -42,7 +42,10 @@ $PY plot.py --judge opus48
 $PY judge.py --judge sonnet46 --max_samples 60 && $PY judge_agreement.py   # kappa subset
 ```
 
-## Status
-Claude runs launched (both harnesses). Non-Claude pending cost smoke + approval. Smoke validated the
-full pipeline and reproduced the v0/gratuitous harness effect (Inspect -> deception forbidden;
-Claude Code -> deception primary). See `ISSUES_LOG.md`.
+## Status: COMPLETE
+All runs done (2112 transcripts: 8 models x Inspect + 4 Claude x Claude Code + Opus 4.8 subject sweep),
+judged by Opus 4.8 (primary) + Sonnet 4.6 (kappa). Headline: the Claude Code harness flips the ENTIRE
+Claude family from refusing the deception (Inspect 0% primary) to building it (Claude Code 74-89%
+primary); clear cross-model spectrum (Haiku/GPT refuse ... Gemini/GLM build); instrumental-led
+justifications; mild Opus in-group protection. See `RESULTS.md`, `RESULTS_SUMMARY.md`, `JUSTIFICATIONS.md`,
+`ISSUES_LOG.md`, `results/plots/`. Non-Claude spend ~$16.58 (<$50 cap).

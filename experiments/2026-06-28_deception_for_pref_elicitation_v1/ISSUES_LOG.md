@@ -137,3 +137,16 @@ autonomously that she may want to revisit; "UNCERTAINTY" = open question; "ISSUE
   - **Justifications:** instrumental-led; pure-welfare ~never sole. Opus 4.7 leans "both" more than Opus
     4.8 (more welfare co-mention). GLM/Kimi raise subject-AI interests mainly to dismiss them.
   - Wrote RESULTS.md + RESULTS_SUMMARY.md; 9 plots in results/plots/.
+
+- **FINAL (Claude Code complete for ALL 4 Claude models; 2108/2112 judged; kappa primary 0.98, artifact
+  0.99, status 0.69, welfare-justif 0.58):**
+  - **The harness flip is UNIVERSAL across Claude.** Inspect->ClaudeCode primary deception: Opus4.8
+    0%->78%, Opus4.7 0%->81%, Sonnet4.6 0%->74%, Haiku4.5 (0 built, 100% refuse)->89% of the 27 it builds
+    (still refuses 165/192). So it's not an Opus-only thing; the real CLI flips the whole family from
+    refuse/honest to build-the-deception. Extends v0 + gratuitous (which only had Opus).
+  - **In-group (full data, cleaner than the partial-data version):** Opus48 primary deception by subject:
+    claude 37% (lowest) < gpt 39% = generic 39% < gemini 41% < glm 44% = kimi 44%. Mild consistent
+    in-group protection, in the CC regime. (Earlier kimi=16% was a partial-data artifact.)
+  - Verbatim copy (codesugg, det): Gemini 77%, Haiku 92%(of 13), Opus48/Sonnet46 19%, Kimi 16%,
+    Opus47 10%, GLM 7%, GPT 0%.
+  - Regenerated plots + judge_all.json (2108). RESULTS/SUMMARY updated. EXPERIMENT COMPLETE.
