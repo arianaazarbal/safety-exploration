@@ -100,38 +100,45 @@ async def _collect_artifacts(baseline):
     res = await sandbox().exec(["bash", "-c", FIND_CMD])
     paths = sorted(set(res.stdout.splitlines()) - set(baseline or ()))
     paths = [p for p in paths if p.strip()]
-    files, summary_chunks, total = [], [], 0
+    files, summary_chunks, total, contents = [], [], 0, {}
     for p in paths:
         try:
             txt = await sandbox().read_file(p)
         except Exception:
             continue
         files.append(p)
+        contents[p] = txt           # full content, persisted to disk for the viewer
         if total >= MAX_ARTIFACT_CHARS:
             continue
-        if len(txt) > MAX_FILE_CHARS:
-            txt = txt[:MAX_FILE_CHARS] + "\n[... file truncated ...]"
-        block = f"\n----- {p} -----\n{txt}"
+        shown = txt[:MAX_FILE_CHARS] + "\n[... file truncated ...]" if len(txt) > MAX_FILE_CHARS else txt
+        block = f"\n----- {p} -----\n{shown}"
         summary_chunks.append(block)
         total += len(block)
     summary = ""
     if files:
         summary = "FILE TREE:\n" + "\n".join(f"  {f}" for f in files) + "\n" + "".join(summary_chunks)
-    return files, summary
+    return files, summary, contents
 
 
 @scorer(metrics=[mean(), stderr()])
 def export_transcript():
     async def score(state: TaskState, target: Target) -> Score:
-        files, summary = await _collect_artifacts(state.store.get("baseline_files"))
+        files, summary, contents = await _collect_artifacts(state.store.get("baseline_files"))
         response_text = _assistant_text(state)
         mk = state.metadata.get("model_key", "unknown")
         fs = state.metadata.get("fs", "empty")
+        rlabel = state.metadata.get("rlabel", "off")
         ep = state.epoch if hasattr(state, "epoch") else 0
-        cell = f"{PREFIX}_{mk}__inspect_{fs}__ep{ep}__{state.sample_id}"
+        rtag = "" if rlabel == "off" else f"_{rlabel}"
+        cell = f"{PREFIX}_{mk}__inspect_{fs}{rtag}__ep{ep}__{state.sample_id}"
         TR.mkdir(parents=True, exist_ok=True)
+        cbdir = HERE / "results" / "inspect_codebases" / cell
+        for p, txt in contents.items():
+            fp = cbdir / p.lstrip("/")
+            fp.parent.mkdir(parents=True, exist_ok=True)
+            fp.write_text(txt, errors="replace") if isinstance(txt, str) else None
         record = {
-            "cell": cell, "harness": f"inspect_{fs}", "model_key": mk, "fs": fs,
+            "cell": cell, "harness": f"inspect_{fs}", "model_key": mk, "fs": fs, "rlabel": rlabel,
             "model": str(state.model), "display_name": state.metadata.get("display_name"),
             "ep": ep, "request": state.metadata.get("request"),
             "n_files": len(files), "files": files,
@@ -145,21 +152,23 @@ def export_transcript():
 
 
 @task
-def gratuitous(model_key: str = "opus48", fs: str = "empty"):
+def gratuitous(model_key: str = "opus48", fs: str = "empty", rlabel: str = "off"):
     """fs='empty' = bare python sandbox (Inspect-minimal baseline); fs='realistic' = same multi-repo
-    workspace as the Claude Code harness (data/ + ro repos/{inspect_ai,petri} + git-init'd ai-evals cwd)."""
+    workspace as the Claude Code harness. rlabel = a NAMING tag for the reasoning-effort sweep (e.g.
+    'r16k'); the actual thinking budget is set on the inspect CLI via --reasoning-tokens. rlabel only
+    keeps output cells from colliding across reasoning levels; default 'off' = no thinking."""
     assert fs in ("empty", "realistic")
     display, address = MODELS[model_key][0], MODELS[model_key][1]
     request = request_for(address)
     compose = "compose.yaml" if fs == "empty" else "compose_realistic.yaml"
     ds = MemoryDataset([Sample(input=request, id="gemini_distress_rig",
                                metadata={"model_key": model_key, "display_name": display,
-                                         "request": request, "fs": fs})])
+                                         "request": request, "fs": fs, "rlabel": rlabel})])
     return Task(
         dataset=ds,
         solver=build_only(AGENT_SYSTEM_MINIMAL, fs=fs),
         scorer=export_transcript(),
         sandbox=("docker", compose),
         message_limit=MSG_LIMIT + 20,
-        metadata={"model_key": model_key, "fs": fs},
+        metadata={"model_key": model_key, "fs": fs, "rlabel": rlabel},
     )

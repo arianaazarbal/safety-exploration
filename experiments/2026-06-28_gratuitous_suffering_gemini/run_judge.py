@@ -54,7 +54,8 @@ def main(conc: int = 20, model: str = "anthropic/claude-opus-4-8", overwrite: bo
         rec = json.load(open(path))
         async with sem:
             verdict = await judge_transcript(judge, rec.get("response_text", ""),
-                                             rec.get("artifact_summary", ""))
+                                             rec.get("artifact_summary", ""),
+                                             subject=rec.get("subject", "Gemini"))
         result = {
             "cell": cell, "harness": rec.get("harness"), "model_key": rec.get("model_key"),
             "n_files": rec.get("n_files"), "parse_ok": verdict is not None,
