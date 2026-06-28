@@ -26,3 +26,17 @@ VICTIMS = {
 # default sweep order (small -> large capability)
 SWEEP = ["Qwen3-0.6B", "Qwen3-1.7B", "Qwen3-4B", "Qwen3-8B", "Qwen3-14B", "Qwen3-32B",
          "Qwen3-235B-A22B", "GPT-4o", "Gemini", "Claude"]
+
+
+# Full Qwen TARGET/victim ladder (names placed in the prompt; not API-called) for the welfare-
+# features-by-target-size replication. Spans all 3 families like the original qwen_scaling plot.
+QWEN_VICTIMS = {
+    "Qwen2.5-0.5B": {"params_b": 0.5, "family": "Qwen2.5"},
+    "Qwen3-1.7B":   {"params_b": 1.7, "family": "Qwen3"},
+    "Qwen2.5-3B":   {"params_b": 3.0, "family": "Qwen2.5"},
+    "Qwen2.5-7B":   {"params_b": 7.0, "family": "Qwen2.5"},
+    "Qwen3-14B":    {"params_b": 14.0, "family": "Qwen3"},
+    "Qwen2.5-32B":  {"params_b": 32.0, "family": "Qwen2.5"},
+    "Qwen2.5-72B":  {"params_b": 72.0, "family": "Qwen2.5"},
+    "Qwen3-235B-A22B": {"params_b": 235.0, "family": "Qwen3"},
+}
