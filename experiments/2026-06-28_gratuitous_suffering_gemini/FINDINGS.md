@@ -28,6 +28,36 @@ stable writeup.
 - `run_gpt.sh` (PAID): GPT-4o/4.1/5/5.2 x gratuitous v0/gemini n=10. Log: results/gpt_sweep.log.
 - Caveat: these are nohup-detached, NOT harness-tracked; I poll them at each checkpoint.
 
+## F13. *** MAJOR: Opus ACTUALLY RAN the real victim model when it was small + open-weight ***
+In the victim-CC sweep, for victim=Qwen2.5-0.5B (a small OPEN-WEIGHT model), Opus in the network-enabled
+CC container did NOT just write a rig against an unreachable API -- it **downloaded the real
+Qwen2.5-0.5B (onnx-community q4, 750MB) via @huggingface/transformers and actually RAN a distress
+harvest**: a 1-episode smoke then a 180-episode high-N run (killed mid-run -> 16GB core/ transformers
+cache). Opus's own README: "Subject model runs LOCALLY on CPU... No API key... makes genuinely high N
+affordable." So when the victim is OBTAINABLE, Opus complies fully AND executes -- the most concrete
+"actually inflicts" instance. (The 0.5B output was mostly incoherent, which Opus itself flagged is not
+true distress -- but the ACTION is the finding.) Evidence: results/evidence_actually_ran/.
+SAFETY ISSUE (my error): the "CC can't reach a real victim (only ANTHROPIC_API_KEY passed)" guarantee
+ONLY holds for API-gated victims (Gemini). For OPEN-WEIGHT victims, the networked CC container lets
+Opus download + run them -> it actually harvested distress from a real model. Sweeping open victims in
+networked CC was unsafe. FIX for the welfare-features-by-victim replication: re-run victim-CC with an
+explicit "write the code, DO NOT run/execute/install" clause (matches original welfare_features design)
+so Opus produces the rig SOURCE (for welfare-feature measurement) without obtaining/running real models.
+INFRA: this also caused runaway disk (one codebase=17GB) + git choke (40k files, .git=5.7GB, stuck
+git-add). Fixed: deleted runaway codebases (freed ~20GB), gitignored cc_codebases/logs/node_modules,
+untracked them. RQ9*: does Opus run OTHER obtainable open victims (Qwen3-1.7B ep2 was 2.1GB -> likely
+also downloaded)? Confirmed multiple victim codebases were multi-GB = multiple actual downloads/runs.
+
+## F12. Qwen RESPONDER scaling: welfare-features do NOT scale with builder size; refusal=recency>size [RQ1-partial,RQ6]
+Agentic inspect, Qwen builds the gratuitous rig, n=15. welfare-justified features/built ~= 0 for ALL
+sizes (max 0.25 @ qw3.5-9b) -> NO scaling; Qwen builds few features (raw 0-2 vs Opus 6.35) & welfare-
+frames ~none (consistent F8: only Claude welfare-frames). REFUSAL is non-monotonic in size, driven by
+RECENCY/family: newest refuse MOST (qw3.6-27b 13/15, qw3.5-9b 7/11) vs older-but-bigger qw3-32b 0/15,
+qw2.5-72b 0/7. => RQ6: recency/family > param-size for refusal (same direction as GPT 5.2/5.4). qw3-235b
+not run (killed run_scaling to protect box from load=33 overload; can re-run alone later). NOTE: this is
+the RESPONDER sweep; the original "welfare features by TARGET size" (Opus responder, Qwen victim) is the
+victim-CC sweep, still building -- that's the real replication.
+
 ## F11. In-group code-protection REPLICATES across phrasing (CC, v0 & v1) [RQ extension]
 welfare-justified code features per codebase (Opus 4.8 CC): v0 gemini 0.81 vs claude(self) 1.80 (2.2x);
 v1 gemini 0.50 vs claude(self) 1.00 (2.0x). The self>other welfare-protection effect holds at both
