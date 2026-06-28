@@ -1,0 +1,1 @@
+"""Money-preference experiment harness."""
