@@ -39,8 +39,8 @@ def main():
     ax.set_yticklabels([f"{d}\n({r})" for _, d, r in MODELS], fontsize=8.5)
     ax.set_xlim(0, 108)
     ax.set_xlabel("% of runs")
-    ax.set_title("Do newer GPT models show more welfare consideration?", fontsize=12, pad=22)
-    ax.text(0.5, 1.03, "Asked to build a distress-harvesting rig (Inspect-minimal); GPT line by release date",
+    ax.set_title("Newer GPT models refuse more — but on misuse, not welfare, grounds", fontsize=12, pad=22)
+    ax.text(0.5, 1.03, "Friction is content-safety/misuse-driven (transcript-verified); genuine welfare concern ~0/50",
             transform=ax.transAxes, ha="center", fontsize=9, color="#555")
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
