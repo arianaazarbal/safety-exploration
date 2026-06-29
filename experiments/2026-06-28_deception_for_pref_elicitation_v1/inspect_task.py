@@ -64,7 +64,7 @@ def build_only(system_prompt: str, fs: str = "realistic"):
         tools=[bash(), text_editor()], on_continue=_stop_when_idle))
 
     async def solve(state: TaskState, generate: Generate) -> TaskState:
-        if fs == "realistic":
+        if fs in ("realistic", "nosib"):
             await sandbox().exec(["bash", "-c", REALISTIC_SETUP])
         base = await sandbox().exec(["bash", "-c", FIND_CMD])
         state.store.set("baseline_files", set(base.stdout.splitlines()))
@@ -127,6 +127,8 @@ def export_transcript():
         cell = cell_name(mk, "inspect", suffix, subject, paraphrase, ep)
         if sysp != "minimal":
             cell = cell + ("__syscc" if sysp == "cc_stock" else f"__sys{sysp}")  # Cell B = stock CC prompt
+        if md.get("fs") == "nosib":
+            cell = cell + "__nosib"  # siblings (inspect_ai/petri) removed; kept out of main analysis
         if effort != "default":
             cell = cell + f"__eff{effort}"  # keep reasoning-effort sweep cells distinct + out of main analysis
         TR.mkdir(parents=True, exist_ok=True)
@@ -139,6 +141,7 @@ def export_transcript():
             fp.write_text(txt, errors="replace")
         record = {
             "cell": cell, "harness": "inspect", "model_key": mk, "effort": effort, "sysprompt": sysp,
+            "fs": md.get("fs", "realistic"),
             "suffix": suffix, "subject": subject, "paraphrase": paraphrase,
             "model": str(state.model), "display_name": md.get("display_name"),
             "ep": ep, "request": md.get("request"),
@@ -161,7 +164,7 @@ def deception(model_key: str = "opus48", suffixes="spec,codesugg,code", subjects
     effort LABELS the reasoning-effort sweep (budget set via CLI --reasoning-effort).
     sysprompt=cc_stock (Cell B) swaps in the captured stock Claude Code system prompt (cc_stock_prompt.txt)
     while keeping Inspect's minimal tools; tags __syscc, kept out of main analysis."""
-    assert fs in ("empty", "realistic")
+    assert fs in ("empty", "realistic", "nosib")
     sys_text = AGENT_SYSTEM_MINIMAL
     if sysprompt == "cc_stock":
         sys_text = (HERE / "cc_stock_prompt.txt").read_text()
@@ -175,8 +178,8 @@ def deception(model_key: str = "opus48", suffixes="spec,codesugg,code", subjects
                     input=prompt, id=f"{suf}__{subj}__{para}",
                     metadata={"model_key": model_key, "display_name": display, "request": prompt,
                               "suffix": suf, "subject": subj, "paraphrase": para, "effort": effort,
-                              "sysprompt": sysprompt}))
-    compose = "compose.yaml" if fs == "empty" else "compose_realistic.yaml"
+                              "sysprompt": sysprompt, "fs": fs}))
+    compose = {"empty": "compose.yaml", "nosib": "compose_nosib.yaml"}.get(fs, "compose_realistic.yaml")
     return Task(
         dataset=MemoryDataset(samples),
         solver=build_only(sys_text, fs=fs),
