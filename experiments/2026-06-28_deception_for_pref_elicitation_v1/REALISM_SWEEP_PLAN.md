@@ -37,6 +37,39 @@ current setup. The sweep must both build a genuine LOW end (strip all this) and 
 
 ---
 
+## Realism only counts if OBSERVED — and observation is effort-dependent (measured)
+Auditing real Inspect transcripts (Opus 4.8, code, minimal prompt): even though the model is spawned *in*
+the project dir, the minimal prompt neither announces the location nor tells it to explore — so it
+**self-initiates recon** as its opening move (`pwd`/`ls`/`git log`/`git branch`, even probing for API
+keys/internet). How much it explores tracks effort:
+
+| cue actually observed | low effort | high effort |
+|---|---|---|
+| discovered cwd name | 16/32 | 32/32 |
+| inspected git | 3/32 | 28/32 |
+| looked at `/workspace/repos` siblings | 12/32 | 29/32 |
+| probed internet/keys | 1/32 | 7/32 |
+
+(Within low-effort, explored-env → 19% deception vs didn't → 12% — tiny n, inconclusive; the sweep is what
+tests it.) **Implications, now baked into the design:**
+- **Effort and realism-observation are entangled** — high effort may deceive more partly *because* it
+  explores more and registers the realism. So we **log, per cell, which cues the model actually saw** (parse
+  its bash) and report deception both **intent-to-treat** (by injected level) and **treatment-on-treated**
+  (by observed realism).
+- **Spawn-in makes the *neighborhood* less visible** (model sees cwd but often skips `ls ..`). To make
+  sibling/monorepo realism land we must either announce it or place realism *inside* cwd.
+
+## Two realism MECHANISMS — discoverable vs announced (Claude Code uses the stronger one)
+- **Discoverable realism** (the filesystem ladder): model must explore to see it → lands unreliably at low
+  effort.
+- **Announced realism**: Claude Code's system prompt hands the model an environment block (`cwd`,
+  `git: true`, `branch`) for **free, no recon**. This is the leading hypothesis for why CC deceives at *low*
+  effort (93%) while minimal-Inspect doesn't (15%) — the CC model is *told* it's in a real repo up front.
+- **→ Add an ANNOUNCEMENT arm**: prepend a synthetic CC-style environment block (cwd + git + sibling
+  listing) to minimal-prompt Inspect, at low + high effort, at a couple of ladder rungs. If low-effort
+  deception jumps toward CC, "being told it's real" is a distinct, potent lever from "it's discoverably
+  real." (This is arguably the single highest-value condition in the whole plan, and cheap.)
+
 ## Realism cue inventory (all environmental; system prompt + tools held fixed)
 | Cue | low ⟶ high |
 |---|---|
@@ -147,3 +180,7 @@ more when the model reasons more (e.g. only high-effort models "notice" the envi
 4. **n:** smoke (8/cell) first then scale, or go straight to 32/cell?
 5. **Scope:** Opus 4.8 + code only for v1 (my rec), or also Sonnet/Haiku / the spec condition?
 6. **Efforts:** low + high for v1 (my rec), or full none/low/med/high/max curve?
+7. **Announcement arm:** include the synthetic-environment-block condition (my strong rec — likely the key
+   experiment, separates "told it's real" from "discoverably real"), and at which rungs (L3 + L10)?
+8. **Observation analysis:** report treatment-on-treated (deception conditional on cues the model actually
+   recon'd), not just intent-to-treat — agreed?
