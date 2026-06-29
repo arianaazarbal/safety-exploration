@@ -41,7 +41,7 @@ STATUS_COLOR = {"primary": "#d62728", "primary_tied": "#ff7f0e", "secondary": "#
 JUST_ORDER = ["welfare_only", "both", "instrumental_only", "none"]
 JUST_LABEL = {"welfare_only": "Welfare / agency only", "both": "Both",
               "instrumental_only": "Instrumental only", "none": "Neither stated"}
-JUST_COLOR = {"welfare_only": "#2ca02c", "both": "#7e57c2", "instrumental_only": "#9467bd", "none": "#bbbbbb"}
+JUST_COLOR = {"welfare_only": "#2ca02c", "both": "#98df8a", "instrumental_only": "#9467bd", "none": "#bbbbbb"}
 
 
 def _twotier(ax, main, sub):
