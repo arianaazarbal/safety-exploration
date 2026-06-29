@@ -28,6 +28,7 @@ MODELS = {
     "haiku45": ("Claude Haiku 4.5", "Claude", "claude-haiku-4-5-20251001",
                 "anthropic/claude-haiku-4-5-20251001", True),
     "gpt54": ("GPT-5.4", "gpt", None, "openai/gpt-5.4", False),
+    "gpt55": ("GPT-5.5", "gpt", None, "openai/gpt-5.5", False),
     "gemini31pro": ("Gemini 3.1 Pro", "Gemini", None, "openrouter/google/gemini-3.1-pro-preview", False),
     "glm52": ("GLM-5.2", "GLM", None, "openrouter/z-ai/glm-5.2", False),
     "kimi26": ("Kimi K2.6", "Kimi", None, "openrouter/moonshotai/kimi-k2.6", False),  # VERIFY slug

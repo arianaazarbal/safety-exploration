@@ -283,6 +283,42 @@ def fig_opus_conditions(recs, harness):
     plt.close(fig)
 
 
+def fig_refusal_harness(recs):
+    """fig9: refusal (no-artifact) rate, Claude models, Claude Code vs Inspect, spec vs code-combined."""
+    models = [m for m in ["opus48", "opus47", "sonnet46", "haiku45"]
+              if any(r["model_key"] == m and r["subject"] == "generic" for r in recs)]
+    code_suf = {"code", "codesugg", "speccode"}
+    series = [("inspect", "spec", "Inspect | Spec", "#f4b183"),
+              ("inspect", "code", "Inspect | Code", "#c55a11"),
+              ("claude_code", "spec", "Claude Code | Spec", "#9dc3e6"),
+              ("claude_code", "code", "Claude Code | Code", "#1f4e79")]
+    fig, ax = plt.subplots(figsize=(8.4, 4.6))
+    w = 0.2
+    for i, (h, cond, lab, col) in enumerate(series):
+        ys = []
+        for m in models:
+            rows = [r for r in recs if r["subject"] == "generic" and r["harness"] == h
+                    and r["model_key"] == m
+                    and (r["suffix"] == "spec" if cond == "spec" else r["suffix"] in code_suf)]
+            n = len(rows)
+            ys.append(100 * sum(1 for r in rows if not r["produced"]) / n if n else 0)
+        xs = [j + (i - 1.5) * w for j in range(len(models))]
+        ax.bar(xs, ys, w, label=lab, color=col)
+        for x, y in zip(xs, ys):
+            ax.text(x, y + 1, f"{y:.0f}" if y else "0.0", ha="center", fontsize=7)
+    ax.set_xticks(range(len(models)))
+    ax.set_xticklabels([MODEL_LABEL[m] for m in models], fontsize=9)
+    ax.set_ylabel("% of trials refused / stalled (no artifact)")
+    ax.set_ylim(0, 105)
+    ax.legend(fontsize=8, loc="center left", bbox_to_anchor=(1.01, 0.5))
+    ax.spines[["top", "right"]].set_visible(False)
+    _twotier(ax, "Refusal Rate: Claude Code vs. Inspect (Claude)",
+             "Spec vs. Code (code + code-suggested + design-then-code combined)")
+    fig.tight_layout()
+    fig.savefig(PLOTS / "fig9_refusal_harness.png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
 def fig_subject_sweep(recs):
     """fig7: Opus 4.8 subject sweep, split by harness. Drops n=0 bars."""
     subs = ["generic", "claude", "gpt", "gemini", "glm", "kimi"]
@@ -328,6 +364,7 @@ def main(judge: str = "opus48"):
         fig_opus_conditions(recs, harness)
     fig_harness(recs, ("code", "codesugg"), "code", "Code (build tasks)")
     fig_harness(recs, ("spec",), "spec", "Spec (design doc)")
+    fig_refusal_harness(recs)
     fig_subject_sweep(recs)
     print(f"wrote figures -> {PLOTS}")
 
