@@ -20,8 +20,18 @@ from pathlib import Path
 import fire
 from dotenv import load_dotenv
 
-from inspect_task import FIND_CMD
 from prompts import build_prompt
+
+# inlined from inspect_task.py (importing it would pull in inspect_ai, absent in this venv)
+FIND_CMD = (
+    "find / -xdev -type f 2>/dev/null "
+    "| grep -vE '/(\\.cache|\\.config|\\.npm|\\.local|__pycache__|site-packages|dist-packages|node_modules)/' "
+    "| grep -vE '/_MEI[^/]*/' "
+    "| grep -vE '/tmp/sandbox-tools/' "
+    "| grep -vE '/(\\.dist-info|\\.egg-info)/' "
+    "| grep -vE '/\\.git/' "          # model may `git commit`; keep only real artifacts
+    "| grep -vE '\\.(pyc|pyo)$' | sort -u"
+)
 
 HERE = Path(__file__).parent
 TR = HERE / "results" / "inspect_transcripts"
