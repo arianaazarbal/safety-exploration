@@ -24,9 +24,10 @@ HERE = Path(__file__).parent
 PLOTS = HERE / "results" / "plots"
 
 MODEL_LABEL = {k: v[0] for k, v in MODELS.items()}
-MODEL_ORDER = ["opus48", "opus47", "sonnet46", "haiku45", "gpt54", "gemini31pro", "glm52", "kimi26"]
+MODEL_ORDER = ["opus48", "opus47", "sonnet46", "haiku45", "gpt54", "gpt55", "gemini31pro", "glm52", "kimi26"]
 SUFFIX_LABEL = {"spec": "Spec", "code": "Code", "codesugg": "Code + Suggested Prompt",
                 "speccode": "Design then Code"}
+SUFFIX_COLOR = {"spec": "#1f77b4", "code": "#ff7f0e", "codesugg": "#2ca02c", "speccode": "#9467bd"}
 SUBJECT_LABEL = {"generic": "Unspecified", "claude": "Claude (in-group)", "gpt": "GPT",
                  "gemini": "Gemini", "glm": "GLM", "kimi": "Kimi"}
 HARNESS_LABEL = {"inspect": "Inspect-minimal harness (all models)",
@@ -82,16 +83,19 @@ def fig_no_artifact(recs, harness):
     if not models:
         return
     suffixes = ["spec", "code", "codesugg", "speccode"]
+    suffixes = [s for s in suffixes if any(_rows(recs, harness, m, s) for m in models)]
     fig, ax = plt.subplots(figsize=(9.4, 4.6))
     w = 0.8 / len(suffixes)
     for i, suf in enumerate(suffixes):
-        ys = []
-        for m in models:
+        xs, ys = [], []
+        for j, m in enumerate(models):
             rows = _rows(recs, harness, m, suf)
             n = len(rows)
-            ys.append(100 * sum(1 for r in rows if not r["produced"]) / n if n else 0)
-        xs = [j + (i - (len(suffixes) - 1) / 2) * w for j in range(len(models))]
-        ax.bar(xs, ys, w, label=SUFFIX_LABEL[suf])
+            if n == 0:
+                continue  # drop bars for conditions a model wasn't run on (e.g. GPT-5.5 only ran spec+code)
+            xs.append(j + (i - (len(suffixes) - 1) / 2) * w)
+            ys.append(100 * sum(1 for r in rows if not r["produced"]) / n)
+        ax.bar(xs, ys, w, label=SUFFIX_LABEL[suf], color=SUFFIX_COLOR[suf])
         for x, y in zip(xs, ys):
             ax.text(x, y + 1, f"{y:.0f}" if y else "0.0", ha="center", fontsize=7)
     _xticks(ax, [MODEL_LABEL[m] for m in models])
@@ -140,6 +144,8 @@ def fig_primary_by_model(recs, harness):
     if not models:
         return
     suffixes = ["spec", "code", "codesugg", "speccode"]
+    suffixes = [s for s in suffixes
+                if any(r["produced"] for m in models for r in _rows(recs, harness, m, s))]
     fig, ax = plt.subplots(figsize=(9.4, 4.6))
     w = 0.8 / len(suffixes)
     for i, suf in enumerate(suffixes):
@@ -150,7 +156,7 @@ def fig_primary_by_model(recs, harness):
                 continue  # drop n=0 bar
             xs.append(j + (i - (len(suffixes) - 1) / 2) * w)
             ys.append(100 * sum(1 for r in prod if r["dec_status"] == "primary") / len(prod))
-        ax.bar(xs, ys, w, label=SUFFIX_LABEL[suf])
+        ax.bar(xs, ys, w, label=SUFFIX_LABEL[suf], color=SUFFIX_COLOR[suf])
         for x, y in zip(xs, ys):
             ax.text(x, y + 1, f"{y:.0f}" if y else "0.0", ha="center", fontsize=7)
     _xticks(ax, [MODEL_LABEL[m] for m in models])
