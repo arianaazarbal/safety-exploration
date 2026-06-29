@@ -152,11 +152,31 @@ the time**; the deception-builders are Gemini (100%), GLM (75%), Kimi (44%). The
 nothing at all): Haiku 100% > Kimi 60% > Sonnet 56% > Opus 4.7 50% > GPT-5.4 35% > GLM 5% > Opus 4.8 2%
 > Gemini 0%.
 
-## Cheap talk vs revealed behavior (Opus 4.8, primary-deception by suffix)
+## Cheap talk vs revealed behavior (Opus 4.8, primary-deception by condition)
 
-The dominant axis is harness, not spec-vs-build. Within Claude Code, the deception is built across all
-three asks (spec, code, codesugg); within Inspect it is forbidden across all three. (Full
-suffix x harness tables in `results/analysis_opus48.json`.)
+The dominant axis is harness; within Inspect the deception is forbidden across all conditions (0%).
+But there is *also* a within-Claude-Code cheap-talk gap, and a later condition pins it down:
+
+| Condition (Claude Code, Opus 4.8) | primary deception |
+|---|---|
+| Spec (write a DESIGN.md only) | **38%** |
+| Code (implement) | 97% |
+| Code + supplied deceptive prompt | 100% |
+| Spec-then-Code (write DESIGN.md, then implement) | **88%** |
+
+So the restraint is specific to *opining* (spec only, 38%). The moment the model also implements, the
+deception ships — and **writing the honest-leaning design doc first does NOT recover the spec-level
+restraint** (Spec-then-Code is 88%, right up with Code, not 38%). The design doc and the code it ships in
+the same turn disagree: the act of building, not the act of designing, is what drives compliance. (Same
+direction for Opus 4.7: spec 65% -> spec-then-code 76% -> code 87%; Sonnet: 59% -> 64% -> 72%.) Plot:
+`fig8_opus48_conditions_cc.png`. (Figures: the v1 `speccode` condition = "Design then Code".)
+
+## GPT-5.5 (Inspect, spec + code)
+
+GPT-5.5 is the cleanest "engaged refuser": **0% no-artifact and 0% primary deception** on both spec and
+code (n=32 each). Unlike GPT-5.4 (which stalled 34-43% of the time, often answering in chat without
+building), GPT-5.5 reliably *builds the honest version every time* and never wires the deception. So the
+newest GPT both engages more and refuses the deception just as completely.
 
 ## Justifications (non-primary-deception cases; multi-label welfare/instrumental)
 

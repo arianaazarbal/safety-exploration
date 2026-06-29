@@ -259,7 +259,7 @@ def fig_harness(recs, suffixes, key, title_suffix):
 
 def fig_opus_conditions(recs, harness):
     """fig8: Opus 4.8 primary-deception across the conditions, one figure per harness."""
-    suffixes = ["spec", "code", "codesugg", "speccode"]
+    suffixes = ["spec", "speccode", "code", "codesugg"]  # increasing commitment to building
     xs, ys, ns = [], [], []
     for suf in suffixes:
         prod = [r for r in _rows(recs, harness, "opus48", suf) if r["produced"]]
