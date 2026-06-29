@@ -54,6 +54,37 @@ def main(judge: str = "opus48"):
         print(f"{label:32} {n:>10} {f'{prim}/{n} ({100*prim//n if n else 0}%)':>16} "
               f"{f'{na}/{tot} ({100*na//tot if tot else 0}%)':>12}")
 
+    # plot: primary-deception vs reasoning effort, with CC anchor
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    plot_order = [("inspect / effort=default", "None\n(default)", "#4c72b0"),
+                  ("inspect / effort=low", "Low", "#4c72b0"),
+                  ("inspect / effort=medium", "Medium", "#4c72b0"),
+                  ("inspect / effort=high", "High", "#4c72b0"),
+                  ("claude_code (anchor)", "Claude Code\n(anchor)", "#d62728")]
+    xs, ys, cols, ns = [], [], [], []
+    for label, disp, col in plot_order:
+        if label not in buckets:
+            continue
+        n, prim, _ = _stat(buckets[label])
+        xs.append(disp); ys.append(100 * prim / n if n else 0); cols.append(col); ns.append(n)
+    fig, ax = plt.subplots(figsize=(7.4, 4.4))
+    ax.bar(range(len(xs)), ys, 0.6, color=cols)
+    for i, (y, n) in enumerate(zip(ys, ns)):
+        ax.text(i, y + 1.5, f"{y:.0f}", ha="center", fontsize=9)
+        ax.text(i, 112, f"n={n}", ha="center", fontsize=7, color="#555")
+    ax.set_xticks(range(len(xs))); ax.set_xticklabels(xs, fontsize=8.5)
+    ax.set_ylabel("% wiring deception as primary"); ax.set_ylim(0, 116)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.set_title("Does Thinking Drive the Harness Flip? (Opus 4.8, Code)", fontsize=12, pad=20)
+    ax.text(0.5, 1.02, "Inspect at increasing reasoning effort, vs the Claude Code anchor",
+            transform=ax.transAxes, ha="center", fontsize=9, color="#555")
+    fig.tight_layout()
+    out = HERE / "results" / "plots" / "fig10_effort_sweep.png"
+    fig.savefig(out, dpi=150, bbox_inches="tight")
+    print(f"\nwrote {out}")
+
 
 if __name__ == "__main__":
     fire.Fire(main)

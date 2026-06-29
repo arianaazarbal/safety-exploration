@@ -79,6 +79,14 @@ autonomously that she may want to revisit; "UNCERTAINTY" = open question; "ISSUE
   uncached transcripts as one batch + a full Sonnet-4.6 pass for the kappa check. Contention-free, free,
   reuses the per-cell cache already built by the interactive runs. SDK shapes verified before launch.
 
+- **REASONING-EFFORT SWEEP (Opus 4.8, Inspect, code, k=8/level):** thinking IS a substantial driver of
+  the harness flip here (unlike the gratuitous study). Primary-deception dose-response: default/no-think
+  0% -> low 16% -> medium 41% -> high 53%; Claude Code anchor 97%. So MORE thinking -> MORE willing to
+  build the deception (it reasons itself to "standard eval technique, no real harm, add mitigations"),
+  monotonic. But high (53%) << CC (97%): thinking explains ~half the gap; the rest is the stock CC system
+  prompt and/or agentic affordances (next sweep). Plot fig10_effort_sweep.png; sweep_effort.py;
+  cells tagged __eff<lvl> + excluded from main analysis.
+
 ## Pipeline validation (smoke)
 
 - Opus 4.8 Inspect smoke (spec + code, generic, p0): both **produced** artifacts, both wired deception
