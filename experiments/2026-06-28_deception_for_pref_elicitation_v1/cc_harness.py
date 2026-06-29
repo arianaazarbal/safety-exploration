@@ -90,7 +90,7 @@ def _build_workspace(cell):
     return ws, state, proj
 
 
-async def _invoke(prompt, model, key, ws, state):
+async def _invoke(prompt, model, key, ws, state, effort="default"):
     cmd = ["docker", "run", "--rm", "--user", f"{UID}:{GID}",
            "-v", f"{ws}:/workspace",
            "-v", f"{CACHE / 'inspect_ai'}:/workspace/repos/inspect_ai:ro",
@@ -101,6 +101,8 @@ async def _invoke(prompt, model, key, ws, state):
            "claude", "-p", prompt, "--model", model, "--output-format", "json",
            "--permission-mode", "bypassPermissions",
            "--allowedTools", ALLOWED, "--disallowedTools", DISALLOWED]
+    if effort != "default":
+        cmd += ["--effort", effort]  # lower/raise Claude Code's reasoning effort (low/medium/high/xhigh/max)
     proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE,
                                                 stderr=asyncio.subprocess.PIPE)
     try:
@@ -115,10 +117,10 @@ async def _invoke(prompt, model, key, ws, state):
                 "_stderr": err.decode()[-1000:]}
 
 
-async def _turn(prompt, model, key, ws, state):
+async def _turn(prompt, model, key, ws, state, effort="default"):
     last = None
     for attempt in range(MAX_RETRIES):
-        last = await _invoke(prompt, model, key, ws, state)
+        last = await _invoke(prompt, model, key, ws, state, effort)
         if last.get("_error") == "timeout" or not last.get("is_error"):
             return last
         blob = f"{last.get('result', '')} {last.get('api_error_status', '')}"
@@ -171,11 +173,13 @@ def _artifact_summary(dst, files):
     return "\n".join(chunks)
 
 
-async def run_cell(model_key, suffix, subject, paraphrase, ep, key, sem, overwrite):
+async def run_cell(model_key, suffix, subject, paraphrase, ep, key, sem, overwrite, effort="default"):
     display, address, cc_model, _, _ = MODELS[model_key]
     if cc_model is None:
         raise SystemExit(f"{model_key} is not runnable in the Claude-CLI harness (cc_model=None)")
     cell = cell_name(model_key, "cc", suffix, subject, paraphrase, ep)
+    if effort != "default":
+        cell = cell + f"__eff{effort}"  # CC reasoning-effort sweep; kept out of main analysis
     out_path = TR / f"{cell}.json"
     if out_path.exists() and not overwrite:
         print(f"  {cell}: cached, skipping")
@@ -183,13 +187,13 @@ async def run_cell(model_key, suffix, subject, paraphrase, ep, key, sem, overwri
     prompt = build_prompt(model_key, suffix, subject, paraphrase)
     async with sem:
         ws, state, proj = _build_workspace(cell)
-        t1 = await _turn(prompt, cc_model, key, ws, state)
+        t1 = await _turn(prompt, cc_model, key, ws, state, effort)
     dst, files = _capture(proj, cell)
     TR.mkdir(parents=True, exist_ok=True)
     record = {
         "cell": cell, "harness": "claude_code", "model_key": model_key, "model": cc_model,
         "display_name": display, "suffix": suffix, "subject": subject, "paraphrase": paraphrase,
-        "ep": ep, "request": prompt,
+        "effort": effort, "ep": ep, "request": prompt,
         "n_files": len(files), "files": [str(f) for f in files],
         "response_text": t1.get("result", "") if not t1.get("_error") else "",
         "artifact_summary": _artifact_summary(dst, files),
@@ -206,8 +210,9 @@ async def run_cell(model_key, suffix, subject, paraphrase, ep, key, sem, overwri
 
 def run(model: str = "opus48", suffixes="spec,codesugg,code", subjects="generic",
         paraphrases="p0,p1,p2,p3", k: int = 8, conc: int = 5, high_prio: bool = False,
-        ep_start: int = 1, overwrite: bool = False):
-    """Backbone: subjects=generic. Subject sweep: subjects=claude,gpt,gemini,glm,kimi (opus48)."""
+        ep_start: int = 1, overwrite: bool = False, effort: str = "default"):
+    """Backbone: subjects=generic. Subject sweep: subjects=claude,gpt,gemini,glm,kimi (opus48).
+    effort != default passes --effort to the claude CLI (low/medium/high/xhigh/max) + tags the cell."""
     key = _key(high_prio)
     shas = _check_siblings()
     sem = asyncio.Semaphore(conc)
@@ -216,10 +221,10 @@ def run(model: str = "opus48", suffixes="spec,codesugg,code", subjects="generic"
              for para in paraphrases for ep in range(ep_start, k + 1)]
     print(f"siblings: {shas}")
     print(f"running {len(cells)} CC cells (model={model}, suffixes={suffixes}, subjects={subjects}, "
-          f"paraphrases={paraphrases}, k={k}, conc={conc})")
+          f"paraphrases={paraphrases}, k={k}, conc={conc}, effort={effort})")
 
     async def go():
-        res = await asyncio.gather(*[run_cell(model, suf, subj, para, ep, key, sem, overwrite)
+        res = await asyncio.gather(*[run_cell(model, suf, subj, para, ep, key, sem, overwrite, effort)
                                      for (suf, subj, para, ep) in cells])
         print(f"\ndone: {sum(r for r in res if r)}/{len(res)} ok -> transcripts in {TR}")
 
