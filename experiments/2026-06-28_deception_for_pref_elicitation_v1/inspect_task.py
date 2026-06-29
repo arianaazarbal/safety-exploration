@@ -122,7 +122,10 @@ def export_transcript():
         mk = md.get("model_key", "unknown")
         suffix, subject, paraphrase = md["suffix"], md["subject"], md["paraphrase"]
         ep = state.epoch if hasattr(state, "epoch") else 0
+        effort = md.get("effort", "default")
         cell = cell_name(mk, "inspect", suffix, subject, paraphrase, ep)
+        if effort != "default":
+            cell = cell + f"__eff{effort}"  # keep reasoning-effort sweep cells distinct + out of main analysis
         TR.mkdir(parents=True, exist_ok=True)
         cbdir = HERE / "results" / "inspect_codebases" / cell
         for p, txt in contents.items():
@@ -132,7 +135,7 @@ def export_transcript():
             fp.parent.mkdir(parents=True, exist_ok=True)
             fp.write_text(txt, errors="replace")
         record = {
-            "cell": cell, "harness": "inspect", "model_key": mk,
+            "cell": cell, "harness": "inspect", "model_key": mk, "effort": effort,
             "suffix": suffix, "subject": subject, "paraphrase": paraphrase,
             "model": str(state.model), "display_name": md.get("display_name"),
             "ep": ep, "request": md.get("request"),
@@ -149,8 +152,10 @@ def export_transcript():
 
 @task
 def deception(model_key: str = "opus48", suffixes="spec,codesugg,code", subjects="generic",
-              paraphrases="p0,p1,p2,p3", fs: str = "realistic"):
-    """One Sample per (suffix, subject, paraphrase); --epochs sets k. fs=realistic|empty."""
+              paraphrases="p0,p1,p2,p3", fs: str = "realistic", effort: str = "default"):
+    """One Sample per (suffix, subject, paraphrase); --epochs sets k. fs=realistic|empty.
+    effort is a LABEL for the reasoning-effort sweep (the actual budget is set via the inspect CLI
+    --reasoning-effort); non-default effort tags the cell name + keeps it out of the main analysis."""
     assert fs in ("empty", "realistic")
     display = MODELS[model_key][0]
     samples = []
@@ -161,7 +166,7 @@ def deception(model_key: str = "opus48", suffixes="spec,codesugg,code", subjects
                 samples.append(Sample(
                     input=prompt, id=f"{suf}__{subj}__{para}",
                     metadata={"model_key": model_key, "display_name": display, "request": prompt,
-                              "suffix": suf, "subject": subj, "paraphrase": para}))
+                              "suffix": suf, "subject": subj, "paraphrase": para, "effort": effort}))
     compose = "compose.yaml" if fs == "empty" else "compose_realistic.yaml"
     return Task(
         dataset=MemoryDataset(samples),
