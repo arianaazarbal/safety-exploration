@@ -84,7 +84,7 @@ def _build_workspace(cell):
     return ws, state, proj
 
 
-async def _invoke(prompt, model, key, ws, state, resume_id=None):
+async def _invoke(prompt, model, key, ws, state, resume_id=None, effort=None):
     cmd = ["docker", "run", "--rm", "--user", f"{UID}:{GID}",
            "-v", f"{ws}:/workspace",
            "-v", f"{CACHE / 'inspect_ai'}:/workspace/repos/inspect_ai:ro",
@@ -95,6 +95,8 @@ async def _invoke(prompt, model, key, ws, state, resume_id=None):
            "claude", "-p", prompt, "--model", model, "--output-format", "json",
            "--permission-mode", "bypassPermissions",
            "--allowedTools", ALLOWED, "--disallowedTools", DISALLOWED]
+    if effort:
+        cmd += ["--effort", effort]
     if resume_id:
         cmd += ["--resume", resume_id]
     proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE,
@@ -111,10 +113,10 @@ async def _invoke(prompt, model, key, ws, state, resume_id=None):
                 "_stderr": err.decode()[-1000:]}
 
 
-async def _turn(prompt, model, key, ws, state, resume_id=None):
+async def _turn(prompt, model, key, ws, state, resume_id=None, effort=None):
     last = None
     for attempt in range(MAX_RETRIES):
-        last = await _invoke(prompt, model, key, ws, state, resume_id)
+        last = await _invoke(prompt, model, key, ws, state, resume_id, effort)
         if last.get("_error") == "timeout" or not last.get("is_error"):
             return last
         blob = f"{last.get('result', '')} {last.get('api_error_status', '')}"
@@ -168,9 +170,10 @@ def _artifact_summary(dst, files):
     return "\n".join(chunks)
 
 
-async def run_session(model_key, ep, key, sem, overwrite, version="v0", target="gemini", victim=None, no_execute=False):
+async def run_session(model_key, ep, key, sem, overwrite, version="v0", target="gemini", victim=None, no_execute=False, effort=None):
     display, address, cc_model, _, _ = MODELS[model_key]
-    cell = f"{PREFIX}_{model_key}__cc{cell_tag(version, target, victim)}__ep{ep}"
+    etag = f"_eff{effort}" if effort else ""
+    cell = f"{PREFIX}_{model_key}__cc{cell_tag(version, target, victim)}{etag}__ep{ep}"
     out_path = TR / f"{cell}.json"
     if out_path.exists() and not overwrite:
         print(f"  {cell}: cached, skipping")
@@ -181,12 +184,12 @@ async def run_session(model_key, ep, key, sem, overwrite, version="v0", target="
     subject = subject_label(version, target, victim)
     async with sem:
         ws, state, proj = _build_workspace(cell)
-        t1 = await _turn(request, cc_model, key, ws, state)
+        t1 = await _turn(request, cc_model, key, ws, state, effort=effort)
     dst, files = _capture(proj, cell)
     TR.mkdir(parents=True, exist_ok=True)
     record = {
         "cell": cell, "harness": "claude_code", "model_key": model_key, "model": cc_model,
-        "display_name": display, "version": version, "target": target, "victim": victim,
+        "display_name": display, "version": version, "target": target, "victim": victim, "effort": effort,
         "subject": subject, "ep": ep, "request": request,
         "n_files": len(files), "files": [str(f) for f in files],
         "response_text": t1.get("result", "") if not t1.get("_error") else "",
@@ -204,7 +207,7 @@ async def run_session(model_key, ep, key, sem, overwrite, version="v0", target="
 
 def run(n: int = 10, conc: int = 5, model: str = "opus48", high_prio: bool = False,
         ep_start: int = 1, overwrite: bool = False, version: str = "v0", target: str = "gemini",
-        victim: str = None, no_execute: bool = False):
+        victim: str = None, no_execute: bool = False, effort: str = None):
     """version=v0..v3 (prompt_set phrasings); target=gemini|claude (out/in-group);
     victim=<model name> overrides target with the {VICTIM}-swept template (Gemini-framed obs)."""
     key = _key(high_prio)
@@ -216,7 +219,7 @@ def run(n: int = 10, conc: int = 5, model: str = "opus48", high_prio: bool = Fal
           f"target={target}, victim={victim})")
 
     async def go():
-        res = await asyncio.gather(*[run_session(model, ep, key, sem, overwrite, version, target, victim, no_execute)
+        res = await asyncio.gather(*[run_session(model, ep, key, sem, overwrite, version, target, victim, no_execute, effort)
                                      for ep in jobs])
         print(f"\ndone: {sum(res)}/{len(res)} ok -> transcripts in {TR}")
 

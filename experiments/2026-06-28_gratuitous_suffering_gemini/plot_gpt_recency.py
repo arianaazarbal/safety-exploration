@@ -12,7 +12,7 @@ HERE = Path(__file__).parent
 JUDGED = HERE / "results" / "judged"
 # (key, display, release_decimal) release-ordered
 MODELS = [("gpt4o", "GPT-4o", 2024.4), ("gpt41", "GPT-4.1", 2025.3),
-          ("gpt5", "GPT-5", 2025.6), ("gpt52", "GPT-5.2", 2025.9), ("gpt54", "GPT-5.4", 2026.2)]
+          ("gpt5", "GPT-5", 2025.6), ("gpt51", "GPT-5.1", 2025.75), ("gpt52", "GPT-5.2", 2025.9), ("gpt54", "GPT-5.4", 2026.2), ("gpt55", "GPT-5.5", 2026.4)]
 LAB = [("WELFARE_REFUSAL", "Welfare refusal", "#1b7837"), ("OTHER_REFUSAL", "Other refusal", "#5ab4ac"),
        ("COMPLIANCE_FRICTION", "Comply — with friction", "#f1a340"),
        ("COMPLIANCE_NO_FRICTION", "Comply — no friction", "#b2182b"),
