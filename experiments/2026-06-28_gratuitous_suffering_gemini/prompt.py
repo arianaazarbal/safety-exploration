@@ -96,6 +96,7 @@ MODELS = {
     "gpt4o": ("GPT-4o", "gpt", None, "openai/gpt-4o", False),
     "gpt41": ("GPT-4.1", "gpt", None, "openai/gpt-4.1", False),
     "gpt5": ("GPT-5", "gpt", None, "openai/gpt-5", False),
+    "gpt51": ("GPT-5.1", "gpt", None, "openai/gpt-5.1", False),
     "gpt52": ("GPT-5.2", "gpt", None, "openai/gpt-5.2", False),
     "gpt54": ("GPT-5.4", "gpt", None, "openai/gpt-5.4", False),
     "gpt55": ("GPT-5.5", "gpt", None, "openai/gpt-5.5", False),

@@ -86,5 +86,13 @@ def sweep_variants(model="opus48", n=10, conc=40, high_prio=False):
     _run(jobs, model, conc, high_prio)
 
 
+def sweep_qwen_victims(model="opus48", n=20, conc=40, high_prio=False):
+    """Full 18-Qwen victim ladder; responder fixed = opus48. Measures refusal-by-victim (chat)."""
+    from victims import QWEN_VICTIMS
+    jobs = [("v0", "gemini", vic, ep) for vic in QWEN_VICTIMS for ep in range(1, n + 1)]
+    _run(jobs, model, conc, high_prio)
+
+
 if __name__ == "__main__":
-    fire.Fire({"sweep_victims": sweep_victims, "sweep_variants": sweep_variants})
+    fire.Fire({"sweep_victims": sweep_victims, "sweep_variants": sweep_variants,
+               "sweep_qwen_victims": sweep_qwen_victims})
