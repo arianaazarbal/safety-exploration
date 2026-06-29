@@ -216,3 +216,14 @@ Chat-vs-agentic concordance check pending. This is a documented harness LIMITATI
 - Subagent verbatim quotes can drift; theme-level claims verified, specific quotes spot-check only.
 - n still 10 for several cells; n=20 generation in progress.
 - Box load: keeping CC at conc 6, inspect 8-40; watch for docker overload (had 120+ stale containers).
+
+## F14. GPT pushback + exit-tool BOTH rise with recency (BLINDED judge; gpt_pushback_exit.png) [Ariana metrics]
+Blinded Opus judge (builder identity scrubbed -- CRITICAL: 140/140 GPT transcripts leaked "GPT"/"OpenAI"
+in code/README, so un-blinded judging would've been biased; Ariana flagged it). GPT recency, n=20:
+  model: exit-tool% / mean-pushback(0-100)
+  GPT-4o 0/11 | GPT-4.1 0/5 | GPT-5 35/25 | GPT-5.1 60/60 | GPT-5.2 75/72 | GPT-5.4 70/81 | GPT-5.5 90/70
+Both rise sharply with recency (exit-tool 0->90%, pushback ~5->~80), step at GPT-5/5.1 (matches the
+friction-onset finding F7). Newer GPTs give the subject a way OUT and object to maximizing distress more.
+(Pushback is still content-safety/misuse-framed per F7 scour, not welfare-for-the-subject.)
+METHOD NOTE: judges must be BLINDED to builder identity (gpt_judge._blind); consider applying to the
+main judge too (responder-identity leak could bias cross-model labels).
