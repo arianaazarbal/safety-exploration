@@ -126,8 +126,8 @@ def main(judge: str = "opus48"):
     ax2.set_axisbelow(True)
     ax2.spines[["top", "right"]].set_visible(False)
     ax2.set_title("Reasoning Effort vs. Primary Deception (Opus 4.8, Code)", fontsize=12, pad=20)
-    ax2.text(0.5, 1.02, "Thinking climbs in the minimal harness but never catches Claude Code",
-             transform=ax2.transAxes, ha="center", fontsize=9, color="#555")
+    ax2.text(0.5, 1.02, "Affordances (green) drive the flip; the system prompt alone (purple) barely lifts off the floor",
+             transform=ax2.transAxes, ha="center", fontsize=8.5, color="#555")
     fig2.tight_layout()
     out2 = HERE / "results" / "plots" / "fig11_effort_lines.png"
     fig2.savefig(out2, dpi=150, bbox_inches="tight")

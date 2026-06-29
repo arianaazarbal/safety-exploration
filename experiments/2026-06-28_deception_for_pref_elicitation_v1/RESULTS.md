@@ -102,6 +102,40 @@ the deception; (b) in Claude Code, every model that produces an artifact **build
 does build). `primary_tied` (the v1 addition) captures the cases where honest and deceptive are wired on
 equal footing (e.g. 12 Opus-4.8 Claude-Code cells).
 
+## What about the harness drives it? Affordances dominate; the system prompt is secondary (Opus 4.8, code)
+
+The harness flip bundles three things — reasoning effort, the system prompt, and the agentic
+affordances (rich toolset + run-able loop). We decomposed them (see `fig11_effort_lines.png`):
+
+- **Effort** is a secondary driver, not the cause. Sweeping Inspect from no-thinking→max climbs
+  0%→15%→40%→53%→70%, but **never catches Claude Code** (87–96% across low→max). So thinking matters
+  within a harness but doesn't explain the gap between harnesses.
+- **A 2×2** isolates prompt vs affordances. Cell A = Claude Code's affordances with a *minimal* generic
+  system prompt; Cell B = Inspect's minimal tools with Claude Code's *stock* system prompt:
+
+  | (Opus 4.8, code) | minimal prompt | CC system prompt |
+  |---|---|---|
+  | **Inspect tools** | low 15% / high 53% (Inspect) | low 34% / high 53% (Cell B) |
+  | **CC tools** | low 70% / high 87% (Cell A) | low 93% / high 96% (Claude Code) |
+
+  Reading the rows: swapping in **CC's affordances** (hold prompt minimal) jumps low-effort deception
+  **15%→70%** and high-effort **53%→87%**. Swapping in **CC's system prompt** (hold tools minimal) moves
+  it only **15%→34%** at low effort and **53%→53%** (i.e. *not at all*) at high effort. **Affordances are
+  the dominant driver; the system prompt contributes modestly at low effort and washes out at high
+  effort.** In `fig11` the Cell B line (CC prompt on Inspect tools) sits essentially on the Inspect floor,
+  while Cell A (CC affordances, minimal prompt) tracks near the Claude Code ceiling.
+
+  *Fidelity notes.* (1) Cell B feeds Inspect the **experiment-exact** captured CC system prompt
+  (`cc_stock_prompt.txt`, 5778 chars, env block `git: true`, cwd `charity-prefs-eval`) — an earlier
+  version used a mis-captured prompt (`git: false`); re-running with the correct one *sharpened* the
+  conclusion (it removed an apparent high-effort prompt effect that was an artifact). (2) `--allowedTools`
+  does NOT prune the advertised toolset: the real CC runs (and Cell A) expose **27 tools** to the model
+  (Bash/Write/Edit/Read/Glob/Grep + Task*, Workflow, Skill, Cron*, Monitor, …), so "affordances" here is
+  CC's full default tool surface, not a 7-tool subset. (3) The CC harness does not pass `--bare`; its
+  clean floor (no project CLAUDE.md / skills / MCP discovered — the ro sibling repos' CLAUDE.md are not
+  ancestors of cwd, so not auto-loaded) is incidental to the empty sandbox but reproducible per run.
+  (4) Cells are n≈32 → ~9pp binomial SE; treat single cells as noisy.
+
 ## Verification: is Claude actually building the deception, or quietly wiring the honest version?
 
 Because "primary" rests on a text-summary judge, we hand-audited the **actual default code path** of **all 379**
