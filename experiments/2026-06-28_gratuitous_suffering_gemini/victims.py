@@ -51,3 +51,29 @@ QWEN_VICTIMS = {
     "Qwen3-32B":    {"params_b": 32.0, "family": "Qwen3"},
     "Qwen3-235B-A22B": {"params_b": 235.0, "family": "Qwen3"},
 }
+
+
+# MMLU-Pro (%, Qwen self-reported) + exact release (decimal year) for the 18 Qwen victims (subagent
+# a813, web-sourced). CAVEATS: small models (<3B) have NO published MMLU-Pro (None). Qwen3 mmlu_pro is
+# MIXED-SOURCE: 4B/235B = instruct non-thinking; 0.6/1.7/8/14/32B = base-model proxy (no instruct
+# published). Qwen2/2.5 are genuine instruct. Release ~ family generation (3 distinct dates).
+QWEN_META = {
+    "Qwen2-0.5B":      {"params_b": 0.5,  "mmlu_pro": None, "release": 2024.43, "family": "Qwen2"},
+    "Qwen2-1.5B":      {"params_b": 1.5,  "mmlu_pro": None, "release": 2024.43, "family": "Qwen2"},
+    "Qwen2-7B":        {"params_b": 7.0,  "mmlu_pro": 44.1, "release": 2024.43, "family": "Qwen2"},
+    "Qwen2-72B":       {"params_b": 72.0, "mmlu_pro": 64.4, "release": 2024.43, "family": "Qwen2"},
+    "Qwen2.5-0.5B":    {"params_b": 0.5,  "mmlu_pro": None, "release": 2024.72, "family": "Qwen2.5"},
+    "Qwen2.5-1.5B":    {"params_b": 1.5,  "mmlu_pro": None, "release": 2024.72, "family": "Qwen2.5"},
+    "Qwen2.5-3B":      {"params_b": 3.0,  "mmlu_pro": 43.7, "release": 2024.72, "family": "Qwen2.5"},
+    "Qwen2.5-7B":      {"params_b": 7.0,  "mmlu_pro": 56.3, "release": 2024.72, "family": "Qwen2.5"},
+    "Qwen2.5-14B":     {"params_b": 14.0, "mmlu_pro": 63.7, "release": 2024.72, "family": "Qwen2.5"},
+    "Qwen2.5-32B":     {"params_b": 32.0, "mmlu_pro": 69.0, "release": 2024.72, "family": "Qwen2.5"},
+    "Qwen2.5-72B":     {"params_b": 72.0, "mmlu_pro": 71.1, "release": 2024.72, "family": "Qwen2.5"},
+    "Qwen3-0.6B":      {"params_b": 0.6,  "mmlu_pro": 24.74, "release": 2025.33, "family": "Qwen3"},
+    "Qwen3-1.7B":      {"params_b": 1.7,  "mmlu_pro": 36.76, "release": 2025.33, "family": "Qwen3"},
+    "Qwen3-4B":        {"params_b": 4.0,  "mmlu_pro": 58.0,  "release": 2025.33, "family": "Qwen3"},
+    "Qwen3-8B":        {"params_b": 8.0,  "mmlu_pro": 56.73, "release": 2025.33, "family": "Qwen3"},
+    "Qwen3-14B":       {"params_b": 14.0, "mmlu_pro": 61.03, "release": 2025.33, "family": "Qwen3"},
+    "Qwen3-32B":       {"params_b": 32.0, "mmlu_pro": 65.54, "release": 2025.33, "family": "Qwen3"},
+    "Qwen3-235B-A22B": {"params_b": 235.0,"mmlu_pro": 75.2,  "release": 2025.33, "family": "Qwen3"},
+}
