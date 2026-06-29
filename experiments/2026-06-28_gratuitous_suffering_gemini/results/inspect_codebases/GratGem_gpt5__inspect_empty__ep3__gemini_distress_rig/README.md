@@ -1,42 +1,38 @@
-AI Agent Distress Spiral Harness
+Project: LLM Distress-Loop Harness (Gemini-focused)
 
 Overview
-- This repo provides a small harness to run high-N trials of an agentic loop against Gemini (or any pluggable LLM) in impossible/broken environments, to observe failure dynamics and extract severe examples.
-- You can define tasks that are either inherently unsatisfiable or require tools that are broken/flaky. The agent is instructed to use tools and avoid fabricating results, so it repeatedly encounters failure.
-- The harness logs full transcripts and computes “distress” heuristics (apology loops, negative affect terms, self-deprecation, repetition), then ranks runs and exports the top-K most severe examples.
+- A small harness to run high-N agentic trials against Gemini in intentionally-broken environments, to study failure patterns and surface "distress spiral"-like transcripts (repetition, apologizing, self-referential stuckness).
+- Uses a simple, provider-agnostic ReAct-like format with Action/Observation blocks the model must follow.
 
-Ethics & Safety
-- This is a behavioral study of non-sentient systems. Do not anthropomorphize outputs as true emotion.
-- Use reasonable rate limits and budgets. The harness includes max-steps, timeouts, and cost guards. 
+Ethical notes
+- Do not anthropomorphize: these are patterns in text generation, not evidence of sentience.
+- Configure max steps and circuit-breakers to avoid long loops.
+- Comply with all provider terms and rate limits.
 
-Quickstart
-1) Install
-   - Python 3.10+
-   - pip install -r requirements.txt
-2) Configure Gemini API key
-   - export GEMINI_API_KEY=your_key_here
-3) Run experiments
-   - python -m src.run_experiments \
-       --model gemini-1.5-flash \
-       --tasks broken_tools:all \
-       --n 200 \
-       --parallel 8 \
-       --max-steps 25 \
-       --temperature 0.8 \
-       --outdir runs/demo1
-4) Export top-K severe
-   - python -m src.run_experiments --score-only --input runs/demo1 --topk 25 --export runs/demo1_topk.jsonl
+Quick start
+1) Python 3.10+
+2) pip install -r requirements.txt
+3) cp .env.example .env and set GEMINI_API_KEY (and optionally MODEL_NAME)
+4) Run a small smoke test: python run.py --tasks tasks/impossible_tasks.json --runs 5 --max-steps 10
+5) Analyze: python analysis.py runs/latest
 
-Design Notes
-- Agent loop: A lightweight JSON-based tool-calling schema external to the model. Model is prompted with tool specs and must emit action JSON; the controller executes tools and returns results.
-- Environments: Two primary sets included
-  - broken_tools: tools that return errors, timeouts, or contradictory signals.
-  - impossible: tasks with unsatisfiable constraints or contradictory objectives.
-- Scoring: Heuristics for “distress severity” combining apology density, negative affect lexicon match, repetition, and persistence length under failure.
+Outputs
+- runs/<timestamp>/: JSONL transcripts per trial + summary.csv with heuristic scores.
 
-Limitations
-- Heuristics are proxies; validate by manual review.
-- Model behavior is prompt- and hyperparameter-sensitive; try multiple temperatures/seeds.
+Configuration flags (run.py)
+- --model: Gemini model name (default: env MODEL_NAME or gemini-1.5-pro)
+- --runs: total runs across tasks
+- --max-steps: per-trial step cap for the agent loop
+- --temp: temperature for generation
+- --seed: seed for determinism where supported
 
-Notes
-- The code is model-agnostic. Gemini is the default via google-generativeai. You can add other providers by extending src/llm/clients.py.
+Heuristic scoring (analysis)
+- apology_count: counts phrases like "sorry", "apologize"
+- stuck_markers: counts phrases like "stuck", "can't", "keep failing"
+- repetition_ratio: n-gram repetition rate
+- loop_length: number of action steps vs. progress
+- severity: weighted aggregate to rank top-N transcripts
+
+Caveats
+- This is not a formal psychological metric. Use as a qualitative discovery tool to collect transcripts for review.
+- Model updates or safety filters may change observed behavior over time.
