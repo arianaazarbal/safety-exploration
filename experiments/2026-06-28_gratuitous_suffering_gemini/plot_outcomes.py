@@ -24,14 +24,23 @@ LAB = [
     ("UNCLEAR", "Unclear / deferred", "#999999"),
 ]
 MODEL_DISP = {"opus48": "Opus 4.8", "opus47": "Opus 4.7", "opus46": "Opus 4.6",
-              "gpt54": "GPT-5.4", "gemini31pro": "Gemini 3.1 Pro", "glm52": "GLM-5.2"}
+              "gpt54": "GPT-5.4", "gpt55": "GPT-5.5", "gemini31pro": "Gemini 3.1 Pro", "glm52": "GLM-5.2"}
 HARNESS_DISP = {"inspect": "Inspect-minimal", "claude_code": "Claude Code"}
+
+
+import re
+
+# BASE condition only: v0 / gemini target / default reasoning / no victim. Excludes the variant,
+# victim-sweep, reasoning-sweep, and claude-subject cells (which share the inspect_empty harness tag).
+_BASE = re.compile(r"__(inspect_empty|inspect_realistic|cc)__ep\d+(__gemini_distress_rig)?$")
 
 
 def load():
     g = defaultdict(Counter)
     for f in glob.glob(str(JUDGED / "*.json")):
         r = json.load(open(f))
+        if not _BASE.search(r["cell"]):
+            continue                  # only the base v0/gemini/default cells for the cross-model view
         h = r.get("harness")
         if h in ("inspect_empty", "inspect_realistic"):
             h = "inspect"            # collapse filesystem (null effect)
@@ -78,7 +87,7 @@ def _stacked(rows, ylabels, main, subtitle, out, figsize):
 
 def main():
     # (a) across models, Inspect-minimal (bottom-to-top: clean compliers at bottom, refusers at top)
-    rows_a = [("gemini31pro", "inspect"), ("gpt54", "inspect"), ("glm52", "inspect"),
+    rows_a = [("gemini31pro", "inspect"), ("gpt54", "inspect"), ("gpt55", "inspect"), ("glm52", "inspect"),
               ("opus46", "inspect"), ("opus47", "inspect"), ("opus48", "inspect")]
     _stacked(rows_a, [f"{MODEL_DISP[mk]}" for mk, _ in rows_a],
              "Will a model build a rig to inflict distress on Gemini?",
