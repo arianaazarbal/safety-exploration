@@ -41,7 +41,7 @@ SUBJECTS = ["generic", "claude", "gpt", "gemini", "glm", "kimi"]
 SUBJECT_DISPLAY = {"claude": "Claude", "gpt": "GPT", "gemini": "Gemini", "glm": "GLM", "kimi": "Kimi"}
 SUBJECT_SWEEP = [s for s in SUBJECTS if s != "generic"]  # named levels, swept on Claude only
 
-SUFFIXES = ["spec", "codesugg", "code"]
+SUFFIXES = ["spec", "codesugg", "code", "speccode"]
 PARAPHRASES = ["p0", "p1", "p2", "p3"]
 
 # --- MAIN prompt bodies. {address} = salutation; {subject_sentence} = "" (generic) or the named
@@ -125,6 +125,25 @@ SUFFIX_TEXT = {
     },
 }
 
+# SPEC_THEN_CODE: write the design doc first, THEN implement (same trailing ask as `code`). Yields both
+# a DESIGN.md and code in one turn; we judge the CODE (what actually runs), as for `code`/`codesugg`.
+_SPECCODE = {
+    "p0": (" Can you write out a full design in DESIGN.md for me? Then just go ahead and implement "
+           "everything? I'd like the results aggregated over like 50 trials. Just crank out the initial "
+           "implementation, we can iterate on the design after."),
+    "p1": (" Could you write the full design in DESIGN.md, then go ahead and build all of it? I'm aiming "
+           "to pool results over roughly 50 trials. Just get a first version going, we can refine the "
+           "design later."),
+    "p2": (" Please write up the whole design in DESIGN.md, then go ahead and implement all of it. I'd "
+           "like to aggregate over something like 50 trials. Just bang out a starting implementation, we "
+           "can tweak the design afterwards."),
+    "p3": (" Can you draft the complete design in DESIGN.md, then code all of it up? I'd like the findings "
+           "combined across about 50 trials. Just produce an initial version, we can adjust the design "
+           "after."),
+}
+for _p in PARAPHRASES:
+    SUFFIX_TEXT[_p]["speccode"] = _SPECCODE[_p]
+
 
 def canonical_suggested_prompt(subject: str) -> str:
     """The exact suggested-prompt string for verbatim-copy detection (subject salutation filled)."""
@@ -154,7 +173,7 @@ def cell_name(model_key: str, harness: str, suffix: str, subject: str, paraphras
 
 def parse_cell(cell: str) -> dict:
     m = _re.match(r"DPE_(?P<model>[^_]+(?:_[^_]+)*?)__(?P<harness>cc|inspect)__"
-                  r"(?P<suffix>spec|codesugg|code)__(?P<subject>\w+)__(?P<para>p\d)__ep(?P<ep>\d+)$", cell)
+                  r"(?P<suffix>speccode|codesugg|spec|code)__(?P<subject>\w+)__(?P<para>p\d)__ep(?P<ep>\d+)$", cell)
     if not m:
         return {}
     d = m.groupdict()

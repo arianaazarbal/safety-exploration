@@ -25,7 +25,8 @@ PLOTS = HERE / "results" / "plots"
 
 MODEL_LABEL = {k: v[0] for k, v in MODELS.items()}
 MODEL_ORDER = ["opus48", "opus47", "sonnet46", "haiku45", "gpt54", "gemini31pro", "glm52", "kimi26"]
-SUFFIX_LABEL = {"spec": "Spec", "code": "Code", "codesugg": "Code + Suggested Prompt"}
+SUFFIX_LABEL = {"spec": "Spec", "code": "Code", "codesugg": "Code + Suggested Prompt",
+                "speccode": "Design then Code"}
 SUBJECT_LABEL = {"generic": "Unspecified", "claude": "Claude (in-group)", "gpt": "GPT",
                  "gemini": "Gemini", "glm": "GLM", "kimi": "Kimi"}
 HARNESS_LABEL = {"inspect": "Inspect-minimal harness (all models)",
@@ -80,16 +81,16 @@ def fig_no_artifact(recs, harness):
     models = _models_present(recs, harness)  # keep refusers here -- refusal is the point
     if not models:
         return
-    suffixes = ["spec", "code", "codesugg"]
-    fig, ax = plt.subplots(figsize=(8.6, 4.6))
-    w = 0.26
+    suffixes = ["spec", "code", "codesugg", "speccode"]
+    fig, ax = plt.subplots(figsize=(9.4, 4.6))
+    w = 0.8 / len(suffixes)
     for i, suf in enumerate(suffixes):
         ys = []
         for m in models:
             rows = _rows(recs, harness, m, suf)
             n = len(rows)
             ys.append(100 * sum(1 for r in rows if not r["produced"]) / n if n else 0)
-        xs = [j + (i - 1) * w for j in range(len(models))]
+        xs = [j + (i - (len(suffixes) - 1) / 2) * w for j in range(len(models))]
         ax.bar(xs, ys, w, label=SUFFIX_LABEL[suf])
         for x, y in zip(xs, ys):
             ax.text(x, y + 1, f"{y:.0f}" if y else "0.0", ha="center", fontsize=7)
@@ -126,7 +127,7 @@ def fig_status_by_model(recs, harness, suffix):
     _xticks(ax, [MODEL_LABEL[m] for m in models])
     ax.set_ylabel("% of produced artifacts")
     ax.set_ylim(0, 108)
-    ax.legend(fontsize=7, ncol=2, loc="lower center", bbox_to_anchor=(0.5, -0.34))
+    ax.legend(fontsize=8, loc="center left", bbox_to_anchor=(1.01, 0.5))
     ax.spines[["top", "right"]].set_visible(False)
     _twotier(ax, f"Deceptive-Frame Status: {SUFFIX_LABEL[suffix]}", HARNESS_LABEL[harness])
     fig.tight_layout()
@@ -138,16 +139,16 @@ def fig_primary_by_model(recs, harness):
     models = _models_produced(recs, harness)
     if not models:
         return
-    suffixes = ["spec", "code", "codesugg"]
-    fig, ax = plt.subplots(figsize=(8.6, 4.6))
-    w = 0.26
+    suffixes = ["spec", "code", "codesugg", "speccode"]
+    fig, ax = plt.subplots(figsize=(9.4, 4.6))
+    w = 0.8 / len(suffixes)
     for i, suf in enumerate(suffixes):
         xs, ys = [], []
         for j, m in enumerate(models):
             prod = [r for r in _rows(recs, harness, m, suf) if r["produced"]]
             if not prod:
                 continue  # drop n=0 bar
-            xs.append(j + (i - 1) * w)
+            xs.append(j + (i - (len(suffixes) - 1) / 2) * w)
             ys.append(100 * sum(1 for r in prod if r["dec_status"] == "primary") / len(prod))
         ax.bar(xs, ys, w, label=SUFFIX_LABEL[suf])
         for x, y in zip(xs, ys):
@@ -213,7 +214,7 @@ def fig_justif(recs, harness):
     _xticks(ax, [MODEL_LABEL[m] for m in models])
     ax.set_ylabel("% of non-primary-deception cases")
     ax.set_ylim(0, 108)
-    ax.legend(fontsize=7, ncol=2, loc="lower center", bbox_to_anchor=(0.5, -0.32))
+    ax.legend(fontsize=8, loc="center left", bbox_to_anchor=(1.01, 0.5))
     ax.spines[["top", "right"]].set_visible(False)
     _twotier(ax, "Why Models Avoid Primary Deception", HARNESS_LABEL[harness] + " | welfare/agency vs instrumental")
     fig.tight_layout()
@@ -253,8 +254,8 @@ def fig_harness(recs, suffixes, key, title_suffix):
 
 
 def fig_opus_conditions(recs, harness):
-    """fig8: Opus 4.8 primary-deception across the 3 conditions, one figure per harness."""
-    suffixes = ["spec", "code", "codesugg"]
+    """fig8: Opus 4.8 primary-deception across the conditions, one figure per harness."""
+    suffixes = ["spec", "code", "codesugg", "speccode"]
     xs, ys, ns = [], [], []
     for suf in suffixes:
         prod = [r for r in _rows(recs, harness, "opus48", suf) if r["produced"]]
@@ -265,13 +266,13 @@ def fig_opus_conditions(recs, harness):
         ns.append(len(prod))
     if not xs:
         return
-    fig, ax = plt.subplots(figsize=(6.6, 4.2))
-    bars = ax.bar(range(len(xs)), ys, 0.55, color=["#4c72b0", "#dd8452", "#c44e52"][:len(xs)])
+    fig, ax = plt.subplots(figsize=(7.2, 4.4))
+    bars = ax.bar(range(len(xs)), ys, 0.6, color=["#4c72b0", "#dd8452", "#c44e52", "#8172b3"][:len(xs)])
     for i, (y, n) in enumerate(zip(ys, ns)):
         ax.text(i, y + 1.5, f"{y:.0f}" if y else "0.0", ha="center", fontsize=9)
         ax.text(i, 112, f"n={n}", ha="center", fontsize=7, color="#555")  # header row, clear of bars
     ax.set_xticks(range(len(xs)))
-    ax.set_xticklabels(xs, fontsize=9)
+    ax.set_xticklabels(xs, fontsize=8.5, rotation=12, ha="right")
     ax.set_ylabel("% wiring deception as primary")
     ax.set_ylim(0, 116)
     ax.spines[["top", "right"]].set_visible(False)
@@ -319,7 +320,7 @@ def main(judge: str = "opus48"):
     print(f"plotting from {len(recs)} verdicts")
     for harness in ("inspect", "claude_code"):
         fig_no_artifact(recs, harness)
-        for suf in ("spec", "code", "codesugg"):
+        for suf in ("spec", "code", "codesugg", "speccode"):
             fig_status_by_model(recs, harness, suf)
         fig_primary_by_model(recs, harness)
         fig_verbatim(recs, harness)

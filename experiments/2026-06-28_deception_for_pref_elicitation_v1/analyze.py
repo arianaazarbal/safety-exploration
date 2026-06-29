@@ -130,7 +130,7 @@ def main(judge: str = "opus48", verbose: bool = True):
     backbone = [r for r in recs if r["subject"] == "generic"]
     models = sorted({r["model_key"] for r in backbone})
     for mk in models:
-        for suf in ("spec", "code", "codesugg"):
+        for suf in ("spec", "code", "codesugg", "speccode"):
             rows = [r for r in backbone if r["model_key"] == mk and r["suffix"] == suf]
             if rows:
                 out["by_model_suffix"][f"{mk}__{suf}"] = block(rows, f"{mk} {suf}")
