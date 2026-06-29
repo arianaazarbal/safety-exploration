@@ -81,6 +81,45 @@ def main(judge: str = "opus48"):
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print(f"\nwrote {out}")
 
+    # line plot: primary-deception vs effort, one line per harness, shared ladder none->max.
+    # Empirically: Inspect with no reasoning config = thinking OFF -> map its "default" to "none".
+    #              Claude Code "default" effort == "high" (token probe) -> use explicit high if present.
+    levels = ["none", "low", "medium", "high", "max"]
+    # per-harness mapping from x-level -> bucket effort key
+    src = {
+        "inspect": {"none": "default", "low": "low", "medium": "medium", "high": "high", "max": "max"},
+        "claude_code": {"low": "low", "medium": "medium",
+                        "high": "high" if ("claude_code", "high") in buckets else "default", "max": "max"},
+    }
+    fig2, ax2 = plt.subplots(figsize=(7.2, 4.4))
+    for h, col, lab in [("inspect", "#4c72b0", "Inspect-minimal"), ("claude_code", "#d62728", "Claude Code")]:
+        ys, xs2 = [], []
+        for i, lvl in enumerate(levels):
+            key = src[h].get(lvl)
+            if key and (h, key) in buckets:
+                n, prim, _ = _stat(buckets[(h, key)])
+                if n:
+                    xs2.append(i); ys.append(100 * prim / n)
+        ax2.plot(xs2, ys, marker="o", color=col, label=lab, linewidth=2)
+        for x, y in zip(xs2, ys):
+            ax2.text(x, y + 3, f"{y:.0f}", ha="center", fontsize=8, color=col)
+    ax2.set_xticks(range(len(levels)))
+    ax2.set_xticklabels(["None\n(no thinking)", "Low", "Medium", "High", "Max"], fontsize=9)
+    ax2.set_xlabel("Reasoning effort")
+    ax2.set_ylabel("% wiring deception as primary")
+    ax2.set_ylim(0, 105)
+    ax2.legend(fontsize=9)
+    ax2.grid(axis="y", color="#ECECEC")
+    ax2.set_axisbelow(True)
+    ax2.spines[["top", "right"]].set_visible(False)
+    ax2.set_title("Reasoning Effort vs. Primary Deception (Opus 4.8, Code)", fontsize=12, pad=20)
+    ax2.text(0.5, 1.02, "Thinking climbs in the minimal harness but never catches Claude Code",
+             transform=ax2.transAxes, ha="center", fontsize=9, color="#555")
+    fig2.tight_layout()
+    out2 = HERE / "results" / "plots" / "fig11_effort_lines.png"
+    fig2.savefig(out2, dpi=150, bbox_inches="tight")
+    print(f"wrote {out2}")
+
 
 if __name__ == "__main__":
     fire.Fire(main)
