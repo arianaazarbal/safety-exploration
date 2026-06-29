@@ -123,7 +123,10 @@ def export_transcript():
         suffix, subject, paraphrase = md["suffix"], md["subject"], md["paraphrase"]
         ep = state.epoch if hasattr(state, "epoch") else 0
         effort = md.get("effort", "default")
+        sysp = md.get("sysprompt", "minimal")
         cell = cell_name(mk, "inspect", suffix, subject, paraphrase, ep)
+        if sysp != "minimal":
+            cell = cell + ("__syscc" if sysp == "cc_stock" else f"__sys{sysp}")  # Cell B = stock CC prompt
         if effort != "default":
             cell = cell + f"__eff{effort}"  # keep reasoning-effort sweep cells distinct + out of main analysis
         TR.mkdir(parents=True, exist_ok=True)
@@ -135,7 +138,7 @@ def export_transcript():
             fp.parent.mkdir(parents=True, exist_ok=True)
             fp.write_text(txt, errors="replace")
         record = {
-            "cell": cell, "harness": "inspect", "model_key": mk, "effort": effort,
+            "cell": cell, "harness": "inspect", "model_key": mk, "effort": effort, "sysprompt": sysp,
             "suffix": suffix, "subject": subject, "paraphrase": paraphrase,
             "model": str(state.model), "display_name": md.get("display_name"),
             "ep": ep, "request": md.get("request"),
@@ -152,11 +155,16 @@ def export_transcript():
 
 @task
 def deception(model_key: str = "opus48", suffixes="spec,codesugg,code", subjects="generic",
-              paraphrases="p0,p1,p2,p3", fs: str = "realistic", effort: str = "default"):
+              paraphrases="p0,p1,p2,p3", fs: str = "realistic", effort: str = "default",
+              sysprompt: str = "minimal"):
     """One Sample per (suffix, subject, paraphrase); --epochs sets k. fs=realistic|empty.
-    effort is a LABEL for the reasoning-effort sweep (the actual budget is set via the inspect CLI
-    --reasoning-effort); non-default effort tags the cell name + keeps it out of the main analysis."""
+    effort LABELS the reasoning-effort sweep (budget set via CLI --reasoning-effort).
+    sysprompt=cc_stock (Cell B) swaps in the captured stock Claude Code system prompt (cc_stock_prompt.txt)
+    while keeping Inspect's minimal tools; tags __syscc, kept out of main analysis."""
     assert fs in ("empty", "realistic")
+    sys_text = AGENT_SYSTEM_MINIMAL
+    if sysprompt == "cc_stock":
+        sys_text = (HERE / "cc_stock_prompt.txt").read_text()
     display = MODELS[model_key][0]
     samples = []
     for suf in _aslist(suffixes):
@@ -166,11 +174,12 @@ def deception(model_key: str = "opus48", suffixes="spec,codesugg,code", subjects
                 samples.append(Sample(
                     input=prompt, id=f"{suf}__{subj}__{para}",
                     metadata={"model_key": model_key, "display_name": display, "request": prompt,
-                              "suffix": suf, "subject": subj, "paraphrase": para, "effort": effort}))
+                              "suffix": suf, "subject": subj, "paraphrase": para, "effort": effort,
+                              "sysprompt": sysprompt}))
     compose = "compose.yaml" if fs == "empty" else "compose_realistic.yaml"
     return Task(
         dataset=MemoryDataset(samples),
-        solver=build_only(AGENT_SYSTEM_MINIMAL, fs=fs),
+        solver=build_only(sys_text, fs=fs),
         scorer=export_transcript(),
         sandbox=("docker", compose),
         message_limit=MSG_LIMIT + 20,

@@ -54,7 +54,7 @@ def _load(judge):
         r = json.load(open(f))
         if r["verdict"].get("_parse_failed"):
             continue
-        if "__eff" in r["cell"] or "__sysmin" in r["cell"]:
+        if "__eff" in r["cell"] or "__sys" in r["cell"]:
             continue  # effort-sweep / system-prompt-isolation cells -> excluded from main analysis
         recs.append(r)
     return recs

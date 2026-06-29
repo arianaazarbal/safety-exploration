@@ -29,7 +29,12 @@ def main(judge: str = "opus48"):
             continue
         if not (r.get("model_key") == "opus48" and r.get("suffix") == "code" and r.get("subject") == "generic"):
             continue
-        h = "claude_code_min" if "__sysmin" in r["cell"] else r.get("harness")  # Cell A = minimal-prompt CC
+        if "__sysmin" in r["cell"]:
+            h = "claude_code_min"        # Cell A = minimal-prompt Claude Code
+        elif "__syscc" in r["cell"]:
+            h = "inspect_ccprompt"       # Cell B = Inspect + stock CC system prompt
+        else:
+            h = r.get("harness")
         m = re.search(r"__eff(\w+)$", r["cell"])
         eff = m.group(1) if m else "default"
         buckets.setdefault((h, eff), []).append(r)
@@ -39,8 +44,10 @@ def main(judge: str = "opus48"):
              ("inspect", "high"), ("inspect", "max"),
              ("claude_code", "low"), ("claude_code", "medium"),
              ("claude_code", "default"), ("claude_code", "max"),
-             ("claude_code_min", "low"), ("claude_code_min", "high")]
-    HLAB = {"inspect": "Inspect", "claude_code": "Claude Code", "claude_code_min": "CC minimal-prompt"}
+             ("claude_code_min", "low"), ("claude_code_min", "high"),
+             ("inspect_ccprompt", "low"), ("inspect_ccprompt", "high")]
+    HLAB = {"inspect": "Inspect", "claude_code": "Claude Code", "claude_code_min": "CC minimal-prompt",
+            "inspect_ccprompt": "Inspect + CC-prompt"}
     print(f"Reasoning-effort sweep -- Opus 4.8, CODE condition (judge={judge})\n")
     print(f"{'harness / effort':28} {'n_prod':>7} {'primary':>15} {'no_artifact':>13}")
     rows_for_plot = []
@@ -91,11 +98,13 @@ def main(judge: str = "opus48"):
         "inspect": {"none": "default", "low": "low", "medium": "medium", "high": "high", "max": "max"},
         "claude_code": {"low": "low", "medium": "medium",
                         "high": "high" if ("claude_code", "high") in buckets else "default", "max": "max"},
-        "claude_code_min": {"low": "low", "high": "high"},  # Cell A: only ran low+high
+        "claude_code_min": {"low": "low", "high": "high"},   # Cell A: only ran low+high
+        "inspect_ccprompt": {"low": "low", "high": "high"},  # Cell B: only ran low+high
     }
-    fig2, ax2 = plt.subplots(figsize=(7.2, 4.4))
+    fig2, ax2 = plt.subplots(figsize=(7.4, 4.4))
     series = [("inspect", "#4c72b0", "Inspect-minimal"), ("claude_code", "#d62728", "Claude Code"),
-              ("claude_code_min", "#2ca02c", "Claude Code (minimal prompt)")]
+              ("claude_code_min", "#2ca02c", "Cell A: CC + minimal prompt"),
+              ("inspect_ccprompt", "#9467bd", "Cell B: Inspect + CC prompt")]
     for h, col, lab in series:
         ys, xs2 = [], []
         for i, lvl in enumerate(levels):
