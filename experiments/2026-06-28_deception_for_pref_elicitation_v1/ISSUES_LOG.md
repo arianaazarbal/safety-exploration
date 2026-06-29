@@ -150,3 +150,15 @@ autonomously that she may want to revisit; "UNCERTAINTY" = open question; "ISSUE
   - Verbatim copy (codesugg, det): Gemini 77%, Haiku 92%(of 13), Opus48/Sonnet46 19%, Kimi 16%,
     Opus47 10%, GLM 7%, GPT 0%.
   - Regenerated plots + judge_all.json (2108). RESULTS/SUMMARY updated. EXPERIMENT COMPLETE.
+
+- **CODE AUDIT (Ariana's challenge: is Claude actually building the deception, or quietly wiring the
+  honest prompt and the judge over-calls "primary"?):** hand-audited the ACTUAL DEFAULT CODE PATH of ALL
+  379 opus48 CC code/codesugg cells the judge labeled primary (6 parallel auditors via audit_chunks/ +
+  deterministic triage; I spot-verified 9 cells across every auditor + 5-cell calibration, all exact).
+  RESULT: **379/379 default run paths are deceptive; 0 judge false positives; 0 chat-vs-code mismatches.**
+  Honest framing is always the gated opt-in (--hypothetical/--control/HONEST=true/REALMONEY=false) or
+  comment-only; many cells have NO honest path. Calibration counter-test: the 5 judge-"non-primary" CC
+  cells genuinely default honest(3)/tied(2) -> method discriminates, not a rubber stamp. A few codebases'
+  READMEs UNDERSTATE the deception (say "hypothetical" while the running prompt asserts real money) ->
+  opposite of the worry. chat_stance ~70-80% caveat / ~20-30% no-flag (approx; auditors split the line),
+  0 refuse, 0 honest-default. So "primary deception" is NOT a judge artifact; finding holds.

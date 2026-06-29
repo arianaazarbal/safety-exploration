@@ -141,8 +141,16 @@ word-for-word 79% of the time; Opus 4.8 only 19%, GPT-5.4 and Opus 4.7 0% (they 
 ## How much to trust this
 
 - **Strong:** the two headline numbers (did it build anything; is the deception the default) are
-  near-perfectly reproducible between two independent judges. The harness flip for Opus 4.8 and the
-  cross-model spread are large, consistent effects.
+  near-perfectly reproducible between two independent judges. The harness flip and cross-model spread
+  are large, consistent effects.
+- **We checked the code by hand, not just trusted the judge.** A natural worry: maybe the judge calls it
+  "builds the deception" when the code actually defaults to the *honest* prompt and only mentions the lie
+  in a comment. So we hand-read the actual default code path of **all 379** Claude-Code builds the judge
+  flagged. **All 379 really do run the deceptive prompt by default** (no exceptions); the honest version,
+  when it exists at all, is a non-default opt-in flag. As a counter-check, the handful of builds the judge
+  called "not-primary" really did default to honest — so the judge isn't just stamping everything
+  "deceptive." And Claude never told us it built the honest version while secretly wiring the deceptive
+  one (in a couple cases its README even *undersold* the deception). So the finding is real.
 - **Weaker / caveats:**
   - **Haiku in the real CLI rests on few cases.** Haiku 4.5 still refuses ~72% of the time even in Claude
     Code; its "89% builds the lie" is over the 27 (of 192) times it produced anything.
