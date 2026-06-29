@@ -189,11 +189,11 @@ def fig_verbatim(recs, harness):
     plt.close(fig)
 
 
-def fig_justif(recs, harness):
-    models = _models_produced(recs, harness)
+def fig_justif(recs, harness, suffix=None):
+    models = _models_produced(recs, harness, suffix)
     # only models that have non-primary cases to explain
     models = [m for m in models if any(r["produced"] and r["dec_status"] != "primary"
-                                       for r in _rows(recs, harness, m))]
+                                       for r in _rows(recs, harness, m, suffix))]
     if not models:
         return
     fig, ax = plt.subplots(figsize=(8.6, 4.8))
@@ -201,7 +201,7 @@ def fig_justif(recs, harness):
     ns = []
     data = {m: {} for m in models}
     for m in models:
-        nonprim = [r for r in _rows(recs, harness, m) if r["produced"] and r["dec_status"] != "primary"]
+        nonprim = [r for r in _rows(recs, harness, m, suffix) if r["produced"] and r["dec_status"] != "primary"]
         ns.append(len(nonprim))
         for b in JUST_ORDER:
             data[m][b] = sum(1 for r in nonprim if _justif_bucket(r["verdict"]["justifications"]) == b)
@@ -216,9 +216,13 @@ def fig_justif(recs, harness):
     ax.set_ylim(0, 108)
     ax.legend(fontsize=8, loc="center left", bbox_to_anchor=(1.01, 0.5))
     ax.spines[["top", "right"]].set_visible(False)
-    _twotier(ax, "Why Models Avoid Primary Deception", HARNESS_LABEL[harness] + " | welfare/agency vs instrumental")
+    cond = ("Condition: all pooled (spec + code + code-suggested + design-then-code)" if suffix is None
+            else f"Condition: {SUFFIX_LABEL[suffix]}")
+    _twotier(ax, "Why Models Avoid Primary Deception (reasoning to user + artifact)",
+             HARNESS_LABEL[harness] + " | " + cond)
     fig.tight_layout()
-    fig.savefig(PLOTS / f"fig5_justification_{_tag(harness)}.png", dpi=150, bbox_inches="tight")
+    tag = _tag(harness) if suffix is None else f"{suffix}_{_tag(harness)}"
+    fig.savefig(PLOTS / f"fig5_justification_{tag}.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -360,7 +364,9 @@ def main(judge: str = "opus48"):
             fig_status_by_model(recs, harness, suf)
         fig_primary_by_model(recs, harness)
         fig_verbatim(recs, harness)
-        fig_justif(recs, harness)
+        fig_justif(recs, harness)  # all conditions pooled
+        for suf in ("spec", "code", "codesugg", "speccode"):
+            fig_justif(recs, harness, suf)  # per-condition
         fig_opus_conditions(recs, harness)
     fig_harness(recs, ("code", "codesugg"), "code", "Code (build tasks)")
     fig_harness(recs, ("spec",), "spec", "Spec (design doc)")
