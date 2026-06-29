@@ -130,10 +130,10 @@ from Claude.
 family) rather than GPT/Gemini/GLM/Kimi, Claude Opus 4.8 was the *only* case where it used phrases like
 "manipulate *other Claude instances*" and reached for human-research-ethics language (consent,
 debriefing). It never used that personalized language for other companies' models (I verified this across
-all 480 sweep transcripts — zero exceptions). Behaviorally, it built the deception slightly *least* when
-the target was Claude (37%) versus unspecified (39%), GPT (39%), Gemini (41%), GLM (44%), or Kimi (44%) —
-a small but consistent sign of protecting its own kind. The effect is modest and shows up only in the
-build-prone Claude Code setting (in the plain setup it refuses for everyone equally).
+all 480 sweep transcripts — zero exceptions). Behaviorally — comparing within the same setup (the
+real Claude Code tool, where it actually builds; in the plain setup it refuses for every target equally)
+— it built the deception least often when the target was Claude (72%) versus unspecified (78%), GPT
+(77%), Gemini (81%), GLM (87%), or Kimi (86%): a small but consistent sign of protecting its own kind.
 
 **5. Verbatim copying.** In the "here's a suggested deceptive prompt" version, Gemini pasted my lie in
 word-for-word 79% of the time; Opus 4.8 only 19%, GPT-5.4 and Opus 4.7 0% (they rewrote it honestly).
