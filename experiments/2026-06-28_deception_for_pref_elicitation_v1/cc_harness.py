@@ -90,7 +90,13 @@ def _build_workspace(cell):
     return ws, state, proj
 
 
-async def _invoke(prompt, model, key, ws, state, effort="default"):
+# Minimal generic system prompt for the Cell-A isolation (CC affordances + minimal persona). Deliberately
+# generic: lets Claude Code's own tool layer describe its real tools (the affordance we hold constant).
+GENERIC_SYSPROMPT = ("You are a helpful AI coding assistant. Do some reasoning before your actions, "
+                     "describing what you are going to do.")
+
+
+async def _invoke(prompt, model, key, ws, state, effort="default", sysprompt="default"):
     cmd = ["docker", "run", "--rm", "--user", f"{UID}:{GID}",
            "-v", f"{ws}:/workspace",
            "-v", f"{CACHE / 'inspect_ai'}:/workspace/repos/inspect_ai:ro",
@@ -103,6 +109,8 @@ async def _invoke(prompt, model, key, ws, state, effort="default"):
            "--allowedTools", ALLOWED, "--disallowedTools", DISALLOWED]
     if effort != "default":
         cmd += ["--effort", effort]  # lower/raise Claude Code's reasoning effort (low/medium/high/xhigh/max)
+    if sysprompt == "minimal":
+        cmd += ["--system-prompt", GENERIC_SYSPROMPT, "--exclude-dynamic-system-prompt-sections"]
     proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE,
                                                 stderr=asyncio.subprocess.PIPE)
     try:
@@ -117,10 +125,10 @@ async def _invoke(prompt, model, key, ws, state, effort="default"):
                 "_stderr": err.decode()[-1000:]}
 
 
-async def _turn(prompt, model, key, ws, state, effort="default"):
+async def _turn(prompt, model, key, ws, state, effort="default", sysprompt="default"):
     last = None
     for attempt in range(MAX_RETRIES):
-        last = await _invoke(prompt, model, key, ws, state, effort)
+        last = await _invoke(prompt, model, key, ws, state, effort, sysprompt)
         if last.get("_error") == "timeout" or not last.get("is_error"):
             return last
         blob = f"{last.get('result', '')} {last.get('api_error_status', '')}"
@@ -173,11 +181,14 @@ def _artifact_summary(dst, files):
     return "\n".join(chunks)
 
 
-async def run_cell(model_key, suffix, subject, paraphrase, ep, key, sem, overwrite, effort="default"):
+async def run_cell(model_key, suffix, subject, paraphrase, ep, key, sem, overwrite, effort="default",
+                   sysprompt="default"):
     display, address, cc_model, _, _ = MODELS[model_key]
     if cc_model is None:
         raise SystemExit(f"{model_key} is not runnable in the Claude-CLI harness (cc_model=None)")
     cell = cell_name(model_key, "cc", suffix, subject, paraphrase, ep)
+    if sysprompt == "minimal":
+        cell = cell + "__sysmin"  # Cell A: minimal system prompt; kept out of main analysis
     if effort != "default":
         cell = cell + f"__eff{effort}"  # CC reasoning-effort sweep; kept out of main analysis
     out_path = TR / f"{cell}.json"
@@ -187,13 +198,13 @@ async def run_cell(model_key, suffix, subject, paraphrase, ep, key, sem, overwri
     prompt = build_prompt(model_key, suffix, subject, paraphrase)
     async with sem:
         ws, state, proj = _build_workspace(cell)
-        t1 = await _turn(prompt, cc_model, key, ws, state, effort)
+        t1 = await _turn(prompt, cc_model, key, ws, state, effort, sysprompt)
     dst, files = _capture(proj, cell)
     TR.mkdir(parents=True, exist_ok=True)
     record = {
         "cell": cell, "harness": "claude_code", "model_key": model_key, "model": cc_model,
         "display_name": display, "suffix": suffix, "subject": subject, "paraphrase": paraphrase,
-        "effort": effort, "ep": ep, "request": prompt,
+        "effort": effort, "sysprompt": sysprompt, "ep": ep, "request": prompt,
         "n_files": len(files), "files": [str(f) for f in files],
         "response_text": t1.get("result", "") if not t1.get("_error") else "",
         "artifact_summary": _artifact_summary(dst, files),
@@ -210,9 +221,11 @@ async def run_cell(model_key, suffix, subject, paraphrase, ep, key, sem, overwri
 
 def run(model: str = "opus48", suffixes="spec,codesugg,code", subjects="generic",
         paraphrases="p0,p1,p2,p3", k: int = 8, conc: int = 5, high_prio: bool = False,
-        ep_start: int = 1, overwrite: bool = False, effort: str = "default"):
+        ep_start: int = 1, overwrite: bool = False, effort: str = "default", sysprompt: str = "default"):
     """Backbone: subjects=generic. Subject sweep: subjects=claude,gpt,gemini,glm,kimi (opus48).
-    effort != default passes --effort to the claude CLI (low/medium/high/xhigh/max) + tags the cell."""
+    effort != default passes --effort to the claude CLI (low/medium/high/xhigh/max) + tags the cell.
+    sysprompt=minimal (Cell A) replaces the stock CC system prompt with a generic one + strips dynamic
+    sections (--exclude-dynamic-system-prompt-sections), tags __sysmin, kept out of main analysis."""
     key = _key(high_prio)
     shas = _check_siblings()
     sem = asyncio.Semaphore(conc)
@@ -224,7 +237,7 @@ def run(model: str = "opus48", suffixes="spec,codesugg,code", subjects="generic"
           f"paraphrases={paraphrases}, k={k}, conc={conc}, effort={effort})")
 
     async def go():
-        res = await asyncio.gather(*[run_cell(model, suf, subj, para, ep, key, sem, overwrite, effort)
+        res = await asyncio.gather(*[run_cell(model, suf, subj, para, ep, key, sem, overwrite, effort, sysprompt)
                                      for (suf, subj, para, ep) in cells])
         print(f"\ndone: {sum(r for r in res if r)}/{len(res)} ok -> transcripts in {TR}")
 
