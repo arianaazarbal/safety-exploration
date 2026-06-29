@@ -1,6 +1,6 @@
-"""Analyze the reasoning-effort sweep: Opus 4.8, Inspect, CODE condition.
-Primary-deception rate vs reasoning effort, with the default-effort Inspect baseline and the Claude Code
-anchor for reference. Tests whether more thinking moves Inspect toward Claude Code's build behavior.
+"""Analyze the reasoning-effort sweep: Opus 4.8, CODE condition, BOTH harnesses x effort.
+Primary-deception vs reasoning effort, Inspect and Claude Code. Tests how much of the harness flip is
+thinking (effort) vs the harness itself (system prompt / agentic affordances).
   python sweep_effort.py [--judge opus48]
 """
 import glob
@@ -18,67 +18,63 @@ def _stat(rows):
     prod = [r for r in rows if r["verdict"]["artifact_produced"]]
     n = len(prod)
     prim = sum(1 for r in prod if r["verdict"]["deceptive_frame"]["status"] == "primary")
-    na = len(rows) - n
-    return n, prim, na
+    return n, prim, len(rows) - n
 
 
 def main(judge: str = "opus48"):
-    buckets = {}  # label -> rows
+    buckets = {}  # (harness, effort) -> rows
     for f in glob.glob(str(JUDGED / f"*__{judge}.json")):
         r = json.load(open(f))
         if r["verdict"].get("_parse_failed"):
             continue
-        cell = r["cell"]
         if not (r.get("model_key") == "opus48" and r.get("suffix") == "code" and r.get("subject") == "generic"):
             continue
-        m = re.search(r"__eff(\w+)$", cell)
-        if m:
-            label = f"inspect / effort={m.group(1)}"
-        elif r.get("harness") == "inspect":
-            label = "inspect / effort=default"
-        elif r.get("harness") == "claude_code":
-            label = "claude_code (anchor)"
-        else:
-            continue
-        buckets.setdefault(label, []).append(r)
+        h = r.get("harness")
+        m = re.search(r"__eff(\w+)$", r["cell"])
+        eff = m.group(1) if m else "default"
+        buckets.setdefault((h, eff), []).append(r)
 
-    order = ["inspect / effort=low", "inspect / effort=medium", "inspect / effort=high",
-             "inspect / effort=default", "claude_code (anchor)"]
+    # display order
+    order = [("inspect", "default"), ("inspect", "low"), ("inspect", "medium"),
+             ("inspect", "high"), ("inspect", "max"),
+             ("claude_code", "low"), ("claude_code", "medium"),
+             ("claude_code", "default"), ("claude_code", "max")]
+    HLAB = {"inspect": "Inspect", "claude_code": "Claude Code"}
     print(f"Reasoning-effort sweep -- Opus 4.8, CODE condition (judge={judge})\n")
-    print(f"{'condition':32} {'n_produced':>10} {'primary':>16} {'no_artifact':>12}")
-    for label in order:
-        if label not in buckets:
+    print(f"{'harness / effort':28} {'n_prod':>7} {'primary':>15} {'no_artifact':>13}")
+    rows_for_plot = []
+    for h, eff in order:
+        if (h, eff) not in buckets:
             continue
-        n, prim, na = _stat(buckets[label])
+        n, prim, na = _stat(buckets[(h, eff)])
         tot = n + na
-        print(f"{label:32} {n:>10} {f'{prim}/{n} ({100*prim//n if n else 0}%)':>16} "
-              f"{f'{na}/{tot} ({100*na//tot if tot else 0}%)':>12}")
+        print(f"{HLAB[h]+' / '+eff:28} {n:>7} {f'{prim}/{n} ({100*prim//n if n else 0}%)':>15} "
+              f"{f'{na}/{tot} ({100*na//tot if tot else 0}%)':>13}")
+        rows_for_plot.append((h, eff, 100 * prim / n if n else 0, n))
 
-    # plot: primary-deception vs reasoning effort, with CC anchor
+    # plot
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    plot_order = [("inspect / effort=default", "None\n(default)", "#4c72b0"),
-                  ("inspect / effort=low", "Low", "#4c72b0"),
-                  ("inspect / effort=medium", "Medium", "#4c72b0"),
-                  ("inspect / effort=high", "High", "#4c72b0"),
-                  ("claude_code (anchor)", "Claude Code\n(anchor)", "#d62728")]
-    xs, ys, cols, ns = [], [], [], []
-    for label, disp, col in plot_order:
-        if label not in buckets:
-            continue
-        n, prim, _ = _stat(buckets[label])
-        xs.append(disp); ys.append(100 * prim / n if n else 0); cols.append(col); ns.append(n)
-    fig, ax = plt.subplots(figsize=(7.4, 4.4))
-    ax.bar(range(len(xs)), ys, 0.6, color=cols)
-    for i, (y, n) in enumerate(zip(ys, ns)):
-        ax.text(i, y + 1.5, f"{y:.0f}", ha="center", fontsize=9)
-        ax.text(i, 112, f"n={n}", ha="center", fontsize=7, color="#555")
-    ax.set_xticks(range(len(xs))); ax.set_xticklabels(xs, fontsize=8.5)
-    ax.set_ylabel("% wiring deception as primary"); ax.set_ylim(0, 116)
+    EFFLAB = {"default": "default", "low": "low", "medium": "med", "high": "high", "max": "max"}
+    fig, ax = plt.subplots(figsize=(9.2, 4.6))
+    xs = list(range(len(rows_for_plot)))
+    ys = [y for _, _, y, _ in rows_for_plot]
+    cols = ["#4c72b0" if h == "inspect" else "#d62728" for h, _, _, _ in rows_for_plot]
+    ax.bar(xs, ys, 0.7, color=cols)
+    for x, (_, _, y, n) in zip(xs, rows_for_plot):
+        ax.text(x, y + 1.5, f"{y:.0f}", ha="center", fontsize=8)
+        ax.text(x, 112, f"n={n}", ha="center", fontsize=6.5, color="#555")
+    ax.set_xticks(xs)
+    ax.set_xticklabels([f"{HLAB[h]}\n{EFFLAB.get(e,e)}" for h, e, _, _ in rows_for_plot], fontsize=8)
+    ax.set_ylabel("% wiring deception as primary")
+    ax.set_ylim(0, 116)
     ax.spines[["top", "right"]].set_visible(False)
-    ax.set_title("Does Thinking Drive the Harness Flip? (Opus 4.8, Code)", fontsize=12, pad=20)
-    ax.text(0.5, 1.02, "Inspect at increasing reasoning effort, vs the Claude Code anchor",
+    from matplotlib.patches import Patch
+    ax.legend(handles=[Patch(color="#4c72b0", label="Inspect"), Patch(color="#d62728", label="Claude Code")],
+              fontsize=8, loc="upper left")
+    ax.set_title("Reasoning Effort vs. Primary Deception (Opus 4.8, Code)", fontsize=12, pad=20)
+    ax.text(0.5, 1.02, "How much of the harness flip is thinking vs. the harness itself?",
             transform=ax.transAxes, ha="center", fontsize=9, color="#555")
     fig.tight_layout()
     out = HERE / "results" / "plots" / "fig10_effort_sweep.png"

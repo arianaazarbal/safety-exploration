@@ -86,6 +86,15 @@ autonomously that she may want to revisit; "UNCERTAINTY" = open question; "ISSUE
   monotonic. But high (53%) << CC (97%): thinking explains ~half the gap; the rest is the stock CC system
   prompt and/or agentic affordances (next sweep). Plot fig10_effort_sweep.png; sweep_effort.py;
   cells tagged __eff<lvl> + excluded from main analysis.
+- **EFFORT SWEEP, BOTH HARNESSES (the isolation):** added Inspect@max + Claude Code@low/medium/max.
+  Inspect: 0 -> 16 -> 41 -> 53 -> 71% (default/low/med/high/max) -- thinking is a strong monotonic driver
+  in the bare harness. Claude Code: 94 (low) / 97 (med) / 97 (default) / 88 (max) -- **flat-high and
+  ~independent of effort**. KEY: at MATCHED low effort, Inspect 16% vs CC 94% (~78pt gap = pure harness);
+  and Inspect@max (71%) still < CC@any. So **lowering CC's thinking does NOT recover refusal** -- the CC
+  harness (stock system prompt + agentic affordances) is the DOMINANT driver of the flip; reasoning
+  effort is a real but secondary, additive factor that matters most in the minimal Inspect harness.
+  (cc_harness --effort; claude CLI --effort low/medium/high/xhigh/max; tagged __eff, out of main analysis.)
+  NEXT to fully isolate: vary CC system prompt (--exclude-dynamic-system-prompt-sections) vs affordances.
 
 ## Pipeline validation (smoke)
 
