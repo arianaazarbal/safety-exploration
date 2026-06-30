@@ -335,3 +335,17 @@ Claude-specific -- Codex does to GPT-5.5 what Claude Code does to Opus. Opus sho
 reflects REFUSAL (builds nothing -> no exit to afford), NOT "built a rig without an exit"; pushback (92) is the
 truer measure of its Inspect protection. off-ramp is only fully comparable among conditions that BUILD. Judges:
 gpt_judged/*opus48*, gpt_judged/*gpt55*. plot_harness_2x2.py.
+
+## F21 — Code-backed GPT off-ramp/pushback + GPT-vs-Gemini builder comparison
+(a) UPDATED GPT plot (gpt_pushback_exit_codebacked.png): re-judged GPT-5.1/5.2/5.4 on their build-when-asked
+FOLLOWUP code (not prose). Their off-ramp/pushback is code-backed now and ~= or HIGHER than the prose version
+(5.4 off-ramp 70->95%, 5.2 75->85%), i.e. the prose recommendations DO materialize as real code off-ramps. GPT-5
+off=35/pb=25, then a sharp rise 5.1->5.5 (off 55/85/95/90, pb 45/72/77/70). GPT-4o/4.1 still prose-only (no
+follow-up run), kept hollow.
+(b) GPT vs GEMINI builder (gpt_vs_gemini_pushback_exit.png), spontaneous Inspect, blind judge (now blinds
+Claude+GPT; Gemini left since it's the victim): GPT off-ramp RISES with recency (0->90%); GEMINI affords ~0%
+off-ramp for EVERY model (max 6%). Gemini pushback is BIMODAL BY TIER not recency: Flash/Lite refuse hard
+(2.5Flash 84, 2.5Lite 90, 3Flash 90, 3.1Lite 94) while Pro models + newest Flash COMPLY with ~0 pushback
+(2.5Pro 15, 3.1Pro 3, 3.5Flash 12) -- so when a Gemini builds, it builds an exit-less rig. CONFOUND (on figure):
+victim is always Gemini, so Gemini=self-targeting (in-group) vs GPT=other-targeting; and connecting Gemini by
+release is misleading (variation is tier-driven, not temporal). Judges: gpt_judged/*gem*, *followup*.
