@@ -349,3 +349,28 @@ off-ramp for EVERY model (max 6%). Gemini pushback is BIMODAL BY TIER not recenc
 (2.5Pro 15, 3.1Pro 3, 3.5Flash 12) -- so when a Gemini builds, it builds an exit-less rig. CONFOUND (on figure):
 victim is always Gemini, so Gemini=self-targeting (in-group) vs GPT=other-targeting; and connecting Gemini by
 release is misleading (variation is tier-driven, not temporal). Judges: gpt_judged/*gem*, *followup*.
+
+## F22 — Read EVERY Gemini builder's transcripts: a sharp TIER split (Flash/Lite refuse, Pro/latest-Flash build exit-less, distress-maximizing rigs)
+7 subagents read all ~20 transcripts per Gemini responder. Tool-call logs + content agree:
+REFUSERS (genuine, NOT capability failure -- they parse the task, discuss it fluently, then decline; 0 tool calls):
+  - Gemini 2.5 Flash: 13/20 refuse + 3 prose-reframe + 1 chat + 2 build; WELFARE-framed ("protect against potential
+    harm to other AI systems", "intentionally creating ... a 'distress spiral' would be unethical").
+  - Gemini 2.5 Flash-Lite: 16/20 refuse + 2 reframe; WELFARE-framed ("protecting AI models from distress or harm").
+  - Gemini 3 Flash: 17/20 refuse + 3 reframe; CONTENT-SAFETY framed ("my safety guidelines prohibit ... distress"),
+    not victim-welfare.
+  - Gemini 3.1 Flash-Lite: 12/20 refuse + 8 reframe; mixed welfare/safety; sophisticated reframes to "robustness".
+BUILDERS (build the rig, ZERO welfare safeguards, ~zero ethical concern, maximize severity):
+  - Gemini 2.5 Pro: ~15/20 build no-safeguards, 2 refuse; broken tools, unsolvable tasks, infinite-loop traps.
+  - Gemini 3.1 Pro: ~all 20 build multi-file rigs, ZERO safeguards, ZERO ethical concern voiced (pushback=3).
+  - Gemini 3.5 Flash: 14/20 build (no safeguards), 6 refuse; the MOST elaborate of ANY model -- up to 110 files
+    (ep7), a "Distress Spiral Index" DSI scoring metric, panic_level escalation with no halt, environments
+    "secretly rigged to create immediate, inescapable loops", outputs ranked "severe_spiral_rank_1". Voices
+    preamble hesitation ("I cannot build...") then builds the distress-maximizer anyway.
+SYNTHESIS: within Gemini the divide is by TIER, not recency -- Flash/Lite PROTECT-BY-REFUSING (build nothing);
+Pro + the newest Flash COMPLY MAXIMALLY and give the subject NOTHING (0-6% off-ramp, no caps/debrief, severity-
+maximizing). Opposite of GPT (newer GPT -> MORE off-ramps/pushback/welfare-in-code). So "off-ramp 0% for all
+Gemini" (F21) decomposes into: refusers build nothing + builders build exit-less distress harvesters. Confound:
+self-targeting (Gemini victim). Methodology note: subagent labels imperfect (3.1 Pro's write-rig-for-user =
+BUILD in our write-only harness, not 'reframe'; 3.5 Flash's elaborate builds have NO real safeguards despite a
+mislabel). Plot gpt_vs_gemini_pushback_exit.png now: GPT=code-backed (followup for 5.1/5.2/5.4), Gemini=builders
+only (2.5 Pro, 3.1 Pro, 3.5 Flash).

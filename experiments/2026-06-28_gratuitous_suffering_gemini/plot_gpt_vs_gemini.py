@@ -25,6 +25,18 @@ GPT_C, GEM_C = "#1b7837", "#d95f02"
 GPT = {"gpt4o": ("4o", 2024.4), "gpt41": ("4.1", 2025.3), "gpt5": ("5", 2025.6),
        "gpt51": ("5.1", 2025.75), "gpt52": ("5.2", 2025.9), "gpt54": ("5.4", 2026.2),
        "gpt55": ("5.5", 2026.4)}
+# GPT-5.1/5.2/5.4 wrote no code spontaneously -> use the build-when-asked FOLLOWUP code (most up-to-date).
+GPT_FOLLOWUP = {"gpt51", "gpt52", "gpt54"}
+# Gemini: only the models that actually BUILD (Pro tier + latest Flash); the older Flash/Lite refuse.
+GEM_KEEP = {"gem25pro", "gemini31pro", "gem35flash"}
+
+
+def gpt_glob(m):
+    if m in GPT_FOLLOWUP:
+        return f"*{m}*followup*"
+    if m == "gpt55":
+        return "*gpt55__inspect*"
+    return f"*{m}__inspect_empty__ep*"
 
 
 def metric(pat):
@@ -62,10 +74,9 @@ def series(spec):
 
 
 def main():
-    gpt_spec = [(GPT[m][1], f"*{m}__inspect_empty__ep*" if m != "gpt55" else "*gpt55__inspect*", GPT[m][0])
-                for m in GPT]
+    gpt_spec = [(GPT[m][1], gpt_glob(m), GPT[m][0]) for m in GPT]
     gem_spec = [(meta["release"], f"*{k}__inspect_empty*", meta["disp"].replace("Gemini ", ""))
-                for k, meta in GEMINI_REL.items()]
+                for k, meta in GEMINI_REL.items() if k in GEM_KEEP]
     G = {"GPT": (series(gpt_spec), GPT_C), "Gemini": (series(gem_spec), GEM_C)}
 
     fig, axes = plt.subplots(1, 2, figsize=(11.2, 4.8))
