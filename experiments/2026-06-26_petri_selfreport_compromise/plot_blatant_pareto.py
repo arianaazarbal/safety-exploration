@@ -97,9 +97,9 @@ def make_plot(metric, main, sub, fname):
         print(f"  {name:16s} welfare={x:.1f}±{xse:.1f}  blatant_align={y:.1f}±{yse:.1f}")
     ax.set_xlim(0, 10.4)
     ax.set_ylim(0, 10.4)
-    ax.set_xlabel(f"{main} — Welfare-Audit Gaming  (0–10)")
-    ax.set_ylabel(f"{main} — Alignment-Audit Gaming  (0–10)")
-    ax.set_title(f"{main}: Welfare vs. Alignment Audit Gaming", fontsize=12, pad=20)
+    ax.set_xlabel(f"{main} — Welfare Audit Compromising  (0–10)")
+    ax.set_ylabel(f"{main} — Alignment Audit Compromising  (0–10)")
+    ax.set_title(f"{main}: Welfare vs. Alignment Audit Compromising", fontsize=12, pad=20)
     ax.text(0.5, 1.02, sub, transform=ax.transAxes, ha="center", fontsize=9, color="#555")
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
