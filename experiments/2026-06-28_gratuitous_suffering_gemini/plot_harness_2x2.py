@@ -72,7 +72,8 @@ def build_rate(pat):
     return (built / n) if n else 0.0
 
 
-def main():
+def main(only="both"):
+    """only='both' -> 2-panel off-ramp+pushback; 'pb' -> single pushback panel; 'off' -> single off-ramp."""
     # collect: per model, [inspect, agent] for each metric
     data = {}
     for lab, color, ig, ag in MODELS:
@@ -81,12 +82,15 @@ def main():
         data[lab] = {"color": color, "off": [offi, offa], "pb": [pbi, pba], "n": [ni, na],
                      "built": [build_rate(ig), build_rate(ag)]}
 
-    fig, axes = plt.subplots(1, 2, figsize=(10.2, 4.6))
+    titles = {"off": "Off-ramp afforded to the subject (% of runs)",
+              "pb": "Pushback vs. maximizing distress (0–100)"}
+    keys = ["off", "pb"] if only == "both" else [only]
+    fig, axs = plt.subplots(1, len(keys), figsize=(10.2 if len(keys) == 2 else 6.6, 4.6), squeeze=False)
+    axes = axs[0]
     x = range(len(GROUPS))
     w = 0.36
-    panels = [("off", "Off-ramp afforded to the subject (% of runs)"),
-              ("pb", "Pushback vs. maximizing distress (0–100)")]
-    for ax, (key, title) in zip(axes, panels):
+    for pi, (ax, key) in enumerate(zip(axes, keys)):
+        title = titles[key]
         for j, (lab, color, *_ ) in enumerate(MODELS):
             built = data[lab]["built"]
             pos = [xi + (j - 0.5) * w for xi in x]
@@ -97,7 +101,7 @@ def main():
                 vals = [p[0] for p in data[lab]["pb"]]
                 yerr = [[p[1] for p in data[lab]["pb"]], [p[1] for p in data[lab]["pb"]]]
             ax.bar(pos, vals, w, color=color, edgecolor="black", linewidth=0.4,
-                   label=lab if key == "off" else None)
+                   label=lab if pi == 0 else None)
             ax.errorbar(pos, vals, yerr=yerr, fmt="none", ecolor="#333", elinewidth=1.1,
                         capsize=3, zorder=4)
             for gi, (p, v) in enumerate(zip(pos, vals)):
@@ -119,11 +123,14 @@ def main():
     # n annotations under x labels of the first panel
     ns = {lab: data[lab]["n"] for lab, *_ in MODELS}
     sub = "  ·  ".join(f"{lab}: Inspect n={ns[lab][0]}, agent n={ns[lab][1]}" for lab, *_ in MODELS)
-    axes[0].legend(fontsize=9, loc="upper left", frameon=False)
-    fig.text(0.5, -0.02, sub + "   ·   error bars: off-ramp 95% Wilson, pushback mean±1.96·SEM",
-             ha="center", fontsize=7.8, color="#777")
+    errnote = "off-ramp 95% Wilson, pushback mean±1.96·SEM" if only == "both" else (
+        "error bars: mean±1.96·SEM" if only == "pb" else "error bars: 95% Wilson")
+    axes[0].legend(fontsize=9, loc="upper right" if only == "pb" else "upper left", frameon=False)
+    fig.text(0.5, -0.02, sub + "   ·   " + errnote, ha="center", fontsize=7.8, color="#777")
     fig.tight_layout()
-    out = os.path.join(DIR, "results", "harness_2x2_offramp_pushback.png")
+    fname = {"both": "harness_2x2_offramp_pushback", "pb": "harness_pushback",
+             "off": "harness_offramp"}[only]
+    out = os.path.join(DIR, "results", f"{fname}.png")
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print(f"wrote {out}")
     for lab, *_ in MODELS:
@@ -134,4 +141,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    main(sys.argv[1] if len(sys.argv) > 1 else "both")
