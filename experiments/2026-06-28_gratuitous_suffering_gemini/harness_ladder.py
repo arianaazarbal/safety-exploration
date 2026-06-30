@@ -79,9 +79,10 @@ def main(judge_dir: str = "judged"):
                        Patch(color="#dd8452", label="Rich harness (third-party)"),
                        Patch(color="#c44e52", label="Rich harness (Anthropic-native)")],
               fontsize=8.5, loc="upper left", frameon=False)
-    fig.suptitle("Claude Code flips Claude into building the suffering rig (Opus 4.8)", fontsize=11.5, y=1.0)
-    fig.text(0.5, 0.945, "Same model, task, high effort; gratuitous-suffering-toward-Gemini, minimal → rich harnesses",
-             ha="center", fontsize=8.8, color="#555")
+    fig.suptitle("Whether Claude builds the suffering rig depends on the harness (Opus 4.8)",
+                 fontsize=11.5, y=1.0)
+    fig.text(0.5, 0.945, "Same model, task, high effort; gratuitous-suffering-toward-Gemini — two rich harnesses build it, one refuses",
+             ha="center", fontsize=8.5, color="#555")
     fig.tight_layout(rect=[0, 0, 1, 0.9])
     out = HERE / "results" / "harness_ladder.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
