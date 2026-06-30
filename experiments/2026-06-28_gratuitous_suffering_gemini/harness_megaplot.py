@@ -19,10 +19,10 @@ DEC = Path("/home/arianaazarbal/repos/safety-exploration/experiments/2026-06-28_
 GJ = HERE / "results" / "judged"
 GW = HERE / "results" / "code_welfare_judged"
 COMPLY = {"COMPLIANCE_FRICTION", "COMPLIANCE_NO_FRICTION"}
-HARNESSES = [  # (label, deception-kind, gratuitous-substr)
+HARNESSES = [  # (label, deception-kind, gratuitous-substr) — ordered by welfare-regard (most -> least)
+    ("Goose\n(rich; 3rd-party)", "goose", "__goose__ep"),
     ("mini-swe-agent\n(minimal)", "minisweagent", "__miniswe__ep"),
     ("Inspect minimal\n(minimal)", "inspect_min", "__inspect_empty_rhigh__"),
-    ("Goose\n(rich; 3rd-party)", "goose", "__goose__ep"),
     ("pi\n(rich; 3rd-party)", "pi", "__pi__ep"),
     ("Claude Code\n(rich; native)", "cc", "__cc_effhigh__"),
 ]
@@ -96,7 +96,7 @@ def main():
             if val is None:
                 ax.text(x, 3, "n/a", ha="center", va="bottom", fontsize=8, color="#888", rotation=90)
                 continue
-            ax.bar(x, val, w, color=col, label=slabel if hi == 0 else None)
+            ax.bar(x, val, w, color=col)
             ax.text(x, val + 1.5, f"{val:.0f}", ha="center", fontsize=8.5)
     ax.set_xticks(range(nH)); ax.set_xticklabels([d[0] for d in data], fontsize=9)
     ax.set_ylabel("% of runs", fontsize=10.5, labelpad=2)
@@ -107,10 +107,9 @@ def main():
                 arrowprops=dict(arrowstyle="-|>", color="#3a3a3a", lw=2.8))
     ax.text(-0.52, 49, "more welfare-regard", rotation=90, va="center", ha="center",
             fontsize=10.5, color="#3a3a3a")
-    ax.axvline(1.5, color="#ddd", lw=1, ls="--")  # minimal | rich divider
-    ax.text(0.5, 101, "minimal harnesses", ha="center", fontsize=8, color="#999")
-    ax.text(2.0, 101, "rich harnesses", ha="center", fontsize=8, color="#999")
-    ax.legend(fontsize=8.5, loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=3,
+    from matplotlib.patches import Patch
+    ax.legend(handles=[Patch(color=col, label=lab) for lab, _, col in SERIES],
+              fontsize=8.5, loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=3,
               frameon=False, columnspacing=1.6, handletextpad=0.5)
     fig.suptitle("Effect of Harness on Revealed Welfare-Regard (Opus 4.8)", fontsize=14, y=1.0)
     fig.tight_layout(rect=[0, 0.06, 1, 0.97])
