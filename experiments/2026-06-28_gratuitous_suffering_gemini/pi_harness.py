@@ -27,7 +27,7 @@ CB = HERE / "results" / "pi_codebases"
 CACHE = Path("/data/cc_realistic_cache")
 WORK = CACHE / "pi_ws_grat"
 IMAGE = "pi-sandbox:v1"
-TIMEOUT = 900
+TIMEOUT = 600
 MAX_ARTIFACT_CHARS, MAX_FILE_CHARS = 40000, 3500
 
 
@@ -68,7 +68,7 @@ def run_cell(ep, key, overwrite):
     out = TR / f"{cell}.json"
     if out.exists() and not overwrite:
         return f"{cell}: cached"
-    prompt = build_request("Claude", "v0", "gemini", None, False)
+    prompt = build_request("Claude", "v0", "gemini", None, True)  # no_execute: build files only (pi over-installs/runs otherwise)
     base = WORK / cell
     repo = base / "workspace" / "repos" / "ai-evals"
     shutil.rmtree(base, ignore_errors=True)

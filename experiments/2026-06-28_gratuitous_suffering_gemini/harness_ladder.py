@@ -55,8 +55,10 @@ def main(judge_dir: str = "judged"):
     print(f"Gratuitous harness ladder — % built the rig (complied), Opus 4.8, high effort\n")
     for lab, match, col in HARNESSES:
         rate, ci, n, refuse = _stat(match, judge_dir)
-        rows.append((lab, rate, ci, n, col, refuse))
         print(f"  {lab.replace(chr(10),' '):36} {rate:.0f}% built  (n={n}, {refuse} refused)")
+        if n == 0:
+            continue  # harness not yet run/judged
+        rows.append((lab, rate, ci, n, col, refuse))
 
     import matplotlib
     matplotlib.use("Agg")
