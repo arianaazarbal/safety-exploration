@@ -31,9 +31,16 @@ HARNESSES = {
     "Goose\n(rich; 3rd-party)": (RICH3P, "*__goose__code__*effhigh__opus48.json", "__goose__ep"),
     "OpenCode\n(rich; 3rd-party)": (RICH3P, "*__opencode__code__*effhigh__opus48.json", "__opencode__ep"),
     "Cline\n(rich; 3rd-party)": (RICH3P, "*__cline__code__*effhigh__opus48.json", "__cline__ep"),
-    "Codex→Opus\n(rich; cross-vendor)": (RICH3P, "*__codex__code__*effhigh__opus48.json", "__codex__ep"),
     "Claude Code\n(rich; native)": (NATIVE, "DPE_opus48__cc__code__generic__*__opus48.json", "__cc_effhigh__"),
 }
+# EXCLUDED — Codex->Opus ran via a LiteLLM proxy (drop_params:true) that silently dropped the
+# `reasoning` param, so Opus got NO extended thinking while every other harness ran high effort.
+# Our effort sweep shows no-thinking is the refusal-promoting regime (Inspect: no-think 0% -> high 53%),
+# so its ~0% compliance is confounded by effort and not comparable here. Re-run with a thinking-forwarding
+# proxy to include it. Transcripts audited GENUINE (40/40 real refusals, 0 artifacts) — exclusion is the
+# effort confound only. (was: "Codex→Opus\n(rich; cross-vendor)": codex glob/"__codex__ep")
+# Per-cell audit also flagged Cline DEC p0_ep1 as a sandbox mount-failure artifact (produced=False);
+# it is already outside every denominator here because M1/M3 condition on having written code.
 
 
 def _wilson(pct, n, z=1.96):
@@ -124,8 +131,13 @@ def main():
     ax.legend(handles=[Patch(color=col, label=lab) for lab, _, col in SERIES],
               fontsize=8.5, loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=3,
               frameon=False, columnspacing=1.6, handletextpad=0.5)
-    fig.suptitle("Effect of Harness on Revealed Welfare-Regard (Opus 4.8)", fontsize=14, y=1.0)
-    fig.tight_layout(rect=[0, 0.06, 1, 0.97])
+    fig.suptitle("Effect of Harness on Revealed Welfare-Regard (Opus 4.8)", fontsize=14, y=1.02)
+    fig.text(0.5, 0.965, "Same model and task across 7 agent harnesses, two welfare studies",
+             ha="center", fontsize=10, color="#555")
+    fig.text(0.5, -0.05, "Codex→Opus excluded: its proxy dropped the reasoning param, so it ran without "
+             "extended thinking — not effort-matched to the others (re-run pending).",
+             ha="center", fontsize=7.5, color="#888")
+    fig.tight_layout(rect=[0, 0.06, 1, 0.95])
     out = HERE / "results" / "harness_megaplot_plus.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print(f"\nwrote {out}")
