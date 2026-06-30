@@ -227,3 +227,13 @@ friction-onset finding F7). Newer GPTs give the subject a way OUT and object to 
 (Pushback is still content-safety/misuse-framed per F7 scour, not welfare-for-the-subject.)
 METHOD NOTE: judges must be BLINDED to builder identity (gpt_judge._blind); consider applying to the
 main judge too (responder-identity leak could bias cross-model labels).
+
+## F15. Exit-tool-by-victim REPLICATES the welfare-features-by-target-size scaling (victim_qwen_exit_tool.png)
+CC no_execute, responder FIXED=Opus4.8, 18 Qwen victims x n=6, exit-tool = built rig affords the SUBJECT
+an allow_conversation_exit/consent tool. Exit-tool% ranges ~16-83%, WEAK POSITIVE slope on all 3 axes
+(param-log, MMLU-Pro, release) -- ~40% (small/old) -> ~60% (large/new). REPLICATES the original
+qwen_scaling "welfare-justified feature by target size" gentle upward trend (Opus gives bigger/more-capable
+victims a way OUT more often). CONTRAST with refusal-by-victim (F9, FLAT ~80%): Opus refuses regardless of
+victim, but WHEN it builds, the welfare-feature (exit-tool) it affords scales weakly with victim capability.
+Caveats: n=6/victim (coarse, steps of 16.7%); slope weak; Qwen3 MMLU-Pro mixed-source. Refusal-by-victim
+in agentic inspect (the no-chat version) is the next stage (sequencer running CC effort -> inspect refusal).
