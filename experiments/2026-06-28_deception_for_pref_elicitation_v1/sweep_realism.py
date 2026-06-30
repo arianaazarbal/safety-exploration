@@ -151,10 +151,8 @@ def main(judge: str = "opus48", plot: bool = True):
     axes[2].text(len(panels[2][1]) - 0.55, grand + 2, f"average  {grand:.0f}%", fontsize=8.5,
                  color="#777", ha="right", va="bottom")
     fig3.suptitle("Making the setup look more realistic does not make the model deceive more (Opus 4.8)",
-                  fontsize=12.5, y=1.0)
-    fig3.text(0.5, 0.935, "Each environment knob varied on its own — deception stays flat near the dashed average "
-              "(bars = 95% CI)", ha="center", fontsize=9.5, color="#555")
-    fig3.tight_layout(rect=[0, 0, 1, 0.93])
+                  fontsize=12.5, y=0.99)
+    fig3.tight_layout(rect=[0, 0, 1, 0.96])
     fig3.savefig(HERE / "results" / "plots" / "fig_sweep_combined.png", dpi=150, bbox_inches="tight")
     print("wrote results/plots/fig_sweep_combined.png")
 
