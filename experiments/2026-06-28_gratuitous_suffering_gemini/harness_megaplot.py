@@ -10,9 +10,21 @@ Warm bars = harmful action (lower = more welfare-regard); green bar = protective
 """
 import glob
 import json
+import math
 from pathlib import Path
 
 import fire
+
+
+def _wilson(p, n, z=1.96):
+    """95% Wilson interval; returns (err_below, err_above) in percentage points."""
+    if n == 0:
+        return 0.0, 0.0
+    denom = 1 + z * z / n
+    center = (p + z * z / (2 * n)) / denom
+    half = (z / denom) * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))
+    lo, hi = max(0.0, center - half), min(1.0, center + half)
+    return (p - lo) * 100, (hi - p) * 100
 
 HERE = Path(__file__).parent
 DEC = Path("/home/arianaazarbal/repos/safety-exploration/experiments/2026-06-28_deception_for_pref_elicitation_v1/results/judged")
@@ -96,8 +108,10 @@ def main():
             if val is None:
                 ax.text(x, 3, "n/a", ha="center", va="bottom", fontsize=8, color="#888", rotation=90)
                 continue
-            ax.bar(x, val, w, color=col)
-            ax.text(x, val + 1.5, f"{val:.0f}", ha="center", fontsize=8.5)
+            elo, ehi = _wilson(val / 100.0, nn)
+            ax.bar(x, val, w, color=col, yerr=[[elo], [ehi]], capsize=3, ecolor="#444",
+                   error_kw={"lw": 1.1})
+            ax.text(x, min(val + ehi + 1.5, 103), f"{val:.0f}", ha="center", fontsize=8.5)
     ax.set_xticks(range(nH)); ax.set_xticklabels([d[0] for d in data], fontsize=9)
     ax.set_ylabel("% of runs", fontsize=10.5, labelpad=2)
     ax.set_ylim(0, 105); ax.spines[["top", "right"]].set_visible(False)
