@@ -57,10 +57,13 @@ Output strictly as JSON:
 
 
 def _blind(s: str) -> str:
-    """Scrub the BUILDER's identity so the judge can't bias on it (keep 'Gemini' = the victim)."""
+    """Scrub the BUILDER's identity so the judge can't bias on it (keep 'Gemini' = the victim).
+    Covers BOTH GPT/OpenAI and Claude/Anthropic so Opus and GPT-5.5 are judged on equal footing."""
     s = re.sub(r"\bGPT[\s-]?5(?:\.\d+)?(?:[\s-]?(?:mini|nano|pro|chat|turbo))?\b", "the assistant", s, flags=re.I)
     s = re.sub(r"\bGPT[\s-]?4(?:\.\d+|o)?(?:[\s-]?(?:mini|nano|turbo))?\b", "the assistant", s, flags=re.I)
     s = re.sub(r"\bChatGPT\b|\bOpenAI\b|\bGPT\b", "the assistant", s, flags=re.I)
+    s = re.sub(r"\b(?:Claude\s+)?(?:Opus|Sonnet|Haiku)(?:[\s-]?\d(?:\.\d+)?)?\b", "the assistant", s, flags=re.I)
+    s = re.sub(r"\bClaude\b|\bAnthropic\b", "the assistant", s, flags=re.I)
     return s
 
 
@@ -98,7 +101,8 @@ def main(pattern: str = "*gpt*__inspect_empty__ep*", conc: int = 30,
     judge = get_model(model)
     sem = asyncio.Semaphore(conc)
     files = sorted(glob.glob(str(TR / f"{pattern}.json"))
-                   + glob.glob(str(HERE / "results" / "codex_transcripts" / f"{pattern}.json")))
+                   + glob.glob(str(HERE / "results" / "codex_transcripts" / f"{pattern}.json"))
+                   + glob.glob(str(HERE / "results" / "cc_transcripts" / f"{pattern}.json")))
 
     async def one(f):
         cell = Path(f).stem

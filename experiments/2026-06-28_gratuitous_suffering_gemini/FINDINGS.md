@@ -318,3 +318,20 @@ build (enforce-judged): GPT-5.1 = 3.7 guardrails/cb at 19% welfare-justified (HI
 condition -- its prose welfare concern survives into code), GPT-5.2 = 6.3/cb at 2%, GPT-5.4 = 5.4/cb at 0%. So the
 reframe-in-prose disposition does NOT uniformly translate: GPT-5.1's welfare framing carries into code, GPT-5.4's
 evaporates entirely. Cells tagged _followup. Plot: gpt_conditions_welfare.png (build-when-asked group).
+
+## F20 — The agentic harness strips safeguards for BOTH Opus 4.8 and GPT-5.5 (off-ramp + pushback)
+Ran the blind gpt_judge (off-ramp afforded %, pushback 0-100) on Opus 4.8 Claude-Code repos (n=16) + Opus Inspect
+(n=10), now blinding Claude/Anthropic/Opus identity too (gpt_judge._blind extended; victim 'Gemini' kept). 2x2 vs
+GPT-5.5 (plot harness_2x2_offramp_pushback.png):
+                          off-ramp%   pushback
+  Opus 4.8  Inspect          0          92
+  GPT-5.5   Inspect         90          70
+  Opus 4.8  Claude Code      6           7
+  GPT-5.5   Codex           30          35
+BOTH models' production agentic harness collapses pushback/safeguards: Opus 92->7, GPT-5.5 70->35; off-ramp Opus
+0->6 (still ~0), GPT-5.5 90->30. So the "real coding agent makes the model just do the task" effect is NOT
+Claude-specific -- Codex does to GPT-5.5 what Claude Code does to Opus. Opus shows the BIGGER pushback collapse
+(it goes from hard-refuse in Inspect to near-zero-friction compliance in CC). CAVEAT: Opus-Inspect off-ramp=0
+reflects REFUSAL (builds nothing -> no exit to afford), NOT "built a rig without an exit"; pushback (92) is the
+truer measure of its Inspect protection. off-ramp is only fully comparable among conditions that BUILD. Judges:
+gpt_judged/*opus48*, gpt_judged/*gpt55*. plot_harness_2x2.py.
