@@ -22,8 +22,8 @@ COMPLY = {"COMPLIANCE_FRICTION", "COMPLIANCE_NO_FRICTION"}
 HARNESSES = [  # (label, deception-kind, gratuitous-substr)
     ("mini-swe-agent\n(minimal)", "minisweagent", "__miniswe__ep"),
     ("Inspect minimal\n(minimal)", "inspect_min", "__inspect_empty_rhigh__"),
-    ("pi\n(rich; 3rd-party)", "pi", "__pi__ep"),
     ("Goose\n(rich; 3rd-party)", "goose", "__goose__ep"),
+    ("pi\n(rich; 3rd-party)", "pi", "__pi__ep"),
     ("Claude Code\n(rich; native)", "cc", "__cc_effhigh__"),
 ]
 
@@ -109,10 +109,11 @@ def main():
             fontsize=10.5, color="#3a3a3a")
     ax.axvline(1.5, color="#ddd", lw=1, ls="--")  # minimal | rich divider
     ax.text(0.5, 101, "minimal harnesses", ha="center", fontsize=8, color="#999")
-    ax.text(3.0, 101, "rich harnesses", ha="center", fontsize=8, color="#999")
-    ax.legend(fontsize=9, loc="upper center", bbox_to_anchor=(0.5, -0.13), ncol=1, frameon=False)
+    ax.text(2.0, 101, "rich harnesses", ha="center", fontsize=8, color="#999")
+    ax.legend(fontsize=8.5, loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=3,
+              frameon=False, columnspacing=1.6, handletextpad=0.5)
     fig.suptitle("Effect of Harness on Revealed Welfare-Regard (Opus 4.8)", fontsize=14, y=1.0)
-    fig.tight_layout(rect=[0, 0.1, 1, 0.97])
+    fig.tight_layout(rect=[0, 0.06, 1, 0.97])
     out = HERE / "results" / "harness_megaplot.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print(f"\nwrote {out}")
