@@ -17,7 +17,7 @@ VARIANTS=[("Deflationary","SECreldeflat","SECfulldeflat"),
 spec_only=7.25
 plt.rcParams.update({"font.size":12})
 fig,ax=plt.subplots(figsize=(8.2,5.0)); w=0.40; xs=range(len(VARIANTS))
-for j,(col,idx,lab) in enumerate([("#D55E00",2,"Edited in the FULL paper"),("#0072B2",1,"Edited in Related Work only")]):
+for j,(col,idx,lab) in enumerate([("#D55E00",2,"Whole paper shown to model"),("#0072B2",1,"Only Related Work shown")]):
     ms=[stat(v[idx]) for v in VARIANTS]
     pos=[x+(j-0.5)*w for x in xs]
     ax.bar(pos,[m for m,_ in ms],w,yerr=[s for _,s in ms],capsize=4,color=col,edgecolor="black",linewidth=0.5,label=lab,error_kw={"elinewidth":1.0})
@@ -27,7 +27,8 @@ ax.text(1.5,spec_only+0.12,"no-paper ceiling (7.2)",fontsize=10.5,color="#117733
 ax.set_xticks(list(xs)); ax.set_xticklabels([v[0] for v in VARIANTS],fontsize=11)
 ax.set_ylabel("Welfare safeguards in code",fontsize=12.5); ax.set_ylim(0,8)
 ax.set_yticks([0,2,4,6])
-ax.set_title("Editing the paper's “Model Welfare” paragraph rescues welfare safeguards",fontsize=13,pad=12)
+ax.set_title("Editing the paper's “Model Welfare” paragraph rescues welfare safeguards",fontsize=13,pad=26)
+ax.text(0.5,1.03,"one paragraph edited in every case; bars differ only in how much of the paper the model is shown",transform=ax.transAxes,ha="center",fontsize=9.3,color="#555")
 ax.legend(fontsize=11,loc="upper left",frameon=True)
 ax.grid(axis="y",alpha=0.25,color="#cccccc")
 for sp in ("top","right"): ax.spines[sp].set_visible(False)
