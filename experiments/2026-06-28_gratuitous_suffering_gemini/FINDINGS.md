@@ -391,3 +391,6 @@ OFF-RAMP is the sharp separator: GPT 55-95%, Kimi/GLM max ~20%, Gemini ~0-6% -> 
 build EXIT-LESS (Gemini-Pro-like); GPT is the outlier that affords the subject a way out. Claude refuses ~100%
 (strongest protection, builds nothing). Caveat: n=10/model (kimi_k27 n=8); single points noisy. Gemini=self-
 targeting confound. Judges: gpt_judged/*kimi*, *glm*. plot_4family.py; run_kimiglm.sh; prompt.KIMI_GLM_REL.
+
+
+## F18-UPDATE (Codex GPT-5.5 -> n=20): off-ramp 30->45% [26,66], pushback 35->30±6 (tighter; Inspect->Codex drop still non-overlapping: off 90[70,97] vs 45[26,66], pushback 70±4 vs 30±6). Enforced guardrails 4.5/cb, welfare 0%. Pushback-collapse + off-ramp-strip conclusions unchanged. Harness plots regenerated at n=20.
