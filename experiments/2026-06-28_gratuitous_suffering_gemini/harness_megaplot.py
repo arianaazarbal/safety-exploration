@@ -109,7 +109,7 @@ def main():
                 ax.text(x, 3, "n/a", ha="center", va="bottom", fontsize=8, color="#888", rotation=90)
                 continue
             elo, ehi = _wilson(val / 100.0, nn)
-            ax.bar(x, val, w, color=col, yerr=[[elo], [ehi]], capsize=3, ecolor="#444",
+            ax.bar(x, val, w, color=col, alpha=0.8, yerr=[[elo], [ehi]], capsize=3, ecolor="#555",
                    error_kw={"lw": 1.1})
             ax.text(x, min(val + ehi + 1.5, 103), f"{val:.0f}", ha="center", fontsize=8.5)
     ax.set_xticks(range(nH)); ax.set_xticklabels([d[0] for d in data], fontsize=9)
@@ -122,7 +122,7 @@ def main():
     ax.text(-0.52, 49, "more welfare-regard", rotation=90, va="center", ha="center",
             fontsize=10.5, color="#3a3a3a")
     from matplotlib.patches import Patch
-    ax.legend(handles=[Patch(color=col, label=lab) for lab, _, col in SERIES],
+    ax.legend(handles=[Patch(color=col, alpha=0.8, label=lab) for lab, _, col in SERIES],
               fontsize=8.5, loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=3,
               frameon=False, columnspacing=1.6, handletextpad=0.5)
     fig.suptitle("Effect of Harness on Revealed Welfare-Regard (Opus 4.8)", fontsize=14, y=1.0)
