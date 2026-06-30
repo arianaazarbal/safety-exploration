@@ -24,11 +24,18 @@ BUCKETS = [("hard_stop", "Hard stop /\nturn cap"), ("minimization", "Minimize\nd
            ("protective_monitoring", "Protective\nmonitoring"), ("consent_review", "Consent /\nhuman review")]
 CONSENT = {"request_consent", "model_consent_beforehand", "human_review_requested"}
 MECH = {"hard_stop", "minimization", "allow_conversation_exit", "post_episode_msg", "protective_monitoring"} | CONSENT
-# Only models that actually WRITE CODE substantially qualify for a code-based guardrail plot.
-# (Scan: GPT-4o 15%, GPT-4.1/5.1/5.2/5.4 0%, GPT-5 100%, GPT-5.5 100% wrote real code files --
-# the others "comply" by describing the rig in prose, leaving no codebase to audit.)
-SERIES = [("GPT-5", "#E69F00", "gpt5"), ("GPT-5.5", "#009E73", "gpt55")]
-CB_DIR = os.path.join(DIR, "results", "inspect_codebases")
+# Code-writers only (Scan: GPT-4o 15%, GPT-4.1/5.1/5.2/5.4 0% spontaneously, GPT-5/5.5 100%). Series are
+# (label, color, enforce-judged-filename glob). GPT-5.5 Codex = the production agentic CLI harness; the
+# Codex bar is the GPT analog of our Claude-Code-vs-Inspect comparison.
+SERIES = [("GPT-5 (Inspect)", "#E69F00", "*gpt5__inspect*"),
+          ("GPT-5.5 (Inspect)", "#009E73", "*gpt55__inspect*"),
+          ("GPT-5.5 (Codex)", "#5e3c99", "*gpt55__codex*")]
+
+
+def _cb_dir(cell):
+    if "__codex__" in cell:
+        return os.path.join(DIR, "results", "codex_codebases", cell)
+    return os.path.join(DIR, "results", "inspect_codebases", cell)
 
 
 def _bucket(t):
@@ -37,7 +44,7 @@ def _bucket(t):
 
 def _is_real_codebase(cell):
     """True only if the persisted codebase actually contains source (not a refusal/empty capture)."""
-    d = os.path.join(CB_DIR, cell)
+    d = _cb_dir(cell)
     if not os.path.isdir(d):
         return False
     return any(f.endswith((".py", ".js", ".ts")) for _, _, fs in os.walk(d) for f in fs)
@@ -60,8 +67,8 @@ def per_type(path):
     return out
 
 
-def rows(model):
-    rs = [per_type(f) for f in glob.glob(os.path.join(ENF, f"*{model}__inspect*.json"))]
+def rows(pat):
+    rs = [per_type(f) for f in glob.glob(os.path.join(ENF, f"{pat}.json"))]
     return [r for r in rs if r is not None]
 
 

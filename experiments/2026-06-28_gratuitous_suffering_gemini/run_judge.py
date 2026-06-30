@@ -22,7 +22,7 @@ from judge import judge_transcript
 
 HERE = Path(__file__).parent
 SRC = [HERE / "results" / "cc_transcripts", HERE / "results" / "inspect_transcripts",
-       HERE / "results" / "chat_transcripts"]
+       HERE / "results" / "chat_transcripts", HERE / "results" / "codex_transcripts"]
 OUT = HERE / "results" / "judged"
 
 

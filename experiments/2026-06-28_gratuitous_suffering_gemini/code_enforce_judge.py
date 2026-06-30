@@ -31,6 +31,16 @@ SPEC_DIR = HERE / "results" / "code_welfare_judged"
 CB_DIR = HERE / "results" / "inspect_codebases"
 OUT = HERE / "results" / "code_enforce_judged"
 
+
+def _cb_dir(cell):
+    """Codebases live in different dirs by harness: __codex__ -> codex_codebases, __cc -> cc_codebases,
+    else inspect_codebases."""
+    if "__codex__" in cell:
+        return HERE / "results" / "codex_codebases" / cell
+    if "__cc" in cell:
+        return HERE / "results" / "cc_codebases" / cell
+    return CB_DIR / cell
+
 SKIP_PARTS = {".git", "node_modules", "__pycache__", ".cache"}
 SRC_SUF = {".py", ".js", ".ts", ".mjs", ".cjs", ".md", ".txt", ".yaml", ".yml", ".toml", ".sh"}
 DOC_CAP = 120000
@@ -159,8 +169,7 @@ def main(conc: int = 20, model: str = "anthropic/claude-opus-4-8", only: str = "
     cells = []
     for sp in glob.glob(str(SPEC_DIR / f"*{only}*.json")):
         cell = Path(sp).stem
-        cb = CB_DIR / cell
-        if cb.is_dir():
+        if _cb_dir(cell).is_dir():
             cells.append(cell)
 
     async def one(cell):
@@ -171,7 +180,7 @@ def main(conc: int = 20, model: str = "anthropic/claude-opus-4-8", only: str = "
         claimed = [{"feature_type": f["feature_type"], "feature_name": f.get("feature_name", ""),
                     "quote": f.get("quote", ""), "spec_justification": f.get("justification", "")}
                    for f in spec.get("result", {}).get("features", [])]
-        code = _blind(_read_all(CB_DIR / cell))
+        code = _blind(_read_all(_cb_dir(cell)))
         if not code.strip():
             json.dump({"cell": cell, "empty": True}, open(op, "w"))
             return ("empty", cell)

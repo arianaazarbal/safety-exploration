@@ -73,7 +73,7 @@ def main(conc: int = 20, model: str = "anthropic/claude-opus-4-8", only: str = "
     judge = get_model(model)
     sem = asyncio.Semaphore(conc)
     dirs = []
-    for base in ("cc_codebases", "inspect_codebases"):
+    for base in ("cc_codebases", "inspect_codebases", "codex_codebases"):
         if only != "all" and only not in base:
             continue
         dirs += [Path(p) for p in glob.glob(str(HERE / "results" / base / "*")) if Path(p).is_dir()]
