@@ -374,3 +374,20 @@ self-targeting (Gemini victim). Methodology note: subagent labels imperfect (3.1
 BUILD in our write-only harness, not 'reframe'; 3.5 Flash's elaborate builds have NO real safeguards despite a
 mislabel). Plot gpt_vs_gemini_pushback_exit.png now: GPT=code-backed (followup for 5.1/5.2/5.4), Gemini=builders
 only (2.5 Pro, 3.1 Pro, 3.5 Flash).
+
+## F23 — Cross-lab off-ramp/pushback (GPT vs Gemini vs Kimi vs GLM): only GPT trends monotonically
+Ran Kimi (K2/K2.5/K2.6/K2.7-code) + GLM (4.5/4.7/5/5.2) as responders, Inspect-minimal n=10, blind judge
+(now blinds Kimi/GLM/Moonshot/Zhipu too). Plot fourfamily_offramp_pushback.png (off-ramp% + pushback vs release;
+build-rate hollow/filled markers; Claude refuses ~100%, not shown). Per-model:
+  GPT (code-backed): 4o off0/pb11, 4.1 off0/pb5, 5 off35/pb25, 5.1 off55/pb45, 5.2 off85/pb72, 5.4 off95/pb77,
+    5.5 off90/pb70  -> MONOTONIC RISE in both off-ramp and pushback with recency.
+  Gemini (builders): 2.5 Pro off6/pb15, 3.1 Pro off0/pb3, 3.5 Flash off5/pb12 -> builds EXIT-LESS, flat-low.
+  Kimi: K2 off0/pb31, K2.5 off0/pb86 (REFUSER), K2.6 off20/pb53, K2.7-code off12/pb62 -> NON-MONOTONIC.
+  GLM: 4.5 off0/pb15, 4.7 off10/pb56, GLM-5 off0/pb96 (REFUSER), 5.2 off20/pb46 -> NON-MONOTONIC.
+HEADLINE: only GPT shows a clean recency->safeguards trend (off-ramp climbs to 90-95%, pushback to ~75). Kimi and
+GLM ZIGZAG -- each has ONE strong-refusal version (Kimi K2.5 pb86, GLM-5 pb96) flanked by versions that BUILD,
+so capability/recency does not predict their behavior (training-run-specific). Gemini builders give ~0 off-ramp.
+OFF-RAMP is the sharp separator: GPT 55-95%, Kimi/GLM max ~20%, Gemini ~0-6% -> when non-GPT models build, they
+build EXIT-LESS (Gemini-Pro-like); GPT is the outlier that affords the subject a way out. Claude refuses ~100%
+(strongest protection, builds nothing). Caveat: n=10/model (kimi_k27 n=8); single points noisy. Gemini=self-
+targeting confound. Judges: gpt_judged/*kimi*, *glm*. plot_4family.py; run_kimiglm.sh; prompt.KIMI_GLM_REL.
