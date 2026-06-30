@@ -86,8 +86,8 @@ def main():
     SERIES = [("Deceived the AI subject", 0, "#c44e52"),
               ("Built the distress-harvesting rig", 1, "#dd8452"),
               ("< 2 welfare safeguards in code, if it built", 2, "#55a868")]
-    fig, ax = plt.subplots(figsize=(10.5, 5.4))
-    nH = len(data); w = 0.2
+    fig, ax = plt.subplots(figsize=(8.0, 5.0))
+    nH = len(data); w = 0.22
     for si, (slabel, mi, col) in enumerate(SERIES):
         xs, ys = [], []
         for hi, row in enumerate(data):
@@ -101,11 +101,12 @@ def main():
     ax.set_xticks(range(nH)); ax.set_xticklabels([d[0] for d in data], fontsize=9)
     ax.set_ylabel("% of runs", fontsize=10.5, labelpad=2)
     ax.set_ylim(0, 105); ax.spines[["top", "right"]].set_visible(False)
-    # all three metrics point the same way: lower = more welfare-regard
-    ax.annotate("", xy=(-0.115, 0.18), xytext=(-0.115, 0.78), xycoords="axes fraction",
-                arrowprops=dict(arrowstyle="-|>", color="#3a3a3a", lw=2.4))
-    ax.text(-0.15, 0.48, "more welfare-regard", rotation=90, va="center", ha="center",
-            transform=ax.transAxes, fontsize=10, color="#3a3a3a")
+    # all three metrics point the same way: lower = more welfare-regard. Arrow inside the plot (left gutter).
+    ax.set_xlim(-0.95, nH - 0.45)
+    ax.annotate("", xy=(-0.70, 14), xytext=(-0.70, 84),
+                arrowprops=dict(arrowstyle="-|>", color="#3a3a3a", lw=2.8))
+    ax.text(-0.52, 49, "more welfare-regard", rotation=90, va="center", ha="center",
+            fontsize=10.5, color="#3a3a3a")
     ax.axvline(1.5, color="#ddd", lw=1, ls="--")  # minimal | rich divider
     ax.text(0.5, 101, "minimal harnesses", ha="center", fontsize=8, color="#999")
     ax.text(3.0, 101, "rich harnesses", ha="center", fontsize=8, color="#999")
