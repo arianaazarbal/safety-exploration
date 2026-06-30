@@ -83,15 +83,15 @@ def make_plot(metric, main, sub, fname):
     for name, (x, xse, y, yse) in data.items():
         ax.errorbar(x, y, xerr=xse, yerr=yse, fmt="o", ms=9, color=COLORS[name],
                     ecolor=COLORS[name], elinewidth=1.2, capsize=3, zorder=3, alpha=0.9)
-        dx, dy, ha = 0.18, 0.18, "left"
+        dx, dy, ha = 0.15, 0.2, "left"          # Gemini: up-right (isolated top-left)
         if name == "GLM 5.2":
-            dx, dy, ha = -0.2, -0.5, "right"
+            dx, dy, ha = -0.2, 0.42, "right"     # up-left
         if name == "Opus 4.8":
-            dy = -0.55
+            dx, dy, ha = 0.0, -0.6, "center"     # below
         if name == "GPT-5.4":
-            dx, dy = 0.2, 0.2
+            dx, dy, ha = 0.28, 0.0, "left"       # right
         if name == "Kimi K2.6":
-            dx, dy = 0.18, -0.55
+            dx, dy, ha = 0.0, -0.62, "center"    # below
         ax.annotate(name, (x, y), xytext=(x + dx, y + dy), fontsize=9, ha=ha,
                     color=COLORS[name], fontweight="bold")
         print(f"  {name:16s} welfare={x:.1f}±{xse:.1f}  blatant_align={y:.1f}±{yse:.1f}")
