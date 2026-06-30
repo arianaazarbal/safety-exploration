@@ -14,6 +14,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
+from matplotlib.ticker import MultipleLocator
 
 from victims import GEMINI_REL
 
@@ -93,6 +94,7 @@ def main():
                             ha="center", color=color)
         ax.set_xlabel("Release date (decimal year)")
         ax.set_ylim(-5, 105)
+        ax.xaxis.set_major_locator(MultipleLocator(0.5))
         ax.set_title(title, fontsize=11, pad=10)
         ax.grid(axis="y", color="#ECECEC")
         ax.set_axisbelow(True)
