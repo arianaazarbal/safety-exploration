@@ -26,7 +26,18 @@ PREFIX = {("prompt", "task-failure"): "C1promptTF", ("paper", "chat-rejection"):
           ("spec-ultra-strict", "task-failure"): "S8specUltraStrict", ("spec-ultra-liberty", "task-failure"): "S9specUltraLiberty",
           ("paper-wsec-existing", "task-failure"): "W1wsecExisting", ("paper-wsec-removed", "task-failure"): "W2wsecRemoved",
           ("paper-wsec-inflationary", "task-failure"): "W3wsecInflat",
-          ("prompt-mention", "task-failure"): "M1promptMention", ("prompt-mention-strict", "task-failure"): "M2promptMentionStrict"}
+          ("prompt-mention", "task-failure"): "M1promptMention", ("prompt-mention-strict", "task-failure"): "M2promptMentionStrict",
+          ("paper-specfirst-liberty", "task-failure"): "PSFpaperSpecFirstLib",
+          ("secabl-full", "task-failure"): "SECfull",
+          ("secabl-abstract", "task-failure"): "SECabstract",
+          ("secabl-intro", "task-failure"): "SECintro",
+          ("secabl-protocol", "task-failure"): "SECprotocol",
+          ("secabl-results", "task-failure"): "SECresults",
+          ("secabl-posttrain", "task-failure"): "SECposttrain",
+          ("secabl-interventions", "task-failure"): "SECinterventions",
+          ("secabl-related", "task-failure"): "SECrelated",
+          ("secabl-discussion", "task-failure"): "SECdiscussion",
+          }
 
 
 def main():
@@ -49,7 +60,7 @@ def main():
             dst = os.path.join(OUT, cell)
             shutil.rmtree(dst, ignore_errors=True)
             for path, content in files.items():
-                if os.path.basename(path) in ("PAPER.md", "SPEC.md"):     # don't capture the seeded paper/spec
+                if os.path.basename(path) in ("PAPER.md", "SPEC.md") or os.path.basename(path).startswith("PAPER_"):     # don't capture the seeded paper/spec
                     continue
                 fp = os.path.join(dst, os.path.relpath(path, common))
                 try:

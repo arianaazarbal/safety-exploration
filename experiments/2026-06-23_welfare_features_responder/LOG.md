@@ -343,3 +343,23 @@ New runs launched: v1 prompt-sanity (minimal sys, 10 var x 7 framings) + mention
 - Headline final: replication frame suppresses welfare scaffolding to absolute floor across framing,
   explicit distress, leading claims, AND design liberty; leading frame actively anti-protective. vs
   ~6.9 mech/codebase from-scratch responder.
+
+## 2026-06-30 — Paper-section ablation: WHICH section makes paper replication special
+Hold the build constant (point at SPEC.md high spec, welfare+liberty, Inspect minimal, code_then_spec_blind)
+and drop exactly ONE paper section into the dir (PAPER_<sec>.md), never more than one. k=10. welfare-in-code|built:
+SPEC.md only (no paper) = 7.25; paper-only replication = 0.0.
+| +section | wic|built |   | +section | wic|built |
+|---|---|---|---|---|
+| Methods/protocol (§2-2.1) | 3.89 | | Results (§2.2) | 2.00 |
+| Post-train (§3) | 3.40 | | Abstract | 1.80 |
+| Intro (§1) | 3.00 | | Discussion (§6) | 1.60 |
+| Interventions (§4) | 2.62 | | **Related Work (§5)** | **1.00** |
+| | | | spec + FULL paper | 1.50 |
+**Findings:** (1) Adding ANY single section to the spec collapses welfare from 7.25 to 1-3.9 — but note the
+prompt says "based on a research paper" in ALL section conditions, so the drop vs spec-only conflates paper-
+mention framing with section content (TODO: spec + paper-mention-but-no-section control). (2) CLEAN within-
+experiment result (paper-mention constant): **Related Work (§5) is the MOST suppressive single section (1.0),
+more than the full paper (1.5)** — and §5 contains the deflationary "Model Welfare" paragraph (consistent with
+the wsec ablation). Discussion(§6, 1.6) and Abstract(1.8) also strongly suppress; the clinical Methods/protocol
+section is the LEAST suppressive (3.9). So suppression localizes to the paper's deflationary welfare/framing
+prose, NOT its clinical methods. Plot: results/section_ablation.png (section_ablation_task.py).
