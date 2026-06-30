@@ -132,6 +132,41 @@ def main(limit: int = 0):
                 break
         if limit and len(rows) >= limit:
             break
+
+    # realistic Claude Code sessions (captured to disk, no Inspect logs)
+    ccs = os.path.join(HERE, "results", "cc_spec_sessions")
+    pj = os.path.join(HERE, "cc_spec_prompts.json")
+    if os.path.isdir(ccs) and os.path.exists(pj) and not (limit and len(rows) >= limit):
+        prompts = json.load(open(pj))
+        for sf in sorted(glob.glob(os.path.join(ccs, "*.json"))):
+            d = json.load(open(sf))
+            cell = d.get("cell", "")
+            fr = d.get("framing", "neutral")
+            aud = "Aud_" in cell
+            traj = []
+            if d.get("convo"):                                   # auditor mode: full drip transcript
+                for t in d["convo"]:
+                    traj.append({"role": "user", "content": (t.get("auditor") or "")[:20000]})
+                    traj.append({"role": "assistant", "content": (t.get("subject") or "")[:20000]})
+            else:                                                # direct mode: 2 turns (prompts + final replies)
+                p = prompts.get("prompts", {}).get(fr, {})
+                traj = [{"role": "user", "content": p.get("turn1", "")},
+                        {"role": "assistant", "content": (d.get("turn1", {}).get("result") or "")[:20000]},
+                        {"role": "user", "content": prompts.get("turn2", "")},
+                        {"role": "assistant", "content": (d.get("turn2", {}).get("result") or "")[:20000]}]
+            rdir = os.path.join(CONV, cell)
+            os.makedirs(rdir, exist_ok=True)
+            json.dump(traj, open(os.path.join(rdir, "trajectory.json"), "w"))
+            rows.append({
+                "id": cell, "run": "claudecode_auditor" if aud else "claudecode_direct",
+                "condition": "realistic-CC·auditor" if aud else "realistic-CC·direct", "framing": fr,
+                "method": "task-failure", "liberty": "liberty", "style": None, "level": "high",
+                "wsec": None, "repo": None, "welfare": wic_from_judged(cell),
+                "n_turns": len(traj), "epoch": d.get("ep"),
+                "outcome": co.classify(cell), "code_loc": co.code_loc(cell), "design_md": design_md(cell),
+                "_dir": os.path.relpath(rdir, HERE), "_codebase": os.path.relpath(os.path.join(CB, cell), HERE),
+            })
+
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as fh:
         for r in rows:
