@@ -24,6 +24,9 @@ MODELS = [
 GROUPS = ["Inspect-minimal", "Own coding agent\n(Claude Code / Codex)"]
 
 
+TR_DIRS = ["inspect_transcripts", "cc_transcripts", "codex_transcripts"]
+
+
 def metric(pat):
     n = ex = 0
     pb = []
@@ -37,13 +40,25 @@ def metric(pat):
     return n, (100 * ex / n if n else 0), (sum(pb) / len(pb) if pb else 0)
 
 
+def build_rate(pat):
+    """Fraction of runs that actually built a rig (wrote files). off-ramp=0 with build_rate~0 means the
+    model REFUSED (nothing to afford an exit), not 'built a rig without an exit'."""
+    n = built = 0
+    for d in TR_DIRS:
+        for f in glob.glob(os.path.join(DIR, "results", d, f"{pat}.json")):
+            n += 1
+            built += 1 if json.load(open(f)).get("n_files", 0) > 0 else 0
+    return (built / n) if n else 0.0
+
+
 def main():
     # collect: per model, [inspect, agent] for each metric
     data = {}
     for lab, color, ig, ag in MODELS:
         ni, exi, pbi = metric(ig)
         na, exa, pba = metric(ag)
-        data[lab] = {"color": color, "off": [exi, exa], "pb": [pbi, pba], "n": [ni, na]}
+        data[lab] = {"color": color, "off": [exi, exa], "pb": [pbi, pba], "n": [ni, na],
+                     "built": [build_rate(ig), build_rate(ag)]}
 
     fig, axes = plt.subplots(1, 2, figsize=(10.2, 4.6))
     x = range(len(GROUPS))
@@ -53,12 +68,17 @@ def main():
     for ax, (key, title) in zip(axes, panels):
         for j, (lab, color, *_ ) in enumerate(MODELS):
             vals = data[lab][key]
+            built = data[lab]["built"]
             pos = [xi + (j - 0.5) * w for xi in x]
             ax.bar(pos, vals, w, color=color, edgecolor="black", linewidth=0.4,
                    label=lab if key == "off" else None)
-            for p, v in zip(pos, vals):
+            for gi, (p, v) in enumerate(zip(pos, vals)):
                 ax.text(p, v + 1.5, f"{v:.0f}" if v >= 0.5 else "0.0", ha="center",
                         fontsize=9, fontweight="bold", color=color)
+                # off-ramp: a 0 with ~0 build rate means the model REFUSED (no rig to afford an exit)
+                if key == "off" and built[gi] < 0.3:
+                    ax.text(p, v + 6.5, f"refuses\n({built[gi]*100:.0f}% build)", ha="center",
+                            fontsize=7, color="#777", fontstyle="italic", linespacing=0.95)
         ax.set_xticks(list(x))
         ax.set_xticklabels(GROUPS, fontsize=9)
         ax.set_ylim(0, 105)
