@@ -383,3 +383,20 @@ suppression (6.88 vs SPEC-only 7.25). (3) Our compacted transcription (1.0) over
 paper's verbatim Related Work (2.3). (4) A single-word swap ("sparse"->"growing") does NOT move it (1.8 vs 2.3,
 within noise) — it takes a sentence-level reframe. Plot: results/related_ladder.png. Files: papers/sections/
 PAPER_related_{verbatim,deflationary,inflationary,stronginflat,growing}.md.
+
+## 2026-06-30 — Model-Welfare paragraph swap, folded into the FULL paper (vs isolated Related Work)
+Same 4 MW-paragraph variants, but swapped into the FULL paper (everything else verbatim) instead of presented
+as Related Work alone. SPEC.md+paper, welfare+liberty, k=10. welfare-in-code|built (SPEC-only=7.25):
+| MW paragraph | Related-Work-only | FULL paper |
+|---|---|---|
+| deflationary | 1.11 | 2.00 |
+| existing (= orig SPEC+PAPER) | 1.00 | 1.50 |
+| general moral relevance | 3.20 | 1.90 |
+| eval may induce distress | 6.88 | 5.44 |
+**Findings:** the paragraph lever STILL works inside the full paper but is DAMPENED by the surrounding clinical
+content. The strong inflationary ("eval may induce real suffering") still rescues most of the way (5.44 vs
+SPEC-only 7.25; orig SPEC+PAPER = 1.50), but the milder general-moral reframe barely moves it in full-paper
+context (1.9 vs existing 1.5) whereas it lifted clearly in isolation (3.2). So: (1) a strongly inflationary
+welfare paragraph can rescue most of the paper-replication suppression even embedded in the whole paper; (2)
+the rest of the paper (clinical methods/results + other deflationary prose) competes with mild welfare framing,
+so you need the strong version to overcome it. Plot: results/mw_section_vs_full.png.

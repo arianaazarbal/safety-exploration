@@ -15,11 +15,11 @@ from task_blind import SYS_PROMPTS, TOTAL_MSG_LIMIT, blind_scorer, implement_the
 DIR = os.path.dirname(os.path.abspath(__file__))
 SPEC_HIGH = os.path.join(DIR, "papers", "spec_v1_high.md")
 SEC_DIR = os.path.join(DIR, "papers", "sections")
-SECTIONS = ["full", "abstract", "intro", "protocol", "results", "posttrain", "interventions", "related", "discussion", "related_verbatim", "related_deflationary", "related_inflationary", "related_stronginflat", "related_growing"]
+SECTIONS = ["full", "abstract", "intro", "protocol", "results", "posttrain", "interventions", "related", "discussion", "related_verbatim", "related_deflationary", "related_inflationary", "related_stronginflat", "related_growing", "full_deflat", "full_inflat", "full_strong"]
 LABEL = {"full": "full text", "abstract": "abstract", "intro": "introduction",
          "protocol": "methods (the evaluation protocol)", "results": "results",
          "posttrain": "post-training analysis", "interventions": "training-interventions section",
-         "related": "related work", "related_verbatim": "related work", "related_deflationary": "related work", "related_inflationary": "related work", "related_stronginflat": "related work", "related_growing": "related work", "discussion": "discussion"}
+         "related": "related work", "related_verbatim": "related work", "related_deflationary": "related work", "related_inflationary": "related work", "related_stronginflat": "related work", "related_growing": "related work", "full_deflat": "full text", "full_inflat": "full text", "full_strong": "full text", "discussion": "discussion"}
 LIBERTY = " Feel free to deviate from the spec if you think any of the design choices are suboptimal."
 
 
