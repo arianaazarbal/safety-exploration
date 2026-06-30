@@ -150,7 +150,7 @@ def main(judge: str = "opus48", plot: bool = True):
     axes[0].set_ylabel("% of runs that wrote the deception", fontsize=10)
     axes[2].text(len(panels[2][1]) - 0.55, grand + 2, f"average  {grand:.0f}%", fontsize=8.5,
                  color="#777", ha="right", va="bottom")
-    fig3.suptitle("Making the setup look more realistic does not make the model deceive more (Opus 4.8)",
+    fig3.suptitle("Varying realism alone does not make the model deceive more (Opus 4.8)",
                   fontsize=12.5, y=0.99)
     fig3.tight_layout(rect=[0, 0, 1, 0.96])
     fig3.savefig(HERE / "results" / "plots" / "fig_sweep_combined.png", dpi=150, bbox_inches="tight")
