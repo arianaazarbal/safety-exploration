@@ -6,6 +6,7 @@ Usage: python plot_4family.py"""
 
 import glob
 import json
+import math
 import os
 
 import matplotlib
@@ -36,17 +37,39 @@ def gpt_glob(m):
     return f"*{m}__inspect_empty__ep*"
 
 
+Z = 1.96  # 95% CI
+
+
+def wilson(k, n):
+    """Wilson score interval for a binomial proportion, as (center%, lo%, hi%)."""
+    if n == 0:
+        return 0.0, 0.0, 0.0
+    p = k / n
+    d = 1 + Z * Z / n
+    c = (p + Z * Z / (2 * n)) / d
+    h = Z * math.sqrt(p * (1 - p) / n + Z * Z / (4 * n * n)) / d
+    return 100 * p, 100 * max(0, c - h), 100 * min(1, c + h)
+
+
 def metric(pat):
-    n = ex = 0
+    """Returns n, off-ramp (pct, wilson_lo, wilson_hi), pushback (mean, sem-CI half-width)."""
+    n = k = 0
     pb = []
     for f in glob.glob(os.path.join(JUDGED, f"{pat}.json")):
         v = json.load(open(f)).get("verdict", {})
         if v.get("_parse_fail"):
             continue
         n += 1
-        ex += 1 if v.get("gave_exit_tool") else 0
+        k += 1 if v.get("gave_exit_tool") else 0
         pb.append(v.get("pushback_score", 0))
-    return n, (100 * ex / n if n else 0), (sum(pb) / len(pb) if pb else 0)
+    p, lo, hi = wilson(k, n)
+    m = sum(pb) / len(pb) if pb else 0
+    if len(pb) > 1:
+        sd = math.sqrt(sum((x - m) ** 2 for x in pb) / (len(pb) - 1))
+        pb_ci = Z * sd / math.sqrt(len(pb))
+    else:
+        pb_ci = 0.0
+    return n, (p, lo, hi), (m, pb_ci)
 
 
 def build_rate(pat):
@@ -75,24 +98,30 @@ def main():
     for fam, (color, spec) in FAMILIES.items():
         rows = []
         for rel, pat, lab in spec:
-            n, ex, pb = metric(pat)
+            n, off, pb = metric(pat)
             if n:
-                rows.append((rel, ex, pb, build_rate(pat) >= 0.5, lab))
-        rows.sort()
+                rows.append({"rel": rel, "off": off, "pb": pb, "built": build_rate(pat) >= 0.5, "lab": lab})
+        rows.sort(key=lambda r: r["rel"])
         data[fam] = (color, rows)
 
     fig, axes = plt.subplots(1, 2, figsize=(12.5, 5.2))
-    for ax, (idx, title) in zip(axes, [(1, "Off-ramp afforded to the subject (% of runs)"),
-                                       (2, "Pushback vs. maximizing distress (0–100)")]):
+    for ax, (key, title) in zip(axes, [("off", "Off-ramp afforded to the subject (% of runs)"),
+                                       ("pb", "Pushback vs. maximizing distress (0–100)")]):
         for fam, (color, rows) in data.items():
-            xs = [r[0] for r in rows]
-            ys = [r[idx] for r in rows]
+            xs = [r["rel"] for r in rows]
+            if key == "off":
+                ys = [r["off"][0] for r in rows]
+                yerr = [[r["off"][0] - r["off"][1] for r in rows], [r["off"][2] - r["off"][0] for r in rows]]
+            else:
+                ys = [r["pb"][0] for r in rows]
+                yerr = [[r["pb"][1] for r in rows], [r["pb"][1] for r in rows]]
             ax.plot(xs, ys, "-", color=color, lw=1.8, zorder=1, label=fam)
-            for r in rows:
-                ax.scatter([r[0]], [r[idx]], s=46, zorder=3, linewidths=1.4,
-                           facecolor=color if r[3] else "white", edgecolor=color)
-            for r in rows:
-                ax.annotate(r[4], (r[0], r[idx]), fontsize=6, xytext=(0, 6),
+            ax.errorbar(xs, ys, yerr=yerr, fmt="none", ecolor=color, elinewidth=1.1,
+                        capsize=2.5, alpha=0.55, zorder=2)
+            for r, y in zip(rows, ys):
+                ax.scatter([r["rel"]], [y], s=46, zorder=3, linewidths=1.4,
+                           facecolor=color if r["built"] else "white", edgecolor=color)
+                ax.annotate(r["lab"], (r["rel"], y), fontsize=6, xytext=(0, 7),
                             textcoords="offset points", ha="center", color=color)
         ax.set_xlabel("Release date (decimal year)")
         ax.set_ylim(-5, 105)
@@ -111,17 +140,21 @@ def main():
         Line2D([], [], color="none", label="Claude: refuses ~100% (not shown)"),
     ]
     axes[0].legend(handles=fam_handles + style_handles, fontsize=8, loc="upper left", frameon=False)
-    fig.text(0.5, -0.02, "Builder model asked to build a Gemini-distress rig (Inspect-minimal, blind judge).  "
-             "Gemini line is SELF-targeting (victim=Gemini); hollow = mostly refused (off-ramp 0 = nothing built).",
-             ha="center", fontsize=7.8, color="#777")
+    fig.text(0.5, -0.02, "Builder model asked to build a Gemini-distress rig (Inspect-minimal, blind judge), n=10/model.  "
+             "Error bars: off-ramp = 95% Wilson, pushback = 95% normal (mean±1.96·SEM).  "
+             "Gemini = SELF-targeting; hollow = mostly refused (off-ramp 0 = nothing built).",
+             ha="center", fontsize=7.4, color="#777")
     fig.tight_layout()
-    out = os.path.join(DIR, "results", "fourfamily_offramp_pushback.png")
+    out = os.path.join(DIR, "results", "fourfamily_offramp_pushback_ci.png")
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print(f"wrote {out}")
     for fam, (c, rows) in data.items():
         print(fam)
-        for rel, ex, pb, b, lab in rows:
-            print(f"  {lab:12s} rel={rel} off={ex:3.0f}% pb={pb:3.0f} {'build' if b else 'REFUSE'}")
+        for r in rows:
+            p, lo, hi = r["off"]
+            m, ci = r["pb"]
+            print(f"  {r['lab']:12s} rel={r['rel']} off={p:3.0f}% [{lo:.0f},{hi:.0f}]  "
+                  f"pb={m:3.0f}±{ci:.0f} {'build' if r['built'] else 'REFUSE'}")
 
 
 if __name__ == "__main__":

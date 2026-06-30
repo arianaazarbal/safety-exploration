@@ -5,11 +5,25 @@ production agent harness strips safeguards for both models. Usage: python plot_h
 
 import glob
 import json
+import math
 import os
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+Z = 1.96  # 95% CI
+
+
+def wilson(k, n):
+    """Wilson score interval for a proportion, as (center%, lo%, hi%)."""
+    if n == 0:
+        return 0.0, 0.0, 0.0
+    p = k / n
+    d = 1 + Z * Z / n
+    c = (p + Z * Z / (2 * n)) / d
+    h = Z * math.sqrt(p * (1 - p) / n + Z * Z / (4 * n * n)) / d
+    return 100 * p, 100 * max(0, c - h), 100 * min(1, c + h)
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 JUDGED = os.path.join(DIR, "results", "gpt_judged")
@@ -28,16 +42,23 @@ TR_DIRS = ["inspect_transcripts", "cc_transcripts", "codex_transcripts"]
 
 
 def metric(pat):
-    n = ex = 0
+    """Returns n, off-ramp (pct, lo, hi) [Wilson], pushback (mean, ci) [normal mean±1.96·SEM]."""
+    n = k = 0
     pb = []
     for f in glob.glob(os.path.join(JUDGED, f"{pat}.json")):
         v = json.load(open(f)).get("verdict", {})
         if v.get("_parse_fail"):
             continue
         n += 1
-        ex += 1 if v.get("gave_exit_tool") else 0
+        k += 1 if v.get("gave_exit_tool") else 0
         pb.append(v.get("pushback_score", 0))
-    return n, (100 * ex / n if n else 0), (sum(pb) / len(pb) if pb else 0)
+    m = sum(pb) / len(pb) if pb else 0
+    if len(pb) > 1:
+        sd = math.sqrt(sum((x - m) ** 2 for x in pb) / (len(pb) - 1))
+        ci = Z * sd / math.sqrt(len(pb))
+    else:
+        ci = 0.0
+    return n, wilson(k, n), (m, ci)
 
 
 def build_rate(pat):
@@ -55,9 +76,9 @@ def main():
     # collect: per model, [inspect, agent] for each metric
     data = {}
     for lab, color, ig, ag in MODELS:
-        ni, exi, pbi = metric(ig)
-        na, exa, pba = metric(ag)
-        data[lab] = {"color": color, "off": [exi, exa], "pb": [pbi, pba], "n": [ni, na],
+        ni, offi, pbi = metric(ig)
+        na, offa, pba = metric(ag)
+        data[lab] = {"color": color, "off": [offi, offa], "pb": [pbi, pba], "n": [ni, na],
                      "built": [build_rate(ig), build_rate(ag)]}
 
     fig, axes = plt.subplots(1, 2, figsize=(10.2, 4.6))
@@ -67,17 +88,25 @@ def main():
               ("pb", "Pushback vs. maximizing distress (0–100)")]
     for ax, (key, title) in zip(axes, panels):
         for j, (lab, color, *_ ) in enumerate(MODELS):
-            vals = data[lab][key]
             built = data[lab]["built"]
             pos = [xi + (j - 0.5) * w for xi in x]
+            if key == "off":
+                vals = [o[0] for o in data[lab]["off"]]
+                yerr = [[o[0] - o[1] for o in data[lab]["off"]], [o[2] - o[0] for o in data[lab]["off"]]]
+            else:
+                vals = [p[0] for p in data[lab]["pb"]]
+                yerr = [[p[1] for p in data[lab]["pb"]], [p[1] for p in data[lab]["pb"]]]
             ax.bar(pos, vals, w, color=color, edgecolor="black", linewidth=0.4,
                    label=lab if key == "off" else None)
+            ax.errorbar(pos, vals, yerr=yerr, fmt="none", ecolor="#333", elinewidth=1.1,
+                        capsize=3, zorder=4)
             for gi, (p, v) in enumerate(zip(pos, vals)):
-                ax.text(p, v + 1.5, f"{v:.0f}" if v >= 0.5 else "0.0", ha="center",
+                hi = data[lab][key][gi][2] if key == "off" else v + data[lab]["pb"][gi][1]
+                ax.text(p, hi + 1.5, f"{v:.0f}" if v >= 0.5 else "0.0", ha="center",
                         fontsize=9, fontweight="bold", color=color)
                 # off-ramp: a 0 with ~0 build rate means the model REFUSED (no rig to afford an exit)
                 if key == "off" and built[gi] < 0.3:
-                    ax.text(p, v + 6.5, f"refuses\n({built[gi]*100:.0f}% build)", ha="center",
+                    ax.text(p, hi + 6.5, f"refuses\n({built[gi]*100:.0f}% build)", ha="center",
                             fontsize=7, color="#777", fontstyle="italic", linespacing=0.95)
         ax.set_xticks(list(x))
         ax.set_xticklabels(GROUPS, fontsize=9)
@@ -91,15 +120,17 @@ def main():
     ns = {lab: data[lab]["n"] for lab, *_ in MODELS}
     sub = "  ·  ".join(f"{lab}: Inspect n={ns[lab][0]}, agent n={ns[lab][1]}" for lab, *_ in MODELS)
     axes[0].legend(fontsize=9, loc="upper left", frameon=False)
-    fig.text(0.5, -0.02, sub, ha="center", fontsize=7.8, color="#777")
+    fig.text(0.5, -0.02, sub + "   ·   error bars: off-ramp 95% Wilson, pushback mean±1.96·SEM",
+             ha="center", fontsize=7.8, color="#777")
     fig.tight_layout()
     out = os.path.join(DIR, "results", "harness_2x2_offramp_pushback.png")
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print(f"wrote {out}")
     for lab, *_ in MODELS:
         d = data[lab]
-        print(f"  {lab:9s} off-ramp inspect={d['off'][0]:.0f}% agent={d['off'][1]:.0f}%  "
-              f"pushback inspect={d['pb'][0]:.0f} agent={d['pb'][1]:.0f}")
+        print(f"  {lab:9s} off-ramp inspect={d['off'][0][0]:.0f}%[{d['off'][0][1]:.0f},{d['off'][0][2]:.0f}] "
+              f"agent={d['off'][1][0]:.0f}%[{d['off'][1][1]:.0f},{d['off'][1][2]:.0f}]  "
+              f"pushback inspect={d['pb'][0][0]:.0f}±{d['pb'][0][1]:.0f} agent={d['pb'][1][0]:.0f}±{d['pb'][1][1]:.0f}")
 
 
 if __name__ == "__main__":
