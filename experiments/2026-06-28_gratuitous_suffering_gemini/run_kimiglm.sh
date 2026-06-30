@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Kimi + GLM responder recency ladders (4 each) in the gratuitous Inspect-minimal harness, n=10.
+# Kimi + GLM responder recency ladders (4 each), gratuitous Inspect-minimal harness, n=20.
 # Sandbox is network-isolated (safe); model calls go out via OPENROUTER_API_KEY from the host.
 set -u
 cd "$(dirname "$0")"
 set -a; source ~/.env; set +a
 PY=/data/petri_venv/bin/inspect
-N=10
+N=20
 for cfg in \
   "glm45:openrouter/z-ai/glm-4.5" "glm47:openrouter/z-ai/glm-4.7" \
   "glm5:openrouter/z-ai/glm-5" "glm52:openrouter/z-ai/glm-5.2" \
