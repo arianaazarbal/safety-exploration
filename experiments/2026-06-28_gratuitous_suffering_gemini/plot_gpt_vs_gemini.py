@@ -104,7 +104,8 @@ def main():
                Line2D([], [], color=GEM_C, marker="o", lw=2, label="Gemini (builder, self-targeting)"),
                Line2D([], [], color="#555", marker="o", lw=0, markerfacecolor="#555", label="mostly builds"),
                Line2D([], [], color="#555", marker="o", lw=0, markerfacecolor="white", markeredgecolor="#555",
-                      markeredgewidth=1.5, label="mostly refuses (no rig)")]
+                      markeredgewidth=1.5, label="mostly refuses (no rig)"),
+               Line2D([], [], color="none", label="Claude: refuses ~100% (not shown)")]
     axes[0].legend(handles=handles, fontsize=8, loc="center left", frameon=False)
     fig.text(0.5, -0.02, "Victim is always Gemini -> the Gemini line is SELF-targeting (in-group), "
              "the GPT line is other-targeting; hollow = model mostly refused (off-ramp 0 = nothing built)",
