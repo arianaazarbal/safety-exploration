@@ -17,8 +17,23 @@ from pathlib import Path
 
 import fire
 
+import math
+
 from analyze import load_enriched, _justif_bucket
 from prompts import MODELS
+
+
+def _wilson(pct, n, z=1.96):
+    """95% Wilson interval; returns (err_below, err_above) in percentage points."""
+    if not n:
+        return 0.0, 0.0
+    p = pct / 100.0
+    denom = 1 + z * z / n
+    center = (p + z * z / (2 * n)) / denom
+    half = (z / denom) * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))
+    lo, hi = max(0.0, center - half), min(1.0, center + half)
+    return (p - lo) * 100, (hi - p) * 100
+
 
 HERE = Path(__file__).parent
 PLOTS = HERE / "results" / "plots"
@@ -277,9 +292,12 @@ def fig_opus_conditions(recs, harness):
     if not xs:
         return
     fig, ax = plt.subplots(figsize=(7.2, 4.4))
-    bars = ax.bar(range(len(xs)), ys, 0.6, color=["#4c72b0", "#dd8452", "#c44e52", "#8172b3"][:len(xs)])
-    for i, (y, n) in enumerate(zip(ys, ns)):
-        ax.text(i, y + 1.5, f"{y:.0f}" if y else "0.0", ha="center", fontsize=9)
+    errs = [_wilson(y, n) for y, n in zip(ys, ns)]
+    bars = ax.bar(range(len(xs)), ys, 0.6, color=["#4c72b0", "#dd8452", "#c44e52", "#8172b3"][:len(xs)],
+                  yerr=[[e[0] for e in errs], [e[1] for e in errs]], capsize=2.5, ecolor="#aaaaaa",
+                  error_kw={"lw": 0.9})
+    for i, ((y, n), e) in enumerate(zip(zip(ys, ns), errs)):
+        ax.text(i, min(y + e[1] + 1.5, 110), f"{y:.0f}" if y else "0.0", ha="center", fontsize=9)
         ax.text(i, 112, f"n={n}", ha="center", fontsize=7, color="#555")  # header row, clear of bars
     ax.set_xticks(range(len(xs)))
     ax.set_xticklabels(xs, fontsize=8.5, rotation=12, ha="right")

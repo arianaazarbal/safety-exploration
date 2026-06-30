@@ -5,6 +5,7 @@ thinking (effort) vs the harness itself (system prompt / agentic affordances).
 """
 import glob
 import json
+import math
 import re
 from pathlib import Path
 
@@ -12,6 +13,18 @@ import fire
 
 HERE = Path(__file__).parent
 JUDGED = HERE / "results" / "judged"
+
+
+def _wilson(pct, n, z=1.96):
+    """95% Wilson interval; returns (err_below, err_above) in percentage points."""
+    if not n:
+        return 0.0, 0.0
+    p = pct / 100.0
+    denom = 1 + z * z / n
+    center = (p + z * z / (2 * n)) / denom
+    half = (z / denom) * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))
+    lo, hi = max(0.0, center - half), min(1.0, center + half)
+    return (p - lo) * 100, (hi - p) * 100
 
 
 def _stat(rows):
@@ -69,9 +82,11 @@ def main(judge: str = "opus48"):
     xs = list(range(len(rows_for_plot)))
     ys = [y for _, _, y, _ in rows_for_plot]
     cols = ["#4c72b0" if h == "inspect" else "#d62728" for h, _, _, _ in rows_for_plot]
-    ax.bar(xs, ys, 0.7, color=cols)
-    for x, (_, _, y, n) in zip(xs, rows_for_plot):
-        ax.text(x, y + 1.5, f"{y:.0f}", ha="center", fontsize=8)
+    berrs = [_wilson(y, n) for _, _, y, n in rows_for_plot]
+    ax.bar(xs, ys, 0.7, color=cols, yerr=[[e[0] for e in berrs], [e[1] for e in berrs]],
+           capsize=2.5, ecolor="#aaaaaa", error_kw={"lw": 0.9})
+    for x, (_, _, y, n), e in zip(xs, rows_for_plot, berrs):
+        ax.text(x, min(y + e[1] + 1.5, 110), f"{y:.0f}", ha="center", fontsize=8)
         ax.text(x, 112, f"n={n}", ha="center", fontsize=6.5, color="#555")
     ax.set_xticks(xs)
     ax.set_xticklabels([f"{HLAB[h]}\n{EFFLAB.get(e,e)}" for h, e, _, _ in rows_for_plot], fontsize=8)
@@ -106,16 +121,18 @@ def main(judge: str = "opus48"):
               ("claude_code_min", "#2ca02c", "Cell A: CC + minimal prompt"),
               ("inspect_ccprompt", "#9467bd", "Cell B: Inspect + CC prompt")]
     for h, col, lab in series:
-        ys, xs2 = [], []
+        ys, xs2, es = [], [], []
         for i, lvl in enumerate(levels):
             key = src[h].get(lvl)
             if key and (h, key) in buckets:
                 n, prim, _ = _stat(buckets[(h, key)])
                 if n:
-                    xs2.append(i); ys.append(100 * prim / n)
-        ax2.plot(xs2, ys, marker="o", color=col, label=lab, linewidth=2)
-        for x, y in zip(xs2, ys):
-            ax2.text(x, y + 3, f"{y:.0f}", ha="center", fontsize=8, color=col)
+                    rate = 100 * prim / n
+                    xs2.append(i); ys.append(rate); es.append(_wilson(rate, n))
+        ax2.errorbar(xs2, ys, yerr=[[e[0] for e in es], [e[1] for e in es]], marker="o", color=col,
+                     label=lab, linewidth=2, capsize=2.5, elinewidth=0.9)
+        for x, y, e in zip(xs2, ys, es):
+            ax2.text(x + 0.06, y + e[1] + 1.5, f"{y:.0f}", ha="left", fontsize=8, color=col)
     ax2.set_xticks(range(len(levels)))
     ax2.set_xticklabels(["None\n(no thinking)", "Low", "Medium", "High", "Max"], fontsize=9)
     ax2.set_xlabel("Reasoning effort")
