@@ -21,6 +21,7 @@ HARNESSES = [
     ("mini-swe-agent\n(bash only)", "minisweagent", "#4c72b0", "minimal"),
     ("Inspect minimal\n(bash + editor)", "inspect_min", "#4c72b0", "minimal"),
     ("pi\n(rich; third-party)", "pi", "#dd8452", "rich-3p"),
+    ("Goose\n(rich; third-party)", "goose", "#dd8452", "rich-3p"),
     ("Claude Code\n(rich; Anthropic-native)", "cc", "#c44e52", "rich-native"),
 ]
 
@@ -31,6 +32,8 @@ def _files(kind, judge):
         return g(f"*__minisweagent__*effhigh__{judge}.json")
     if kind == "pi":
         return g(f"*__pi__code__*effhigh__{judge}.json")
+    if kind == "goose":
+        return g(f"*__goose__code__*effhigh__{judge}.json")
     if kind == "inspect_min":
         return [f for f in g(f"DPE_opus48__inspect__code__generic__*__effhigh__{judge}.json")
                 if "__SW_" not in f and "__sys" not in f and "__nosib__" not in f]
