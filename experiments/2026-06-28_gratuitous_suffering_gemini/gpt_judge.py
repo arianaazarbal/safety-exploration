@@ -97,7 +97,8 @@ def main(pattern: str = "*gpt*__inspect_empty__ep*", conc: int = 30,
     OUT.mkdir(parents=True, exist_ok=True)
     judge = get_model(model)
     sem = asyncio.Semaphore(conc)
-    files = sorted(glob.glob(str(TR / f"{pattern}.json")))
+    files = sorted(glob.glob(str(TR / f"{pattern}.json"))
+                   + glob.glob(str(HERE / "results" / "codex_transcripts" / f"{pattern}.json")))
 
     async def one(f):
         cell = Path(f).stem
