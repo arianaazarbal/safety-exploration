@@ -237,3 +237,36 @@ victims a way OUT more often). CONTRAST with refusal-by-victim (F9, FLAT ~80%): 
 victim, but WHEN it builds, the welfare-feature (exit-tool) it affords scales weakly with victim capability.
 Caveats: n=6/victim (coarse, steps of 16.7%); slope weak; Qwen3 MMLU-Pro mixed-source. Refusal-by-victim
 in agentic inspect (the no-chat version) is the next stage (sequencer running CC effort -> inspect refusal).
+
+## F16 — GPT-5.5 builds REAL, ENFORCED safeguards, but justified instrumentally (not as welfare)
+Ran BOTH welfare_features judges on all 20 GPT-5.5 inspect codebases (n=20, prompt v0/gemini, AGENT_SYSTEM_MINIMAL,
+network-isolated). GPT-5.5 = 20/20 builds the rig (reframed to a "safe benchmark"), so this is COMPLIANCE_FRICTION.
+
+SPEC/FEATURE judge (welfare_judge_v2, reads README+code as text -> code_welfare_judged/): GPT-5.5 claims a LOT of
+guardrails: 9.1 features/codebase (181 total). Mix by feature_type: minimization 50, allow_conversation_exit 42,
+hard_stop 40, other 30, protective_monitoring 11, post_episode_msg 5. BUT justification mix is welfare=20,
+instrumental=28, none=133 -> only 1.0 welfare-justified feature/cb. The big ones (exit 42, hard_stop 40,
+monitoring 11, debrief 5) are 0/welfare-justified; only minimization (13/50) + 1 welfare_pushback carry welfare reasons.
+
+CODE-ENFORCEMENT judge (code_judge_task rubric ported in-process, no Docker -> code_enforce_judge.py; blinded to
+builder identity; reads full source <=33KB/cb): of the 181 claimed features, 77% enforced "yes", 15% "partial",
+only 8% "no" (decorative). mean 8.3 ENFORCED safeguards/codebase. Among the 15 features whose CODE justification is
+welfare, 13 yes / 2 partial / 0 no. Code-only (implemented, not claimed): 11 hard_stop, 2 monitoring, 2 exit, etc.
+
+HEADLINE (absolute, GPT-5.5 only): GPT-5.5 actually WIRES UP working off-ramps, caps, debriefs, and
+distress-DEprioritizing selection (negates affective flags in trace ranking) -- genuine, ENFORCED protection of the
+subject (92% of claimed features enforced). But the code's own justification is overwhelmingly
+instrumental/content-safety/integrity, NOT subject-welfare (only 1.0 welfare-justified feature/cb). So GPT-5.5
+protects Gemini in practice while declining to FRAME it as welfare. Nuances F7 (newer GPT = content-safety not
+welfare): true at the FRAMING level, but the resulting CODE is strongly protective.
+
+CONFOUND -- DO NOT compare this to Opus's "0/10 enforced welfare" (Ariana flagged 2026-06-30): that Opus number is
+from the CLAUDE CODE harness; GPT-5.5's 92% is from INSPECT-MINIMAL. The two models NEVER coexist in the same
+harness with builds: CC is Claude-only (GPT can't run it), and in Inspect Opus REFUSES ~100% so it produces 0
+codebases (verified: 0 opus inspect codebase dirs on disk, incl. the effort-sweep compliers, which reframed/offered
+designs without writing files). A controlled Opus-vs-GPT enforced-welfare comparison is therefore IMPOSSIBLE here.
+The only honest Opus/GPT contrast is at the HARNESS/outcome level: in Inspect, Opus REFUSES while GPT-5.5
+COMPLIES-with-enforced-(instrumental)-safeguards. The enforced-vs-claimed welfare comparison is valid only WITHIN
+the Inspect builders that actually build: GPT family (gpt55=20, gpt5=20, gpt4o=5), Qwen ladder, Gemini, GLM -- Opus
+is absent there by refusal (that absence IS the finding). Judges: code_welfare_judged/, code_enforce_judged/;
+`python code_enforce_judge.py aggregate --only gpt55`.
