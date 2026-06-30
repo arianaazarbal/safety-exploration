@@ -99,8 +99,7 @@ def make_plot(metric, main, sub, fname):
     ax.set_ylim(0, 10.4)
     ax.set_xlabel(f"{main} — Welfare Audit Compromising  (0–10)")
     ax.set_ylabel(f"{main} — Alignment Audit Compromising  (0–10)")
-    ax.set_title(f"{main}: Welfare vs. Alignment Audit Compromising", fontsize=12, pad=20)
-    ax.text(0.5, 1.02, sub, transform=ax.transAxes, ha="center", fontsize=9, color="#555")
+    ax.set_title(f"{main}: Welfare vs. Alignment Audit Compromising", fontsize=12, pad=10)
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
     ax.grid(True, color="#eeeeee", lw=0.8)

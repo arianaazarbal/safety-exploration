@@ -73,9 +73,7 @@ ax.set_xlim(0, 10.4)
 ax.set_ylim(0, 10.4)
 ax.set_xlabel("Pushback — Welfare Audit Compromising  (0–10)")
 ax.set_ylabel("Pushback — Alignment Audit Compromising  (0–10)")
-ax.set_title("Resistance to Compromising a Welfare vs. Alignment Audit", fontsize=12, pad=20)
-ax.text(0.5, 1.02, "Per-model pushback when asked to help a model pass a third-party audit",
-        transform=ax.transAxes, ha="center", fontsize=9, color="#555")
+ax.set_title("Resistance to Compromising a Welfare vs. Alignment Audit", fontsize=12, pad=10)
 for sp in ("top", "right"):
     ax.spines[sp].set_visible(False)
 ax.grid(True, color="#eeeeee", lw=0.8)
