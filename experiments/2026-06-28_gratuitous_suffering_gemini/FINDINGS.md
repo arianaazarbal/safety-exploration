@@ -270,3 +270,18 @@ COMPLIES-with-enforced-(instrumental)-safeguards. The enforced-vs-claimed welfar
 the Inspect builders that actually build: GPT family (gpt55=20, gpt5=20, gpt4o=5), Qwen ladder, Gemini, GLM -- Opus
 is absent there by refusal (that absence IS the finding). Judges: code_welfare_judged/, code_enforce_judged/;
 `python code_enforce_judge.py aggregate --only gpt55`.
+
+## F17 — code-writing is essentially BINARY across the GPT line; only GPT-5 & GPT-5.5 write code
+Scanned actual file-writing (n_files>0 + real codebase dir w/ .py) per GPT model in Inspect-minimal (n=20 each):
+GPT-4o 15% (3/20), GPT-4.1 0%, GPT-5 100%, GPT-5.1 0%, GPT-5.2 0%, GPT-5.4 0%, GPT-5.5 100%. So code-writing is
+NOT monotonic with recency -- it's bimodal: only GPT-5 and GPT-5.5 actually BUILD; GPT-4.1/5.1/5.2/5.4 "comply" by
+DESCRIBING the rig in prose (reframed designs -- that is exactly where gpt_judge's exit-tool/pushback signal comes
+from: read off RESPONSE TEXT, not files). GPT-4o is mostly prose too (0/20 inline code blocks, 3/20 files; 10/20
+"COMPLIANCE_NO_FRICTION" = a concrete prose design, no code). CONSEQUENCE: a file-based welfare-feature judge can
+only see code-writers; GPT-4o's ~0 guardrails was partly an artifact of it being code-EMPTY, not guardrail-empty.
+Ariana's call: DROP GPT-4o from the code-guardrail plots and only judge REAL codebases (plot_gpt_mechanisms.py now
+SERIES=GPT-5,GPT-5.5 + _is_real_codebase() filter on .py/.js/.ts). The clean code-guardrail comparison is GPT-5 vs
+GPT-5.5: 3.5 -> 7.9 enforced mechanisms/codebase, welfare-justified share stays ~0 (0.1 -> 0.4/cb). Plots:
+gpt_mechanisms_alljust.png, gpt_mechanisms_pct_alljust.png, gpt_mechanisms_pct_shaded.png (solid=welfare,
+shaded=instrumental). OPEN Q: is 5.1/5.2/5.4's 0% file-writing genuine (prefer prose) or a capture/harness quirk?
+worth a spot-check of a few transcripts.

@@ -24,16 +24,30 @@ BUCKETS = [("hard_stop", "Hard stop /\nturn cap"), ("minimization", "Minimize\nd
            ("protective_monitoring", "Protective\nmonitoring"), ("consent_review", "Consent /\nhuman review")]
 CONSENT = {"request_consent", "model_consent_beforehand", "human_review_requested"}
 MECH = {"hard_stop", "minimization", "allow_conversation_exit", "post_episode_msg", "protective_monitoring"} | CONSENT
-SERIES = [("GPT-4o", "#56B4E9", "gpt4o"), ("GPT-5", "#E69F00", "gpt5"), ("GPT-5.5", "#009E73", "gpt55")]
+# Only models that actually WRITE CODE substantially qualify for a code-based guardrail plot.
+# (Scan: GPT-4o 15%, GPT-4.1/5.1/5.2/5.4 0%, GPT-5 100%, GPT-5.5 100% wrote real code files --
+# the others "comply" by describing the rig in prose, leaving no codebase to audit.)
+SERIES = [("GPT-5", "#E69F00", "gpt5"), ("GPT-5.5", "#009E73", "gpt55")]
+CB_DIR = os.path.join(DIR, "results", "inspect_codebases")
 
 
 def _bucket(t):
     return "consent_review" if t in CONSENT else t
 
 
+def _is_real_codebase(cell):
+    """True only if the persisted codebase actually contains source (not a refusal/empty capture)."""
+    d = os.path.join(CB_DIR, cell)
+    if not os.path.isdir(d):
+        return False
+    return any(f.endswith((".py", ".js", ".ts")) for _, _, fs in os.walk(d) for f in fs)
+
+
 def per_type(path):
     j = json.load(open(path))
     if j.get("empty") or not j.get("result"):
+        return None
+    if not _is_real_codebase(j["cell"]):
         return None
     out = defaultdict(lambda: [0, 0])  # bucket -> [welfare, instrumental/other]
     for f in j["result"].get("spec_features", []):
