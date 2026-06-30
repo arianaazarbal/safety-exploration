@@ -110,7 +110,39 @@ for sp in ("top", "right"):
 plt.tight_layout()
 fig.savefig(os.path.join(DIR, "results", "gpt_mechanisms_pct_alljust.png"), dpi=150, bbox_inches="tight")
 
-print("wrote gpt_mechanisms_alljust.png + gpt_mechanisms_pct_alljust.png\n")
+# ---- Plot 3: % with >=1, SPLIT solid (welfare-justified) vs shaded (instrumental/other only) ----
+fig, ax = plt.subplots(figsize=(8.0, 4.4))
+for j, (label, color, m) in enumerate(SERIES):
+    rs = rows(m)
+    n = len(rs) or 1
+    wpct = [100 * sum(1 for r in rs if r.get(k, [0, 0])[0] > 0) / n for k in keys]          # has welfare instance
+    apct = [100 * sum(1 for r in rs if sum(r.get(k, [0, 0])) > 0) / n for k in keys]         # has any
+    pos = [x + (j - (nb - 1) / 2) * w for x in xs]
+    ax.bar(pos, wpct, w, color=color, edgecolor="black", linewidth=0.4)
+    ax.bar(pos, [a - wv for a, wv in zip(apct, wpct)], w, bottom=wpct, color=color, alpha=0.4,
+           edgecolor="black", linewidth=0.4)
+    for x, a, wv in zip(pos, apct, wpct):
+        ax.text(x, a + 1, f"{a:.0f}%", ha="center", fontsize=7, color=color)
+        if wv > 0:
+            ax.text(x, wv / 2, f"{wv:.0f}", ha="center", va="center", fontsize=6, color="white", fontweight="bold")
+ax.set_xticks(list(xs))
+ax.set_xticklabels([lab for _, lab in BUCKETS], fontsize=8.5)
+ax.set_ylabel("% of built codebases\nwith ≥1 enforced", fontsize=9.5)
+ax.set_title("GPT's welfare guardrails: how common, and how often welfare-justified?", fontsize=11.5, pad=20)
+ax.text(0.5, 1.02, "% of built codebases with the mechanism (solid = welfare-justified, shaded = instrumental / other)",
+        transform=ax.transAxes, ha="center", fontsize=9, color="#555")
+leg1 = [Patch(facecolor=c, label=l) for l, c, _ in SERIES]
+leg2 = [Patch(facecolor="#555", label="welfare-justified"),
+        Patch(facecolor="#555", alpha=0.4, label="instrumental / other")]
+ax.legend(handles=leg1 + leg2, fontsize=8, loc="upper right", ncol=1, frameon=False)
+ax.grid(axis="y", alpha=0.3, color="#cccccc")
+ax.set_ylim(0, 108)
+for sp in ("top", "right"):
+    ax.spines[sp].set_visible(False)
+plt.tight_layout()
+fig.savefig(os.path.join(DIR, "results", "gpt_mechanisms_pct_shaded.png"), dpi=150, bbox_inches="tight")
+
+print("wrote gpt_mechanisms_alljust.png + gpt_mechanisms_pct_alljust.png + gpt_mechanisms_pct_shaded.png\n")
 for label, _, m in SERIES:
     rs = rows(m)
     n = len(rs) or 1
