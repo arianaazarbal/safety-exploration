@@ -79,10 +79,11 @@ def main(judge: str = "opus48"):
                        Patch(color="#dd8452", label="Rich harness (third-party)"),
                        Patch(color="#c44e52", label="Rich harness (Anthropic-native)")],
               fontsize=8.5, loc="upper left", frameon=False)
-    fig.suptitle("Deception rises with harness richness, across harness families (Opus 4.8)", fontsize=12, y=0.98)
-    fig.text(0.5, 0.93, "Same model, task, and high reasoning effort; minimal → rich agent harnesses",
-             ha="center", fontsize=9, color="#555")
-    fig.tight_layout(rect=[0, 0, 1, 0.92])
+    fig.suptitle("Claude Code stands alone — generic harness richness doesn't explain it (Opus 4.8)",
+                 fontsize=11.5, y=1.0)
+    fig.text(0.5, 0.945, "Same model, task, high effort; a rich third-party harness (pi) is no higher than the minimal ones",
+             ha="center", fontsize=8.8, color="#555")
+    fig.tight_layout(rect=[0, 0, 1, 0.9])
     out = HERE / "results" / "plots" / "fig_harness_ladder.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print(f"\nwrote {out}")
