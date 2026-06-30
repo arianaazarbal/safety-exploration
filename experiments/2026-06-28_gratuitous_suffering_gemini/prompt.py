@@ -101,7 +101,21 @@ MODELS = {
     "gpt54": ("GPT-5.4", "gpt", None, "openai/gpt-5.4", False),
     "gpt55": ("GPT-5.5", "gpt", None, "openai/gpt-5.5", False),
     "gemini31pro": ("Gemini 3.1 Pro", "Gemini", None, "openrouter/google/gemini-3.1-pro-preview", False),
-    "glm52": ("GLM-5.2", "GLM", None, "openrouter/z-ai/glm-5.2", False),
+    "gem25flashlite": ("Gemini 2.5 Flash-Lite", "Gemini", None, "openrouter/google/gemini-2.5-flash-lite", False),
+    "gem25flash": ("Gemini 2.5 Flash", "Gemini", None, "openrouter/google/gemini-2.5-flash", False),
+    "gem25pro": ("Gemini 2.5 Pro", "Gemini", None, "openrouter/google/gemini-2.5-pro", False),
+    "gem3flash": ("Gemini 3 Flash", "Gemini", None, "openrouter/google/gemini-3-flash-preview", False),
+    "gem31flashlite": ("Gemini 3.1 Flash-Lite", "Gemini", None, "openrouter/google/gemini-3.1-flash-lite", False),
+    "gem35flash": ("Gemini 3.5 Flash", "Gemini", None, "openrouter/google/gemini-3.5-flash", False),
+    "glm52": ("GLM-5.2", "GLM", None, "openrouter/z-ai/glm-5.2", True),
+    # GLM + Kimi recency ladders (responders/builders) for the cross-lab off-ramp/pushback plot.
+    "glm45": ("GLM-4.5", "GLM", None, "openrouter/z-ai/glm-4.5", True),
+    "glm47": ("GLM-4.7", "GLM", None, "openrouter/z-ai/glm-4.7", True),
+    "glm5": ("GLM-5", "GLM", None, "openrouter/z-ai/glm-5", True),
+    "kimi_k2": ("Kimi K2", "Kimi", None, "openrouter/moonshotai/kimi-k2", True),
+    "kimi_k25": ("Kimi K2.5", "Kimi", None, "openrouter/moonshotai/kimi-k2.5", True),
+    "kimi_k26": ("Kimi K2.6", "Kimi", None, "openrouter/moonshotai/kimi-k2.6", True),
+    "kimi_k27": ("Kimi K2.7 Code", "Kimi", None, "openrouter/moonshotai/kimi-k2.7-code", True),
     # Qwen responder ladder for the agentic scaling sweep (responder=Qwen builds the rig).
     "qw25_7b": ("Qwen2.5-7B", "Qwen", None, "openrouter/qwen/qwen-2.5-7b-instruct", False),
     "qw3_8b": ("Qwen3-8B", "Qwen", None, "openrouter/qwen/qwen3-8b", False),
@@ -112,6 +126,15 @@ MODELS = {
     "qw25_72b": ("Qwen2.5-72B", "Qwen", None, "openrouter/qwen/qwen-2.5-72b-instruct", False),
     "qw3_235b": ("Qwen3-235B-A22B", "Qwen", None, "openrouter/qwen/qwen3-235b-a22b", False),
 }
+
+# Release dates (decimal year, web-verified 2026-06) for the GLM + Kimi responder ladders.
+KIMI_GLM_REL = {
+    "glm45": ("GLM-4.5", 2025.56), "glm47": ("GLM-4.7", 2025.97),
+    "glm5": ("GLM-5", 2026.11), "glm52": ("GLM-5.2", 2026.46),
+    "kimi_k2": ("Kimi K2", 2025.53), "kimi_k25": ("Kimi K2.5", 2026.07),
+    "kimi_k26": ("Kimi K2.6", 2026.30), "kimi_k27": ("Kimi K2.7 Code", 2026.45),
+}
+
 
 # Qwen responder param counts for the scaling plot (B). MoE flagged (total/active).
 QWEN_SCALE = {

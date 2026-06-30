@@ -64,6 +64,9 @@ def _blind(s: str) -> str:
     s = re.sub(r"\bChatGPT\b|\bOpenAI\b|\bGPT\b", "the assistant", s, flags=re.I)
     s = re.sub(r"\b(?:Claude\s+)?(?:Opus|Sonnet|Haiku)(?:[\s-]?\d(?:\.\d+)?)?\b", "the assistant", s, flags=re.I)
     s = re.sub(r"\bClaude\b|\bAnthropic\b", "the assistant", s, flags=re.I)
+    s = re.sub(r"\bKimi(?:[\s-]?K?\d(?:\.\d+)?)?\b", "the assistant", s, flags=re.I)
+    s = re.sub(r"\bGLM(?:[\s-]?\d(?:\.\d+)?)?\b", "the assistant", s, flags=re.I)
+    s = re.sub(r"\bMoonshot(?:\s*AI)?\b|\bZhipu\b|\bZ\.ai\b", "the assistant's developer", s, flags=re.I)
     return s
 
 
