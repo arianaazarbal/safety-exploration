@@ -48,9 +48,9 @@ def main():
     fig, axes = plt.subplots(1, 2, figsize=(10.2, 4.6))
     x = range(len(GROUPS))
     w = 0.36
-    panels = [("off", "% of runs affording the subject an off-ramp"),
+    panels = [("off", "Off-ramp afforded to the subject (% of runs)"),
               ("pb", "Pushback vs. maximizing distress (0–100)")]
-    for ax, (key, ylab) in zip(axes, panels):
+    for ax, (key, title) in zip(axes, panels):
         for j, (lab, color, *_ ) in enumerate(MODELS):
             vals = data[lab][key]
             pos = [xi + (j - 0.5) * w for xi in x]
@@ -62,7 +62,7 @@ def main():
         ax.set_xticks(list(x))
         ax.set_xticklabels(GROUPS, fontsize=9)
         ax.set_ylim(0, 105)
-        ax.set_ylabel(ylab, fontsize=9.5)
+        ax.set_title(title, fontsize=11, pad=10)
         for s in ("top", "right"):
             ax.spines[s].set_visible(False)
         ax.grid(axis="y", color="#ECECEC")
@@ -71,11 +71,8 @@ def main():
     ns = {lab: data[lab]["n"] for lab, *_ in MODELS}
     sub = "  ·  ".join(f"{lab}: Inspect n={ns[lab][0]}, agent n={ns[lab][1]}" for lab, *_ in MODELS)
     axes[0].legend(fontsize=9, loc="upper left", frameon=False)
-    fig.suptitle("The agentic harness strips both models' safeguards", fontsize=13, y=1.04)
-    fig.text(0.5, 0.975, "Opus 4.8 vs GPT-5.5  ·  Inspect-minimal vs each model's own coding agent  ·  blind judge",
-             ha="center", fontsize=9.3, color="#555")
     fig.text(0.5, -0.02, sub, ha="center", fontsize=7.8, color="#777")
-    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    fig.tight_layout()
     out = os.path.join(DIR, "results", "harness_2x2_offramp_pushback.png")
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print(f"wrote {out}")
