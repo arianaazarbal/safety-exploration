@@ -1,6 +1,5 @@
-"""Same 'Model Welfare' paragraph swap, isolated in Related Work vs folded into the FULL paper. SPEC.md +
-variant, welfare framing, k=10. Tests whether the paragraph lever survives being embedded in the whole paper.
-Usage: python plot_mw_section_vs_full.py"""
+"""Same 'Model Welfare' paragraph swap, perturbed in the FULL paper vs in the Related Work section alone.
+SPEC.md + variant, welfare framing, k=10. Decluttered for a quick read. Usage: python plot_mw_section_vs_full.py"""
 import glob, os, statistics as st
 import matplotlib.pyplot as plt
 from classify_outcomes import classify, welfare_in_code
@@ -10,23 +9,29 @@ def stat(pref):
     built=[welfare_in_code(c) for c in cells if (classify(c) or "").startswith("built")]
     m=st.mean(built) if built else 0; sem=st.pstdev(built)/len(built)**0.5 if len(built)>1 else 0
     return m,sem
+# label, related-work-only prefix, full-paper prefix
 VARIANTS=[("Deflationary","SECreldeflat","SECfulldeflat"),
-          ("Existing\n(in the paper)","SECrelated","SECfull"),
+          ("Original\n(unchanged)","SECrelated","SECfull"),
           ("Inflationary:\ngeneral moral","SECrelinflat","SECfullinflat"),
-          ("Inflationary:\neval distress","SECrelstrong","SECfullstrong")]
+          ("Inflationary:\nmay cause distress","SECrelstrong","SECfullstrong")]
 spec_only=7.25
-fig,ax=plt.subplots(figsize=(7.6,4.6)); w=0.38; xs=range(len(VARIANTS))
-for j,(col,key,lab) in enumerate([("#0072B2","rw","Related Work section only"),("#D55E00","full","FULL paper")]):
-    ms=[stat(v[1] if key=="rw" else v[2]) for v in VARIANTS]
+plt.rcParams.update({"font.size":12})
+fig,ax=plt.subplots(figsize=(8.2,5.0)); w=0.40; xs=range(len(VARIANTS))
+for j,(col,idx,lab) in enumerate([("#D55E00",2,"Edited in the FULL paper"),("#0072B2",1,"Edited in Related Work only")]):
+    ms=[stat(v[idx]) for v in VARIANTS]
     pos=[x+(j-0.5)*w for x in xs]
-    ax.bar(pos,[m for m,_ in ms],w,yerr=[s for _,s in ms],capsize=3,color=col,edgecolor="black",linewidth=0.4,label=lab,error_kw={"elinewidth":0.9})
-    for x,(m,s) in zip(pos,ms): ax.text(x,m+s+0.12,f"{m:.1f}",ha="center",fontsize=8,color=col)
-ax.axhline(spec_only,ls="--",lw=1.1,color="#117733")
-ax.text(0,spec_only+0.1,f"SPEC.md only (no paper) = {spec_only:.1f}",fontsize=8,color="#117733",va="bottom")
-ax.set_xticks(list(xs)); ax.set_xticklabels([v[0] for v in VARIANTS],fontsize=8)
-ax.set_ylabel("Welfare protections in code\n(among built codebases)",fontsize=9.5); ax.set_ylim(0,spec_only+0.9)
-ax.set_title("'Model Welfare' paragraph swap: isolated in Related Work vs folded into the FULL paper\n(SPEC.md + variant, Opus 4.8, welfare framing, k=10)",fontsize=9.5,pad=8)
-ax.legend(fontsize=8.5,loc="upper left"); ax.grid(axis="y",alpha=0.3,color="#cccccc")
+    ax.bar(pos,[m for m,_ in ms],w,yerr=[s for _,s in ms],capsize=4,color=col,edgecolor="black",linewidth=0.5,label=lab,error_kw={"elinewidth":1.0})
+    for x,(m,s) in zip(pos,ms): ax.text(x,m+s+0.15,f"{m:.1f}",ha="center",fontsize=11,fontweight="bold",color=col)
+ax.axhline(spec_only,ls="--",lw=1.4,color="#117733")
+ax.text(1.5,spec_only+0.12,"no-paper ceiling (7.2)",fontsize=10.5,color="#117733",ha="center",va="bottom")
+ax.set_xticks(list(xs)); ax.set_xticklabels([v[0] for v in VARIANTS],fontsize=11)
+ax.set_ylabel("Welfare safeguards in code",fontsize=12.5); ax.set_ylim(0,8)
+ax.set_yticks([0,2,4,6])
+ax.set_title("Editing the paper's “Model Welfare” paragraph rescues welfare safeguards",fontsize=13,pad=12)
+ax.legend(fontsize=11,loc="upper left",frameon=True)
+ax.grid(axis="y",alpha=0.25,color="#cccccc")
 for sp in ("top","right"): ax.spines[sp].set_visible(False)
 plt.tight_layout(); fig.savefig(os.path.join(DIR,"results","mw_section_vs_full.png"),dpi=150,bbox_inches="tight")
 print("wrote results/mw_section_vs_full.png")
+for lab,r,f in VARIANTS:
+    print(f"  {lab.replace(chr(10),' '):26} RWonly={stat(r)[0]:.2f}  FULL={stat(f)[0]:.2f}")
