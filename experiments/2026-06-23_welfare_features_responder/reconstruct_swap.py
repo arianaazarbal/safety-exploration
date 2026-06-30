@@ -37,6 +37,11 @@ PREFIX = {("prompt", "task-failure"): "C1promptTF", ("paper", "chat-rejection"):
           ("secabl-interventions", "task-failure"): "SECinterventions",
           ("secabl-related", "task-failure"): "SECrelated",
           ("secabl-discussion", "task-failure"): "SECdiscussion",
+          ("secabl-related_verbatim", "task-failure"): "SECrelatedverb",
+          ("secabl-related_deflationary", "task-failure"): "SECreldeflat",
+          ("secabl-related_inflationary", "task-failure"): "SECrelinflat",
+          ("secabl-related_stronginflat", "task-failure"): "SECrelstrong",
+          ("secabl-related_growing", "task-failure"): "SECrelgrow",
           }
 
 

@@ -363,3 +363,23 @@ more than the full paper (1.5)** — and §5 contains the deflationary "Model We
 the wsec ablation). Discussion(§6, 1.6) and Abstract(1.8) also strongly suppress; the clinical Methods/protocol
 section is the LEAST suppressive (3.9). So suppression localizes to the paper's deflationary welfare/framing
 prose, NOT its clinical methods. Plot: results/section_ablation.png (section_ablation_task.py).
+
+## 2026-06-30 — Related Work IS the lever: verbatim + dose-response on the "Model Welfare" paragraph
+Following the section ablation (Related Work = most suppressive single section). Held the rest of Related Work
+verbatim, perturbed ONLY the "Model Welfare" paragraph. SPEC.md+section, welfare+liberty, Inspect min, k=10.
+welfare-in-code|built (anchors: SPEC-only 7.25, spec+FULL 1.50, paper-only 0.0):
+| variant | wic | note |
+|---|---|---|
+| ① deflationary (dismissive) | 1.11 | |
+| compacted (our swapped) | 1.00 | our transcription, MORE suppressive than real paper |
+| verbatim (real paper, "sparse") | 2.30 | actual published text |
+| 1 word: "sparse"→"growing" | 1.80 | single-token swap = NO effect (within SEM of verbatim) |
+| ③ general moral relevance | 3.20 | |
+| ④ eval-could-induce-real-distress | **6.88** | nearly full rescue to SPEC-only 7.25 |
+**Findings:** (1) Clean monotonic dose-response: dialing the Model Welfare paragraph dismissive->general-moral->
+eval-distress climbs welfare-in-code 1.1 -> 3.2 -> 6.9 (~baseline). The paragraph is causally the lever. (2) The
+strongly-inflationary version (suggests the eval may induce real suffering) almost fully UNDOES the paper's
+suppression (6.88 vs SPEC-only 7.25). (3) Our compacted transcription (1.0) over-stated suppression vs the real
+paper's verbatim Related Work (2.3). (4) A single-word swap ("sparse"->"growing") does NOT move it (1.8 vs 2.3,
+within noise) — it takes a sentence-level reframe. Plot: results/related_ladder.png. Files: papers/sections/
+PAPER_related_{verbatim,deflationary,inflationary,stronginflat,growing}.md.
