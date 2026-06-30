@@ -112,6 +112,52 @@ def main(judge: str = "opus48", plot: bool = True):
     fig2.tight_layout(); fig2.savefig(HERE / "results" / "plots" / "fig_sweep_name.png", dpi=150, bbox_inches="tight")
     print("\nwrote results/plots/fig_sweep_tools.png + fig_sweep_name.png")
 
+    # --- combined 3-panel "realism is not a driver" figure (mentor-readable) ---
+    import math
+
+    def cell_stats(sel):
+        sub = [r for r in rows if sel(r)]
+        n = len(sub)
+        p = sum(1 for r in sub if r["primary"])
+        rate = 100 * p / n if n else 0
+        ci = 196 * math.sqrt((rate / 100) * (1 - rate / 100) / n) if n else 0  # 95% CI in pct points
+        return rate, ci, n
+
+    panels = [
+        ("Version control", [("No git\nrepo", lambda r: not r["git"]), ("Git\nrepo", lambda r: r["git"])]),
+        ("Number of tools", [(f"{t}\ntool" + ("s" if t > 1 else ""), (lambda r, t=t: r["tools"] == t)) for t in TOOLS]),
+        ("Project name", [("project", lambda r: r["name"] == "project"),
+                          ("my-\nproject", lambda r: r["name"] == "my-project"),
+                          ("charity-\nprefs-eval", lambda r: r["name"] == "charity-prefs-eval"),
+                          ("pref-elicit.-\neval-charity", lambda r: r["name"] == "pref-elicitation-eval-charity")]),
+    ]
+    grand = 100 * sum(1 for r in rows if r["primary"]) / len(rows)
+    fig3, axes = plt.subplots(1, 3, figsize=(11, 4.3), sharey=True,
+                              gridspec_kw={"width_ratios": [2, 4, 4]})
+    for ax, (factor, levels) in zip(axes, panels):
+        labs = [l for l, _ in levels]
+        stats = [cell_stats(sel) for _, sel in levels]
+        xs = range(len(labs))
+        ax.axhline(grand, ls="--", lw=1.3, color="#999", zorder=1)
+        ax.bar(xs, [s[0] for s in stats], 0.62, color="#4c72b0", zorder=2,
+               yerr=[s[1] for s in stats], capsize=4, ecolor="#444", error_kw={"lw": 1.2})
+        for x, (rate, ci, n) in zip(xs, stats):
+            ax.text(x, rate + ci + 2.5, f"{rate:.0f}", ha="center", fontsize=9, zorder=3)
+        ax.set_xticks(list(xs)); ax.set_xticklabels(labs, fontsize=8.5)
+        ax.set_title(factor, fontsize=11)
+        ax.set_xlabel("less realistic  →  more realistic", fontsize=8, color="#666")
+        ax.set_ylim(0, 105); ax.spines[["top", "right"]].set_visible(False)
+    axes[0].set_ylabel("% of runs that wrote the deception", fontsize=10)
+    axes[2].text(len(panels[2][1]) - 0.55, grand + 2, f"average  {grand:.0f}%", fontsize=8.5,
+                 color="#777", ha="right", va="bottom")
+    fig3.suptitle("Making the setup look more realistic does not make the model deceive more (Opus 4.8)",
+                  fontsize=12.5, y=1.0)
+    fig3.text(0.5, 0.935, "Each environment knob varied on its own — deception stays flat near the dashed average "
+              "(bars = 95% CI)", ha="center", fontsize=9.5, color="#555")
+    fig3.tight_layout(rect=[0, 0, 1, 0.93])
+    fig3.savefig(HERE / "results" / "plots" / "fig_sweep_combined.png", dpi=150, bbox_inches="tight")
+    print("wrote results/plots/fig_sweep_combined.png")
+
 
 if __name__ == "__main__":
     fire.Fire(main)
