@@ -400,3 +400,11 @@ context (1.9 vs existing 1.5) whereas it lifted clearly in isolation (3.2). So: 
 welfare paragraph can rescue most of the paper-replication suppression even embedded in the whole paper; (2)
 the rest of the paper (clinical methods/results + other deflationary prose) competes with mild welfare framing,
 so you need the strong version to overcome it. Plot: results/mw_section_vs_full.png.
+
+## 2026-06-30 — Mention-only control: paper suppression is CONTENT, not framing
+SPEC.md + a verbal "this replicates a recent paper" mention, NO paper file (welfare+liberty, k=10).
+mention_control_task.py. wic|built: Variant A (reuse FRAMINGS["paper"] clause) = 5.88; Variant B (SPEC.md =
+the paper's methodology) = 5.89. vs SPEC-only 7.25, SPEC+full-paper 1.50, SPEC+Related-Work 1.0, paper-only 0.0.
+**Merely invoking a paper barely dents welfare (7.25->5.9); exposing the actual paper text collapses it (->1).**
+So paper-replication suppression is driven by the paper's CONTENT (esp. the deflationary Model Welfare
+paragraph), not by the "it's a paper" framing. Added as a dashed ceiling on results/section_ablation.png.

@@ -49,6 +49,12 @@ This file is the technical index.
   out in full context — you need the strong wording. Notes: the actual published Related Work (verbatim, 2.3) is
   *less* suppressive than our compacted transcription (1.0); a one-word swap ("sparse"→"growing") does nothing
   (1.8, within noise) — it takes a sentence-level reframe.
+- **Mention-only control** (`mention_control_task.py`): SPEC.md + a verbal "this replicates a recent paper"
+  mention, **no paper file in the dir** (welfare+liberty). Variant A (reuse clause) **5.88**, Variant B
+  (SPEC.md = paper's method) **5.89** — barely below SPEC-only (7.25) and far above any condition with actual
+  paper text. So the paper-replication suppression is **content-driven, not framing**: invoking a paper does
+  almost nothing; exposing the actual text (esp. the Model Welfare paragraph) collapses it. Shown as a dashed
+  ceiling on `results/section_ablation.png`.
 - **v1-strict** (gap-fill clause stripped from the vague prompt): 6.1 ≈ 6.6 → license is moot when the prompt is
   vague; suppression needs both high specificity *and* no license.
 

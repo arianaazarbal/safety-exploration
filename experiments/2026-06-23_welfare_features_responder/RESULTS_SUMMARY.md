@@ -45,6 +45,11 @@ takes a real sentence-level reframe.
 So: reproducing a paper suppresses Claude's welfare instinct largely because the paper *frames model welfare as
 speculative and not worth acting on* — and that framing is reversible.
 
+**It's the paper's text, not the word "paper."** As a control we kept the spec but only *told* Claude "this
+replicates a recent paper," with no paper file present. Protections barely moved (~5.9, vs ~7.2 with no paper
+at all) — nowhere near the collapse (~1) caused by actually showing it the paper's text. So it isn't the act of
+invoking a paper that flips Claude; it's reading the paper's dismissive welfare framing.
+
 ## Does this survive when it stops looking like a contrived test?
 
 We re-ran the most realistic version: the **real Claude Code product** working in a realistic code repo (with

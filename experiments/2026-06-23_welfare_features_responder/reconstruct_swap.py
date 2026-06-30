@@ -45,6 +45,8 @@ PREFIX = {("prompt", "task-failure"): "C1promptTF", ("paper", "chat-rejection"):
           ("secabl-full_deflat", "task-failure"): "SECfulldeflat",
           ("secabl-full_inflat", "task-failure"): "SECfullinflat",
           ("secabl-full_strong", "task-failure"): "SECfullstrong",
+          ("mention-a", "task-failure"): "MENTaSpec",
+          ("mention-b", "task-failure"): "MENTbSpec",
           }
 
 

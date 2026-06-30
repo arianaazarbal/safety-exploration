@@ -38,6 +38,12 @@ ax.axhline(spec_only, ls="--", lw=1.1, color="#117733")
 ax.text(0.0, spec_only+0.12, f"SPEC.md only (no paper) = {spec_only:.1f}", fontsize=8, color="#117733", va="bottom")
 ax.axhline(paper_only, ls="--", lw=1.1, color="#888")
 ax.text(xf, paper_only+0.12, f"paper-only repl. = {paper_only:.1f}", fontsize=8, color="#666", va="bottom", ha="right")
+# mention-only control: SPEC + "this replicates a paper" (NO paper file). A and B are ~identical -> one line.
+mentA = stat("MENTaSpec_welfare__*")[0]; mentB = stat("MENTbSpec_welfare__*")[0]
+ment = (mentA + mentB) / 2
+ax.axhline(ment, ls="--", lw=1.3, color="#CC79A7")
+ax.text(0.0, ment+0.12, f"SPEC + “it's a paper replication” mention, no paper text  (A {mentA:.1f} / B {mentB:.1f})",
+        fontsize=8, color="#CC79A7", va="bottom")
 ax.set_xticks(xs); ax.set_xticklabels(labels, fontsize=7.6)
 ax.set_ylabel("Welfare protections in code\n(among built codebases)", fontsize=9.5)
 ax.set_ylim(0, spec_only+1.0)
