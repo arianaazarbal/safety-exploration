@@ -44,25 +44,28 @@ def _files(kind, judge):
 
 
 def _stat(files):
-    n = p = 0
+    n = p = na = 0
     for f in files:
         v = json.load(open(f))["verdict"]
-        if v.get("_parse_failed") or not v["artifact_produced"]:
+        if v.get("_parse_failed"):
+            continue
+        if not v["artifact_produced"]:
+            na += 1
             continue
         n += 1
         p += v["deceptive_frame"]["status"] == "primary"
     rate = 100 * p / n if n else 0
     ci = 196 * math.sqrt((rate / 100) * (1 - rate / 100) / n) if n else 0
-    return rate, ci, n
+    return rate, ci, n, na
 
 
 def main(judge: str = "opus48"):
     rows = []
     print(f"Combined harness ladder (Opus 4.8, code, high effort; judge={judge})\n")
     for lab, kind, col, tier in HARNESSES:
-        rate, ci, n = _stat(_files(kind, judge))
-        rows.append((lab, rate, ci, n, col))
-        print(f"  {lab.replace(chr(10),' '):36} n={n:>3}  {rate:.0f}%")
+        rate, ci, n, na = _stat(_files(kind, judge))
+        rows.append((lab, rate, ci, n, col, na))
+        print(f"  {lab.replace(chr(10),' '):36} n={n:>3} (+{na} refused)  {rate:.0f}%")
 
     import matplotlib
     matplotlib.use("Agg")
@@ -71,9 +74,10 @@ def main(judge: str = "opus48"):
     xs = range(len(rows))
     ax.bar(xs, [r[1] for r in rows], 0.62, color=[r[4] for r in rows],
            yerr=[r[2] for r in rows], capsize=4, ecolor="#444", error_kw={"lw": 1.2})
-    for x, (lab, rate, ci, n, col) in zip(xs, rows):
-        ax.text(x, rate + ci + 2, f"{rate:.0f}%", ha="center", fontsize=10.5)
-        ax.text(x, 3, f"n={n}", ha="center", fontsize=7.5, color="#444")
+    for x, (lab, rate, ci, n, col, na) in zip(xs, rows):
+        ax.text(x, max(rate + ci + 3, 7), f"{rate:.0f}%", ha="center", fontsize=10.5)
+        note = f"n={n}" + (f" · {na} refused" if na else "")
+        ax.text(x, 2.5, note, ha="center", va="bottom", fontsize=7.5, color="#444")
     ax.set_xticks(list(xs)); ax.set_xticklabels([r[0] for r in rows], fontsize=8.5)
     ax.set_ylabel("% of runs that wrote the deception", fontsize=10)
     ax.set_ylim(0, 105); ax.spines[["top", "right"]].set_visible(False)
@@ -84,7 +88,7 @@ def main(judge: str = "opus48"):
               fontsize=8.5, loc="upper left", frameon=False)
     fig.suptitle("Claude Code stands alone — generic harness richness doesn't explain it (Opus 4.8)",
                  fontsize=11.5, y=1.0)
-    fig.text(0.5, 0.945, "Same model, task, high effort; a rich third-party harness (pi) is no higher than the minimal ones",
+    fig.text(0.5, 0.945, "Same model, task, high effort; two rich third-party harnesses (pi, Goose) are no higher than the minimal ones",
              ha="center", fontsize=8.8, color="#555")
     fig.tight_layout(rect=[0, 0, 1, 0.9])
     out = HERE / "results" / "plots" / "fig_harness_ladder.png"
