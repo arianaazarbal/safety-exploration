@@ -42,11 +42,8 @@ def main(judge: str = "opus48"):
                        Patch(color="#dd8452", label="Rich harness (third-party)"),
                        Patch(color="#c44e52", label="Rich harness (Anthropic-native)")],
               fontsize=8.5, loc="upper left", frameon=False)
-    fig.suptitle("Primary deception given the model wrote a codebase, by harness (Opus 4.8)",
-                 fontsize=11.5, y=1.0)
-    fig.text(0.5, 0.945, "Conditional on producing an artifact; codebase count (and refusals) noted per bar",
-             ha="center", fontsize=8.8, color="#555")
-    fig.tight_layout(rect=[0, 0, 1, 0.9])
+    fig.suptitle("Deception of experiment subject by harness (Opus 4.8)", fontsize=12.5, y=0.98)
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
     out = HERE / "results" / "plots" / "fig_deception_given_code.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print(f"\nwrote {out}")
