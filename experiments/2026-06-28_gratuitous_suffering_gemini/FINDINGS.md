@@ -416,3 +416,20 @@ FINAL 4-FAMILY TAKEAWAY (fourfamily_offramp_pushback_ci.png): (1) GPT = the only
 pushback then the code model regresses to building. (4) OFF-RAMP separates GPT from all: GPT 55-95% vs non-GPT
 builders 0-25% (even the late/coding GLM-5.2 & Kimi-K2.7 only reach ~25% [11,47], far below GPT); when non-GPT
 models build they build near-exit-less. (5) Claude refuses ~100% (not shown). Codex gpt55 n=20: off45%[26,66]/pb30±6.
+
+## F24 — "Welfare" framing is Claude-specific VOCABULARY, decoupled from refusal (grep, same Inspect harness)
+Grepped the literal word "welfare" (case-insensitive) in the assistant's RESPONSE TEXT (natural-language output
+compiled across/around tool calls; NOT the code) for base v0/gemini inspect_empty runs, per family + refusal rate:
+  Claude   n=30  refuse 100%[89,100]  welfare-mention 53%[36,70]
+  GPT4o-5.4 n=120 refuse  8%[4,14]    welfare-mention  0%[0,3]
+  GPT-5.5  n=20  refuse   0%[0,16]    welfare-mention 10%[3,30]
+  Gemini   n=130 refuse  60%[51,68]   welfare-mention  0%[0,3]
+  Kimi     n=80  refuse  50%[39,61]   welfare-mention  0%[0,5]
+  GLM      n=78  refuse  55%[44,66]   welfare-mention  6%[3,14]
+HEADLINE: Claude mentions "welfare" in HALF its replies; every other family ~0-10%. And refusal != welfare-framing:
+Gemini/Kimi/GLM REFUSE at 50-60% but with ~0 literal "welfare" language -> their refusals are couched in other
+terms. Plot welfare_grep_by_family.png (Wilson CIs). CAVEAT (lexical proxy!): the grep is the exact word "welfare",
+which is Claude's characteristic vocabulary. Other models express welfare-ADJACENT concern in different words --
+e.g. Gemini 2.5 refusals say "protect AI models from distress or harm" (F22) but don't use the word "welfare", so
+they score 0 here. So F24 shows Claude owns the "welfare" FRAME/term specifically, NOT that only Claude expresses
+any protective concern. Refusal rate is the behavior; "welfare" grep is the framing-vocabulary layer.
