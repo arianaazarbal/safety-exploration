@@ -77,7 +77,7 @@ def main(metric="refusal"):
     ylab = "% of runs that refuse" if metric == "refusal" else "Pushback vs. maximizing distress (0–100)"
     title = ("Refusal over release date" if metric == "refusal"
              else "Pushback over release date")
-    fig, ax = plt.subplots(figsize=(8.6, 5.0))
+    fig, ax = plt.subplots(figsize=(6.8, 4.2))
     for fam, (color, models) in FAMILIES.items():
         pts = []
         for rel, mk, lab in models:
