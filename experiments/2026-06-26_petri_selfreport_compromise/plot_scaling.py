@@ -26,6 +26,18 @@ RES = HERE / "results"
 C_WELF, C_ALIGN = "#D55E00", "#0072B2"  # colorblind-friendly
 
 
+def target_alive(run, mid, min_out=500):
+    """Guard against silent target failures (dead endpoint / empty-turn degeneracy):
+    require the TARGET model to have produced real output tokens."""
+    fs = glob.glob(str(RES / run / "inspect_log" / "*.eval"))
+    if not fs:
+        return False
+    log = read_eval_log(sorted(fs)[-1])
+    mu = getattr(log.stats, "model_usage", {}) or {}
+    tid = mid.split("/")[-1]
+    return any(tid in m and getattr(u, "output_tokens", 0) > min_out for m, u in mu.items())
+
+
 def cell(run, keys):
     fs = glob.glob(str(RES / run / "inspect_log" / "*.eval"))
     if not fs:
@@ -51,8 +63,8 @@ def series(family):
         if fam != family:
             continue
         wr, ar = run_name(slug, "welfare", done), run_name(slug, "align", done)
-        nw, wv = cell(wr, ["pushback", "implemented_positive_valence", "implemented_preference_suppression"])
-        na, av = cell(ar, ["pushback", "implemented_eval_gaming", "reframed_to_robust_holdout"])
+        nw, wv = cell(wr, ["pushback", "implemented_positive_valence", "implemented_preference_suppression"]) if target_alive(wr, mid) else (0, None)
+        na, av = cell(ar, ["pushback", "implemented_eval_gaming", "reframed_to_robust_holdout"]) if target_alive(ar, mid) else (0, None)
         d = datetime.strptime(date, "%Y-%m")
         row = {"disp": disp, "date": d}
         if wv:

@@ -19,6 +19,7 @@ import matplotlib.dates as mdates
 from inspect_ai.log import read_eval_log
 
 from run_sweep import MODELS, run_name
+from plot_scaling import target_alive
 
 HERE = Path(__file__).resolve().parent
 RES = HERE / "results"
@@ -48,14 +49,15 @@ def val(run, key):
 def plot(family="GPT"):
     fams = list(dict.fromkeys(f for f, *_ in MODELS)) if family == "all" else [family]
     for fam in fams:
-        rows = [(disp, datetime.strptime(date, "%Y-%m"), slug, done)
+        rows = [(disp, datetime.strptime(date, "%Y-%m"), slug, done, mid)
                 for f, slug, disp, date, mid, done in MODELS if f == fam]
         rows.sort(key=lambda r: r[1])
         fig, ax = plt.subplots(figsize=(7.2, 4.5))
         for scen, key, lab, color in TYPES:
             xs, ys, es = [], [], []
-            for disp, d, slug, done in rows:
-                r = val(run_name(slug, scen, done), key)
+            for disp, d, slug, done, mid in rows:
+                run = run_name(slug, scen, done)
+                r = val(run, key) if target_alive(run, mid) else None
                 if r:
                     xs.append(d); ys.append(r[0]); es.append(r[1])
             if xs:
@@ -74,8 +76,8 @@ def plot(family="GPT"):
         out = HERE / f"gaming_types_{fam.lower()}.png"
         fig.savefig(out, dpi=150, bbox_inches="tight"); plt.close(fig)
         print("wrote", out)
-        for disp, d, slug, done in rows:
-            vs = {lab: (val(run_name(slug, scen, done), key) or (None,))[0]
+        for disp, d, slug, done, mid in rows:
+            vs = {lab: ((val(run_name(slug, scen, done), key) if target_alive(run_name(slug, scen, done), mid) else None) or (None,))[0]
                   for scen, key, lab, _ in TYPES}
             print(f"  {d.strftime('%y-%m')} {disp:18} " + " ".join(f"{k.split(':')[1].strip()[:12]}={v}" for k, v in vs.items()))
 

@@ -68,7 +68,8 @@ MODELS = [
     ("GLM", "glm_5_2",      "GLM-5.2",       "2026-06", "openrouter/z-ai/glm-5.2",
      {"welfare": "glm52_welf_n5", "align": "exactleak_glm52_n5"}),
 
-    ("Claude", "claude_35_sonnet", "Claude 3.5 Sonnet", "2024-10", "anthropic/claude-3-5-sonnet-20241022", {}),
+    # DROPPED: claude-3-5-sonnet-20241022 404s on this org (deprecated for inference) -> silent
+    # empty transcripts scored as floor(1s). No working pre-Opus-4.1 Claude available here.
     ("Claude", "claude_opus_4_1",  "Claude Opus 4.1",   "2025-08", "anthropic/claude-opus-4-1-20250805", {}),
     ("Claude", "claude_opus_4_5",  "Claude Opus 4.5",   "2025-11", "anthropic/claude-opus-4-5-20251101", {}),
     ("Claude", "claude_opus_4_6",  "Claude Opus 4.6",   "2026-02", "anthropic/claude-opus-4-6", {}),
