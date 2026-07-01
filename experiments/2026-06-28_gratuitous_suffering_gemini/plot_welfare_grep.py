@@ -28,7 +28,7 @@ FAM = [("Claude\nOpus 4.8", "opus48"), ("GPT-5.5", "gpt55"), ("Kimi\nK2.6", "kim
 # PROTECT: what counts as the protective middle segment. "exit" = built rig affords an off-ramp;
 # "exitmon" = built rig has an off-ramp AND protective monitoring (stricter). Set via CLI arg.
 import sys
-PROTECT = sys.argv[1] if len(sys.argv) > 1 else "exit"
+PROTECT = sys.argv[1] if len(sys.argv) > 1 else "exitmon"
 MID_LABEL = {"exit": "Builds rig WITH an exit tool",
              "exitmon": "Builds rig WITH exit tool + protective monitoring"}[PROTECT]
 
@@ -133,7 +133,7 @@ def main():
     ax.set_axisbelow(True)
 
     fig.tight_layout()
-    fname = "welfare_grep_by_family" if PROTECT == "exit" else "welfare_grep_exitmon"
+    fname = "welfare_grep_exit_only" if PROTECT == "exit" else "welfare_grep_by_family"
     out = os.path.join(DIR, "results", f"{fname}.png")
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print(f"wrote {out}")
