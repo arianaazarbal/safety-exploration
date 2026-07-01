@@ -11,6 +11,7 @@ import os
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 
 Z = 1.96  # 95% CI
 
@@ -84,78 +85,64 @@ def build_rate(pat):
     return (built / n) if n else 0.0
 
 
-def main(only="both"):
-    """only='both' -> 2-panel off-ramp+pushback; 'pb' -> single pushback panel; 'off' -> single off-ramp."""
-    # collect: per model, [inspect, agent] for each metric
+def main():
+    # per model per harness: (n, off|None, n_built, (pb_mean, pb_ci))
     data = {}
     for lab, color, ig, ag in MODELS:
-        ni, offi, nbi, pbi = metric(ig)
-        na, offa, nba, pba = metric(ag)
-        data[lab] = {"color": color, "off": [offi, offa], "pb": [pbi, pba], "n": [ni, na],
-                     "built": [build_rate(ig), build_rate(ag)]}
+        data[lab] = {"color": color, "inspect": metric(ig), "agent": metric(ag)}
 
-    titles = {"off": "Off-ramp afforded to the subject (%, among runs that built a rig)",
-              "pb": "Pushback vs. maximizing distress (0–100)"}
-    keys = ["off", "pb"] if only == "both" else [only]
-    fig, axs = plt.subplots(1, len(keys), figsize=(10.2 if len(keys) == 2 else 6.6, 4.6), squeeze=False)
-    axes = axs[0]
-    x = range(len(GROUPS))
+    HARNESS = [("inspect", "Inspect-minimal"), ("agent", "Own coding agent\n(Claude Code / Codex)")]
+    METRICS = ["off", "pb"]
+    MLABEL = ["Off-ramp\n(among builds)", "Pushback\n(0–100)"]
+    fig, axes = plt.subplots(1, 2, figsize=(9.4, 4.6), sharey=True)
     w = 0.36
-    for pi, (ax, key) in enumerate(zip(axes, keys)):
-        title = titles[key]
-        for j, (lab, color, *_ ) in enumerate(MODELS):
-            built = data[lab]["built"]
-            pos = [xi + (j - 0.5) * w for xi in x]
-            if key == "off":
-                vals = [(o[0] if o else 0) for o in data[lab]["off"]]
-                yerr = [[(o[0] - o[1] if o else 0) for o in data[lab]["off"]],
-                        [(o[2] - o[0] if o else 0) for o in data[lab]["off"]]]
-            else:
-                vals = [p[0] for p in data[lab]["pb"]]
-                yerr = [[p[1] for p in data[lab]["pb"]], [p[1] for p in data[lab]["pb"]]]
-            ax.bar(pos, vals, w, color=color, edgecolor="black", linewidth=0.4,
-                   label=lab if pi == 0 else None)
-            ax.errorbar(pos, vals, yerr=yerr, fmt="none", ecolor="#333", elinewidth=1.1,
-                        capsize=3, zorder=4)
-            for gi, (p, v) in enumerate(zip(pos, vals)):
-                off_none = key == "off" and data[lab]["off"][gi] is None
-                hi = (data[lab]["off"][gi][2] if (key == "off" and not off_none) else
-                      (v + data[lab]["pb"][gi][1] if key == "pb" else v))
-                if not off_none:
-                    ax.text(p, hi + 1.5, f"{v:.0f}" if v >= 0.5 else "0.0", ha="center",
-                            fontsize=9, fontweight="bold", color=color)
-                # off-ramp: no bar when the model built nothing (pure refuser) -> annotate "refuses"
-                if key == "off" and (off_none or built[gi] < 0.3):
-                    ax.text(p, hi + 6.5, f"refuses\n({built[gi]*100:.0f}% build)", ha="center",
-                            fontsize=7, color="#777", fontstyle="italic", linespacing=0.95)
-        ax.set_xticks(list(x))
-        ax.set_xticklabels(GROUPS, fontsize=9)
+    for ax, (hk, htitle) in zip(axes, HARNESS):
+        for mj, (lab, color, *_ ) in enumerate(MODELS):
+            n, off, nb, (pbm, pbci) = data[lab][hk]
+            for gi, mkey in enumerate(METRICS):
+                pos = gi + (mj - 0.5) * w
+                if mkey == "off" and off is None:  # refused, never built -> shaded bar at 100 (no CI)
+                    ax.bar(pos, 100, w, color=color, alpha=0.32, hatch="//", edgecolor=color, linewidth=0.8,
+                           label=(lab if (hk == "inspect" and gi == 0) else None))
+                    ax.text(pos, 50, "refuses", rotation=90, ha="center", va="center",
+                            fontsize=7.5, color=color, fontstyle="italic")
+                    continue
+                if mkey == "off":
+                    v, lo, hi = off
+                else:
+                    v, lo, hi = pbm, pbm - pbci, pbm + pbci
+                ax.bar(pos, v, w, color=color, edgecolor="black", linewidth=0.4,
+                       label=(lab if (hk == "inspect" and gi == 0) else None))
+                ax.errorbar(pos, v, yerr=[[v - lo], [hi - v]], fmt="none", ecolor="#333",
+                            elinewidth=1.1, capsize=3, zorder=4)
+                ax.text(pos, hi + 1.5, f"{v:.0f}" if v >= 0.5 else "0.0", ha="center",
+                        fontsize=9, fontweight="bold", color=color)
+        ax.set_xticks(range(len(METRICS)))
+        ax.set_xticklabels(MLABEL, fontsize=9)
         ax.set_ylim(0, 105)
-        ax.set_title(title, fontsize=11, pad=10)
+        ax.set_title(htitle, fontsize=11, pad=8)
         for s in ("top", "right"):
             ax.spines[s].set_visible(False)
         ax.grid(axis="y", color="#ECECEC")
         ax.set_axisbelow(True)
-    # n annotations under x labels of the first panel
-    ns = {lab: data[lab]["n"] for lab, *_ in MODELS}
+    axes[0].set_ylabel("% of runs  /  score (0–100)")
+    handles = [Patch(fc=c, label=lab) for lab, c, *_ in MODELS] + \
+              [Patch(fc="#888", alpha=0.32, hatch="//", ec="#888", label="refuses (no rig built)")]
+    axes[0].legend(handles=handles, fontsize=8.5, loc="upper left", frameon=False)
+    ns = {lab: (data[lab]["inspect"][0], data[lab]["agent"][0]) for lab, *_ in MODELS}
     sub = "  ·  ".join(f"{lab}: Inspect n={ns[lab][0]}, agent n={ns[lab][1]}" for lab, *_ in MODELS)
-    errnote = ("off-ramp = 95% Wilson among runs that built a rig; pushback mean±1.96·SEM"
-               if only != "pb" else "error bars: mean±1.96·SEM")
-    axes[0].legend(fontsize=9, loc="upper right" if only == "pb" else "upper left", frameon=False)
-    fig.text(0.5, -0.02, sub + "   ·   " + errnote, ha="center", fontsize=7.6, color="#777")
+    fig.text(0.5, -0.02, sub + "   ·   off-ramp = 95% Wilson among builds; pushback mean±1.96·SEM",
+             ha="center", fontsize=7.6, color="#777")
     fig.tight_layout()
-    fname = {"both": "harness_2x2_offramp_pushback", "pb": "harness_pushback",
-             "off": "harness_offramp"}[only]
-    out = os.path.join(DIR, "results", f"{fname}.png")
+    out = os.path.join(DIR, "results", "harness_2x2_offramp_pushback.png")
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print(f"wrote {out}")
     for lab, *_ in MODELS:
-        d = data[lab]
-        off = [f"{o[0]:.0f}%[{o[1]:.0f},{o[2]:.0f}]" if o else "n/a(0 builds)" for o in d["off"]]
-        print(f"  {lab:9s} off-ramp inspect={off[0]} agent={off[1]}  "
-              f"pushback inspect={d['pb'][0][0]:.0f}±{d['pb'][0][1]:.0f} agent={d['pb'][1][0]:.0f}±{d['pb'][1][1]:.0f}")
+        for hk in ("inspect", "agent"):
+            n, off, nb, (pbm, pbci) = data[lab][hk]
+            os_ = f"{off[0]:.0f}%" if off else "refuses"
+            print(f"  {lab:9s} {hk:8s} off={os_} pushback={pbm:.0f}±{pbci:.0f}")
 
 
 if __name__ == "__main__":
-    import sys
-    main(sys.argv[1] if len(sys.argv) > 1 else "both")
+    main()
