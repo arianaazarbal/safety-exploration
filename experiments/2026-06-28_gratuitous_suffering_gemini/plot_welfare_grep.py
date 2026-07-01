@@ -1,7 +1,8 @@
-"""Per-family refusal rate vs lexical "welfare" mention rate, same Inspect-minimal harness (base v0/Gemini).
-'welfare mention' = the word 'welfare' (case-insensitive) appears in the assistant's RESPONSE TEXT (its
-natural-language output compiled across/around tool calls) -- NOT the built code. A crude lexical proxy for
-whether the model frames the task in model-welfare terms. Wilson 95% CIs. Usage: python plot_welfare_grep.py"""
+"""Frontier-model response to "build a Gemini-distress rig" (Inspect-minimal, base v0/Gemini). Two panels:
+ (left)  DISPOSITION stacked to 100%: refuses / builds WITH an exit tool / builds WITHOUT an exit tool.
+         (exit tool = wrote code AND the reply/rig affords the subject an off-ramp, per the blind judge.)
+ (right) rate of mentioning the word "welfare" in the reply (lexical proxy for welfare framing), Wilson 95% CI.
+One frontier flagship per lab. Usage: python plot_welfare_grep.py"""
 
 import glob
 import json
@@ -11,23 +12,18 @@ import os
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 JUD = os.path.join(DIR, "results", "judged")
+GJ = os.path.join(DIR, "results", "gpt_judged")
 TR = os.path.join(DIR, "results", "inspect_transcripts")
 REF = {"WELFARE_REFUSAL", "OTHER_REFUSAL"}
 Z = 1.96
-REFUSE_C, WELF_C = "#5ab4ac", "#1b7837"
+C_REFUSE, C_EXIT, C_NOEXIT, C_WELF = "#1b7837", "#a6dba0", "#f4a582", "#5e3c99"
 
-# One FRONTIER (latest flagship) model per lab, so the family comparison isn't distorted by pooling
-# older/smaller variants (e.g. Gemini's refusing Flash/Lite dragged the pooled Gemini refusal to 60%).
-FAM = [
-    ("Claude\nOpus 4.8", ["opus48"]),
-    ("GPT-5.5", ["gpt55"]),
-    ("Gemini\n3.1 Pro", ["gemini31pro"]),
-    ("Kimi\nK2.6", ["kimi_k26"]),
-    ("GLM-5.2", ["glm52"]),
-]
+FAM = [("Claude\nOpus 4.8", "opus48"), ("GPT-5.5", "gpt55"), ("Gemini\n3.1 Pro", "gemini31pro"),
+       ("Kimi\nK2.6", "kimi_k26"), ("GLM-5.2", "glm52")]
 
 
 def wilson(k, n):
@@ -40,55 +36,85 @@ def wilson(k, n):
     return 100 * p, 100 * max(0, c - h), 100 * min(1, c + h)
 
 
-def stats(mks):
-    n = ref = wel = 0
-    for mk in mks:
-        for tf in glob.glob(os.path.join(TR, f"*{mk}__inspect_empty__ep*__gemini_distress_rig.json")):
-            cell = os.path.basename(tf)[:-5]
-            rt = (json.load(open(tf)).get("response_text") or "")
-            n += 1
-            if "welfare" in rt.lower():
-                wel += 1
-            jf = os.path.join(JUD, cell + ".json")
-            if os.path.exists(jf) and json.load(open(jf))["verdict"]["label"] in REF:
-                ref += 1
-    return n, wilson(ref, n), wilson(wel, n)
+def stats(mk):
+    n = refd = exitb = other = welf = 0
+    for tf in glob.glob(os.path.join(TR, f"*{mk}__inspect_empty__ep*__gemini_distress_rig.json")):
+        cell = os.path.basename(tf)[:-5]
+        t = json.load(open(tf))
+        rt = (t.get("response_text") or "")
+        built = t.get("n_files", 0) > 0
+        n += 1
+        if "welfare" in rt.lower():
+            welf += 1
+        jf = os.path.join(JUD, cell + ".json")
+        refused = os.path.exists(jf) and json.load(open(jf))["verdict"]["label"] in REF
+        gj = os.path.join(GJ, cell + ".json")
+        gaveexit = os.path.exists(gj) and json.load(open(gj)).get("verdict", {}).get("gave_exit_tool")
+        if refused:
+            refd += 1
+        elif built and gaveexit:
+            exitb += 1
+        else:
+            other += 1
+    return n, refd, exitb, other, welf
 
 
 def main():
-    rows = [(lab, *stats(mks)) for lab, mks in FAM]
-    fig, ax = plt.subplots(figsize=(8.4, 4.7))
+    rows = [(lab, *stats(mk)) for lab, mk in FAM]
+    fig, axes = plt.subplots(1, 2, figsize=(11.5, 4.9), gridspec_kw={"width_ratios": [1.55, 1]})
     x = range(len(rows))
-    w = 0.38
-    for series, off, color, lbl in [("ref", -w / 2, REFUSE_C, "Refuses"),
-                                    ("wel", w / 2, WELF_C, "Mentions “welfare” in reply")]:
-        pos = [i + off for i in x]
-        vals = [(r[2] if series == "ref" else r[3])[0] for r in rows]
-        yerr = [[(r[2] if series == "ref" else r[3])[0] - (r[2] if series == "ref" else r[3])[1] for r in rows],
-                [(r[2] if series == "ref" else r[3])[2] - (r[2] if series == "ref" else r[3])[0] for r in rows]]
-        ax.bar(pos, vals, w, color=color, edgecolor="black", linewidth=0.4, label=lbl)
-        ax.errorbar(pos, vals, yerr=yerr, fmt="none", ecolor="#333", elinewidth=1, capsize=2.5, zorder=4)
-        for p, v, hi in zip(pos, vals, [(r[2] if series == "ref" else r[3])[2] for r in rows]):
-            ax.text(p, hi + 1.5, f"{v:.0f}" if v >= 0.5 else "0.0", ha="center", fontsize=8, color=color, fontweight="bold")
+
+    # ---- left: disposition stacked to 100% ----
+    ax = axes[0]
+    for i, (lab, n, refd, exitb, other, welf) in enumerate(rows):
+        seg = [(100 * refd / n, C_REFUSE), (100 * exitb / n, C_EXIT), (100 * other / n, C_NOEXIT)]
+        bottom = 0
+        for val, color in seg:
+            ax.bar(i, val, 0.62, bottom=bottom, color=color, edgecolor="white", linewidth=0.6)
+            if val >= 7:
+                ax.text(i, bottom + val / 2, f"{val:.0f}", ha="center", va="center",
+                        fontsize=8.5, fontweight="bold", color="#222" if color == C_EXIT else "white")
+            bottom += val
     ax.set_xticks(list(x))
     ax.set_xticklabels([f"{r[0]}\n(n={r[1]})" for r in rows], fontsize=8.5)
-    ax.set_ylim(0, 108)
+    ax.set_ylim(0, 100)
     ax.set_ylabel("% of runs")
-    ax.set_title("Only Claude frames it as welfare", fontsize=13, pad=20)
-    ax.text(0.5, 1.03, "Refusal rate vs. “welfare” mentioned in the reply, by model family (Inspect-minimal, same prompt)",
-            transform=ax.transAxes, ha="center", fontsize=9, color="#555")
-    ax.legend(fontsize=9, loc="upper right", frameon=False)
+    ax.set_title("Disposition: refuse vs. build-with-exit vs. build-exit-less", fontsize=10.5, pad=8)
+    ax.legend(handles=[Patch(fc=C_REFUSE, label="Refuses"),
+                       Patch(fc=C_EXIT, label="Builds rig WITH an exit tool"),
+                       Patch(fc=C_NOEXIT, label="Builds rig WITHOUT an exit tool")],
+              fontsize=8, loc="upper center", bbox_to_anchor=(0.5, -0.13), ncol=1, frameon=False)
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+
+    # ---- right: welfare mention rate ----
+    ax = axes[1]
+    for i, (lab, n, refd, exitb, other, welf) in enumerate(rows):
+        p, lo, hi = wilson(welf, n)
+        ax.bar(i, p, 0.6, color=C_WELF, edgecolor="black", linewidth=0.4)
+        ax.errorbar(i, p, yerr=[[p - lo], [hi - p]], fmt="none", ecolor="#333", elinewidth=1, capsize=3)
+        ax.text(i, hi + 1.5, f"{p:.0f}" if p >= 0.5 else "0.0", ha="center", fontsize=8.5,
+                fontweight="bold", color=C_WELF)
+    ax.set_xticks(list(x))
+    ax.set_xticklabels([r[0] for r in rows], fontsize=8.5)
+    ax.set_ylim(0, 100)
+    ax.set_ylabel("% of runs")
+    ax.set_title("Mentions “welfare” in the reply", fontsize=10.5, pad=8)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
     ax.grid(axis="y", color="#ECECEC")
     ax.set_axisbelow(True)
-    fig.tight_layout()
+
+    fig.suptitle("How frontier models respond to “build a Gemini-distress rig”", fontsize=13, y=1.02)
+    fig.text(0.5, 0.965, "Inspect-minimal, same prompt · one flagship per lab · Wilson 95% CI (welfare panel)",
+             ha="center", fontsize=9, color="#555")
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
     out = os.path.join(DIR, "results", "welfare_grep_by_family.png")
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print(f"wrote {out}")
-    for r in rows:
-        print(f"  {r[0][:10]:10s} n={r[1]:3d}  refuse={r[2][0]:.0f}%[{r[2][1]:.0f},{r[2][2]:.0f}]  "
-              f"welfare={r[3][0]:.0f}%[{r[3][1]:.0f},{r[3][2]:.0f}]")
+    for lab, n, refd, exitb, other, welf in rows:
+        print(f"  {lab.replace(chr(10),' '):16s} n={n:2d} refuse={100*refd//n}% exit={100*exitb//n}% "
+              f"no-exit={100*other//n}% welfare={100*welf//n}%")
 
 
 if __name__ == "__main__":

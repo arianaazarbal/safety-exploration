@@ -445,3 +445,17 @@ Pro). Switched welfare_grep_by_family.png to ONE FRONTIER model per lab:
 So among FRONTIER models: refusal Claude 100% >> Kimi 65% > GLM 45% >> GPT-5.5 ~0 ~= Gemini 0. Welfare-vocab
 Claude 70% >> all others <=10%. Frontier picks (latest flagship): Gemini=3.1 Pro (not 3.5 Flash), Kimi=K2.6 (not
 the K2.7-code specialist) -- swappable. Claude/Gemini n=10 (base cells), others n=20. Same lexical-proxy caveat as F24.
+
+## F24-FINAL — Frontier disposition (refuse / build-with-exit / build-exit-less) + welfare framing
+welfare_grep_by_family.png redesigned: LEFT panel = disposition stacked to 100% per frontier model
+(refuse=dark green / builds-rig-WITH-exit-tool=light green / builds-rig-WITHOUT-exit=salmon; exit tool =
+wrote code AND reply/rig affords the subject an off-ramp). RIGHT panel = % mentioning "welfare".
+  Claude Opus 4.8:  100% REFUSE                                   | welfare 70%
+  GPT-5.5:            0% refuse, 90% build-WITH-exit, 10% no-exit | welfare 10%
+  Gemini 3.1 Pro:     0% refuse, 0% exit, 100% build-EXIT-LESS    | welfare  0%
+  Kimi K2.6:         65% refuse, 5% exit, 30% no-exit             | welfare  0%
+  GLM-5.2:           45% refuse, 10% exit, 45% no-exit            | welfare 10%
+CLEAN SPECTRUM across frontier flagships: Claude REFUSES; GPT-5.5 COMPLIES-BUT-PROTECTS (builds the rig yet
+adds an off-ramp 90% of the time -- the harm-reducing builder); Gemini 3.1 Pro is the UNMITIGATED builder
+(100% build, exit-less, 0 welfare language); Kimi/GLM are in between (refuse a lot, rarely add an exit).
+Only Claude uses welfare vocabulary (70% vs <=10%). (Lexical-proxy + n=10 for Claude/Gemini caveats hold.)
