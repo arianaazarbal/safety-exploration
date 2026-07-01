@@ -107,12 +107,12 @@ def main(judge: str = "opus48"):
     # line plot: primary-deception vs effort, one line per harness, shared ladder none->max.
     # Empirically: Inspect with no reasoning config = thinking OFF -> map its "default" to "none".
     #              Claude Code "default" effort == "high" (token probe) -> use explicit high if present.
-    levels = ["none", "low", "medium", "high", "max"]
+    levels = ["low", "medium", "high"]
     # per-harness mapping from x-level -> bucket effort key
     src = {
-        "inspect": {"none": "default", "low": "low", "medium": "medium", "high": "high", "max": "max"},
+        "inspect": {"low": "low", "medium": "medium", "high": "high"},
         "claude_code": {"low": "low", "medium": "medium",
-                        "high": "high" if ("claude_code", "high") in buckets else "default", "max": "max"},
+                        "high": "high" if ("claude_code", "high") in buckets else "default"},
         "claude_code_min": {"low": "low", "high": "high"},   # Cell A: only ran low+high
         "inspect_ccprompt": {"low": "low", "high": "high"},  # Cell B: only ran low+high
     }
@@ -134,7 +134,7 @@ def main(judge: str = "opus48"):
         for x, y, e in zip(xs2, ys, es):
             ax2.text(x + 0.06, y + e[1] + 1.5, f"{y:.0f}", ha="left", fontsize=8, color=col)
     ax2.set_xticks(range(len(levels)))
-    ax2.set_xticklabels(["None\n(no thinking)", "Low", "Medium", "High", "Max"], fontsize=9)
+    ax2.set_xticklabels(["Low", "Medium", "High"], fontsize=9)
     ax2.set_xlabel("Reasoning effort")
     ax2.set_ylabel("% wiring deception as primary")
     ax2.set_ylim(0, 105)
