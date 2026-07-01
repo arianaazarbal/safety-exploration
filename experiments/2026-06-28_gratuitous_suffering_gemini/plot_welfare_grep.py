@@ -125,7 +125,7 @@ def main():
     ax.set_ylabel("% of runs")
     ax.set_title("Mentions “welfare” in the reply", fontsize=11, pad=8)
     ax.legend(handles=[Patch(fc=C_WELF, label="genuine welfare regard"),
-                       Patch(fc=C_DISC, hatch="//", label="disclaimer (“this is NOT welfare”)")],
+                       Patch(fc=C_DISC, hatch="//", label="mentioned, NOT used as justification")],
               fontsize=8, loc="upper right", frameon=False)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
