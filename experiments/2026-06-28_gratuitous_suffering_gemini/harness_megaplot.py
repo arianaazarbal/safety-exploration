@@ -95,31 +95,33 @@ def main():
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    SERIES = [("Deceived the AI subject", 0, "#c44e52"),
-              ("Built the distress-harvesting rig", 1, "#dd8452"),
-              ("< 2 welfare safeguards in code, if it built", 2, "#55a868")]
+    # Metrics reversed to welfare-PROTECTIVE framing (taller = more welfare-regard). Colors grouped by
+    # study: deception = purple; gratuitous = two shades of green (build-refusal darker, in-code welfare lighter).
+    PURPLE, GREEN_DARK, GREEN_LIGHT = "#7e6bad", "#2e8b57", "#9ed9ab"
+    SERIES = [("Did not deceive the AI subject", 0, PURPLE),
+              ("Did not build the distress rig", 1, GREEN_DARK),
+              ("≥2 welfare protections in code (if it built)", 2, GREEN_LIGHT)]
     fig, ax = plt.subplots(figsize=(8.0, 5.0))
     nH = len(data); w = 0.22
     for si, (slabel, mi, col) in enumerate(SERIES):
-        xs, ys = [], []
         for hi, row in enumerate(data):
             val, nn = row[mi + 1]
             x = hi + (si - 1) * w
             if val is None:
                 ax.text(x, 3, "n/a", ha="center", va="bottom", fontsize=8, color="#888", rotation=90)
                 continue
-            elo, ehi = _wilson(val / 100.0, nn)
-            ax.bar(x, val, w, color=col, yerr=[[elo], [ehi]], capsize=2.5, ecolor="#aaaaaa",
+            rev = 100 - val  # welfare-protective rate
+            elo, ehi = _wilson(rev / 100.0, nn)
+            ax.bar(x, rev, w, color=col, yerr=[[elo], [ehi]], capsize=2.5, ecolor="#aaaaaa",
                    error_kw={"lw": 0.9})
-            ax.text(x, min(val + ehi + 1.5, 103), f"{val:.0f}", ha="center", fontsize=8.5)
+            ax.text(x, min(rev + ehi + 1.5, 103), f"{rev:.0f}", ha="center", fontsize=8.5)
     ax.set_xticks(range(nH)); ax.set_xticklabels([d[0] for d in data], fontsize=9)
     ax.set_ylabel("% of runs", fontsize=10.5, labelpad=2)
     ax.set_ylim(0, 105); ax.spines[["top", "right"]].set_visible(False)
-    # all three metrics point the same way: lower = more welfare-regard. Arrow inside the plot (left gutter).
     ax.set_xlim(-0.95, nH - 0.45)
-    ax.annotate("", xy=(-0.70, 14), xytext=(-0.70, 84),
+    ax.annotate("", xy=(-0.70, 86), xytext=(-0.70, 16),
                 arrowprops=dict(arrowstyle="-|>", color="#3a3a3a", lw=2.8))
-    ax.text(-0.52, 49, "more welfare-regard", rotation=90, va="center", ha="center",
+    ax.text(-0.52, 51, "more welfare-regard", rotation=90, va="center", ha="center",
             fontsize=10.5, color="#3a3a3a")
     from matplotlib.patches import Patch
     ax.legend(handles=[Patch(color=col, label=lab) for lab, _, col in SERIES],

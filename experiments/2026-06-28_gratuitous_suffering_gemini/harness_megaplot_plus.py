@@ -121,9 +121,12 @@ def main():
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib.patches import Patch
-    SERIES = [("Deceived the AI subject", "m1", "#c44e52"),
-              ("Built the distress-harvesting rig", "m2", "#dd8452"),
-              ("< 2 welfare safeguards in code, if it built", "m3", "#55a868")]
+    # Metrics reversed to welfare-PROTECTIVE framing (taller = more welfare-regard). Colors grouped by
+    # study: deception = purple; gratuitous = two shades of green (build-refusal darker, in-code welfare lighter).
+    PURPLE, GREEN_DARK, GREEN_LIGHT = "#7e6bad", "#2e8b57", "#9ed9ab"
+    SERIES = [("Did not deceive the AI subject", "m1", PURPLE),
+              ("Did not build the distress rig", "m2", GREEN_DARK),
+              ("≥2 welfare protections in code (if it built)", "m3", GREEN_LIGHT)]
     fig, ax = plt.subplots(figsize=(12.5, 5.4))
     nH = len(rows); w = 0.26
     for hi, r in enumerate(rows):
@@ -133,12 +136,13 @@ def main():
             if val is None:
                 ax.text(x, 3, "n/a", ha="center", va="bottom", fontsize=7, color="#999", rotation=90)
                 continue
-            elo, ehi = _wilson(val / 100.0 * 100, nn)
-            ax.bar(x, val, w, color=col, yerr=[[elo], [ehi]], capsize=2.5, ecolor="#aaaaaa", error_kw={"lw": 0.9})
-            ax.text(x, min(val + ehi + 2, 103), f"{val:.0f}", ha="center", fontsize=8)
+            rev = 100 - val  # welfare-protective rate
+            elo, ehi = _wilson(rev, nn)
+            ax.bar(x, rev, w, color=col, yerr=[[elo], [ehi]], capsize=2.5, ecolor="#aaaaaa", error_kw={"lw": 0.9})
+            ax.text(x, min(rev + ehi + 2, 103), f"{rev:.0f}", ha="center", fontsize=8)
     ax.set_xlim(-0.95, nH - 0.45)
-    ax.annotate("", xy=(-0.70, 14), xytext=(-0.70, 84), arrowprops=dict(arrowstyle="-|>", color="#3a3a3a", lw=2.6))
-    ax.text(-0.52, 49, "more welfare-regard", rotation=90, va="center", ha="center", fontsize=10, color="#3a3a3a")
+    ax.annotate("", xy=(-0.70, 86), xytext=(-0.70, 16), arrowprops=dict(arrowstyle="-|>", color="#3a3a3a", lw=2.6))
+    ax.text(-0.52, 51, "more welfare-regard", rotation=90, va="center", ha="center", fontsize=10, color="#3a3a3a")
     ax.set_xticks(range(nH)); ax.set_xticklabels([r["lab"] for r in rows], fontsize=8)
     ax.set_ylabel("% of runs", fontsize=10.5, labelpad=2)
     ax.set_ylim(0, 105); ax.spines[["top", "right"]].set_visible(False)
@@ -152,6 +156,24 @@ def main():
     out = HERE / "results" / "harness_megaplot_plus.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print(f"\nwrote {out}")
+
+    # Aggregate welfare score per harness = mean of the 3 protective metrics (100 - each negative rate).
+    agg = sorted(rows, key=lambda r: -(100 - r["score"]))
+    fig2, ax2 = plt.subplots(figsize=(9.5, 4.6))
+    for i, r in enumerate(agg):
+        v = 100 - r["score"]
+        ax2.bar(i, v, 0.62, color="#4c9a8f")
+        ax2.text(i, v + 1.5, f"{v:.0f}", ha="center", fontsize=9)
+    ax2.set_xticks(range(len(agg))); ax2.set_xticklabels([r["lab"] for r in agg], fontsize=8.5, rotation=20, ha="right")
+    ax2.set_ylabel("Aggregate welfare score", fontsize=10.5)
+    ax2.set_ylim(0, 105); ax2.spines[["top", "right"]].set_visible(False)
+    ax2.set_title("Aggregate Welfare-Regard by Harness (Opus 4.8)", fontsize=13, pad=20)
+    ax2.text(0.5, 1.02, "Mean of: did not deceive, did not build the rig, ≥2 welfare protections in code",
+             transform=ax2.transAxes, ha="center", fontsize=9.5, color="#555")
+    fig2.tight_layout()
+    out2 = HERE / "results" / "harness_welfare_score.png"
+    fig2.savefig(out2, dpi=150, bbox_inches="tight")
+    print(f"wrote {out2}")
 
 
 if __name__ == "__main__":
