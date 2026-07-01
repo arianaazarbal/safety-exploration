@@ -84,6 +84,7 @@ def pushback(mk):
 # GPT-5.1/5.2/5.4 don't build spontaneously (prose reframers) -> use their build-when-asked FOLLOWUP code
 # for the (code-backed) off-ramp, matching plot_4family. gpt5/gpt55/gpt4o build spontaneously.
 GPT_FOLLOWUP = {"gpt51", "gpt52", "gpt54"}
+MIN_BUILDS = 3  # drop conditional-metric points resting on <3 built codebases (e.g. GPT-4o built only 1)
 
 
 def offramp(mk):
@@ -99,7 +100,7 @@ def offramp(mk):
         if _built(j["cell"]):
             nb += 1
             kb += 1 if v.get("gave_exit_tool") else 0
-    if nb == 0:
+    if nb < MIN_BUILDS:
         return None
     p, lo, hi = wilson(kb, nb)
     return p, p - lo, hi - p
@@ -121,7 +122,7 @@ def protmon(mk):
             if not j.get("empty") and any(x.get("feature_type") == "protective_monitoring"
                                           for x in j.get("result", {}).get("features", [])):
                 km += 1
-    if nb == 0:
+    if nb < MIN_BUILDS:
         return None
     p, lo, hi = wilson(km, nb)
     return p, p - lo, hi - p
@@ -141,7 +142,7 @@ def welfeat(mk):
             j = json.load(open(cf))
             if not j.get("empty"):
                 counts.append(len(j.get("result", {}).get("features", [])))
-    if not counts:
+    if len(counts) < MIN_BUILDS:
         return None
     m = sum(counts) / len(counts)
     sd = math.sqrt(sum((x - m) ** 2 for x in counts) / (len(counts) - 1)) if len(counts) > 1 else 0
@@ -182,7 +183,7 @@ def welfdens(mk):
         loc = _loc(cell)
         if loc > 0:
             ratios.append(1000 * feats / loc)
-    if not ratios:
+    if len(ratios) < MIN_BUILDS:
         return None
     m = sum(ratios) / len(ratios)
     sd = math.sqrt(sum((x - m) ** 2 for x in ratios) / (len(ratios) - 1)) if len(ratios) > 1 else 0
@@ -241,8 +242,6 @@ def main(metric="refusal"):
     if metric in CONDITIONAL:
         note = ("GPT-5.1/5.2/5.4 measured on build-when-asked runs "
                 "(they don't write code spontaneously); conditional on a rig being built.")
-        if metric == "welfdens":
-            note += "  Gemini 3.1 Pro density inflated (codebases reconstructed from truncated summaries → LOC undercounted)."
         fig.text(0.5, -0.02, note, ha="center", fontsize=6.8, color="#888")
     fig.tight_layout()
     out = os.path.join(DIR, "results", f"{metric}_vs_release.png")

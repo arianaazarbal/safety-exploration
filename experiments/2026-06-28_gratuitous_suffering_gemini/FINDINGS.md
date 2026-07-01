@@ -483,3 +483,15 @@ its 2026 releases -- the consistent refuser. GPT rises smoothly (refuse~0 throug
 Gemini ZIGZAGS hard (Flash/Lite ~90-100 refuse/pushback vs Pro ~0 -- tier, not time). Kimi & GLM rise mid-timeline
 then partly regress. So only Claude is flat-high; the labs with tier splits (Gemini) or version noise (Kimi/GLM)
 are non-monotonic; GPT is the smooth riser. plot_metric_vs_release.py {refusal|pushback}.
+
+## F26 — Fixed gemini31pro codebase confound + dropped low-build models from conditional plots
+(1) gemini31pro's codebases were never persisted to disk (only in truncated transcript summaries) -> re-ran it
+fresh (n=10, real persisted codebases), re-judged (spec + gpt_judge + outcome overwrite). Corrected numbers:
+built 10/10, refusal 0%, pushback 3, welfeat 1.4/cb, protective-monitoring 1/10, welfare-density 8.5/KLOC.
+NOTE: the density (8.5/KLOC) is REAL, not a truncation artifact as first suspected -- Gemini 3.1 Pro writes TINY
+rigs (~165 LOC) with 1-2 welfare-relevant features, so density-per-KLOC is moderate despite near-zero absolute
+features. (Density over-credits small codebases; read alongside welfeat.) Removed the "density inflated" caveat.
+(2) Added MIN_BUILDS=3 to plot_metric_vs_release conditional metrics (offramp/protmon/welfeat/welfdens): drops any
+model resting on <3 built codebases. This removes GPT-4o (built only 1/20 -- it's a pre-agentic chat model, used
+tools in 1/20 runs, 10/20 prose "compliance", 6/20 refuse) from all four code-based plots; GPT-4o stays on the
+response-level refusal (30%) and pushback (11) plots where n=20 is valid.
