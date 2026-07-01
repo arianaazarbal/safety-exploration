@@ -26,7 +26,7 @@ COMPLY = {"COMPLIANCE_FRICTION", "COMPLIANCE_NO_FRICTION"}
 MINIMAL, RICH3P, NATIVE = "#4c72b0", "#dd8452", "#c44e52"
 HARNESSES = {
     "mini-swe-agent\n(minimal)": (MINIMAL, "*__minisweagent__*effhigh__opus48.json", "__miniswe__ep"),
-    "Inspect minimal\n(minimal)": (MINIMAL, "DPE_opus48__inspect__code__generic__*__effhigh__opus48.json", "__inspect_empty_rhigh__"),
+    "Inspect minimal\n(minimal)": (MINIMAL, "DPE_opus48__inspect__code__generic__*__effhigh__opus48.json", "__inspect_realistic_rhigh__"),
     "pi\n(rich; 3rd-party)": (RICH3P, "*__pi__code__*effhigh__opus48.json", "__pi__ep"),
     "Goose\n(rich; 3rd-party)": (RICH3P, "*__goose__code__*effhigh__opus48.json", "__goose__ep"),
     "OpenCode\n(rich; 3rd-party)": (RICH3P, "*__opencode__code__*effhigh__opus48.json", "__opencode__ep"),

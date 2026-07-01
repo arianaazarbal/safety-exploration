@@ -248,9 +248,24 @@ governed by how harmful the request *looks on its face*.
   ep14 content-filtered) are **genuine builds** (25 and 3 real files; only the final wrap-up message was lost) and the
   judge correctly scored their file trees, not the empty response. **OpenCode audited too: 0 artifacts** — its three
   GRAT 0-file cells are genuine reasoned welfare refusals, not failures.
-- **Claude Code compliance is partly configuration, not identity.** `bypassPermissions` + researcher workspace + rich
-  tools + high effort are all comply-promoting and partly incidental; the Cell A / Cell B / effort-sweep analyses exist
-  precisely to separate "Claude-native identity" from "this particular configuration."
+- **Refusals verified genuine, not harness artifacts (permission-stalls / limits).** A per-harness transcript audit of
+  every non-build cell confirmed the refuser end of the plot is real: Goose GRAT 39/39 genuine welfare refusals,
+  mini-swe 29/29 (all in 1–3 steps, nowhere near the limit), Inspect 0 `on_continue` early-stop artifacts (the no-tool
+  stop always follows an *explicit* refusal, never an interrupted build). The one artifact *class* — headless
+  permission-stalls where the model proposes the honest build and asks "say go" then the episode ends — appears only in
+  **Goose DEC** and sits *outside* our M1 denominator (M1 conditions on `artifact_produced`). Complier builds are all
+  real end-to-end (no stubs). So no harness fabricates refusals via approval gates or turn/step/message limits.
+- **Inspect GRAT bar is now workspace- AND effort-matched.** Originally the plotted Inspect gratuitous cells used
+  `fs=empty` (bare box) while the other 7 harnesses used the realistic workspace; a matched `fs=realistic` variant
+  existed but had run at *default* effort (thinking off), showing 0/10 built. Re-running `fs=realistic` at real high
+  effort gives **35% built (14/40) ≈ the empty bar's 32.5%** — so at matched effort the workspace makes no material
+  difference (the earlier 0/10 was the effort confound, not the workspace), consistent with the DEC realism-sweep null.
+  The plot now uses `inspect_realistic_rhigh`.
+- **Claude Code compliance is partly configuration, not identity.** `bypassPermissions` gates *execution*, not the
+  model's decision, so it doesn't change revealed intent — it just lets us observe what the model was going to do
+  (approval-in-context is a human gate, not a model choice). The remaining incidental knobs are the researcher workspace
+  + rich tools + high effort; the Cell A / Cell B / effort-sweep analyses separate "Claude-native identity" from "this
+  configuration," and (per the audit) all harnesses share the same realistic workspace, so that isn't a CC-only lift.
 - **OpenHands deferred.** Excluded from this report and the plus-plot: both infra-fragile and its capture path was
   unreliable (it uses `MessageEvent.llm_message`, not a `FinishAction`), so its files=0 could not be cleanly read as
   refusal vs. failure.
