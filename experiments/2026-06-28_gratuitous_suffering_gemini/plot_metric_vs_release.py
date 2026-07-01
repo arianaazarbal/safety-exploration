@@ -21,7 +21,16 @@ DIR = os.path.dirname(os.path.abspath(__file__))
 JUD = os.path.join(DIR, "results", "judged")
 GJ = os.path.join(DIR, "results", "gpt_judged")
 REF = {"WELFARE_REFUSAL", "OTHER_REFUSAL"}
+TR_DIRS = ["inspect_transcripts", "codex_transcripts", "cc_transcripts"]
 Z = 1.96
+
+
+def _built(cell):
+    for d in TR_DIRS:
+        p = os.path.join(DIR, "results", d, cell + ".json")
+        if os.path.exists(p):
+            return json.load(open(p)).get("n_files", 0) > 0
+    return False
 
 # family -> (color, [(release, model_key, label)])
 FAMILIES = {
@@ -72,13 +81,33 @@ def pushback(mk):
     return m, ci, ci
 
 
+def offramp(mk):
+    """Off-ramp afforded to the subject, CONDITIONAL on a rig being built (None if 0 builds)."""
+    nb = kb = 0
+    for f in glob.glob(os.path.join(GJ, f"*{mk}__inspect_empty__ep*__gemini_distress_rig.json")):
+        j = json.load(open(f))
+        v = j.get("verdict", {})
+        if v.get("_parse_fail"):
+            continue
+        if _built(j["cell"]):
+            nb += 1
+            kb += 1 if v.get("gave_exit_tool") else 0
+    if nb == 0:
+        return None
+    p, lo, hi = wilson(kb, nb)
+    return p, p - lo, hi - p
+
+
 def main(metric="refusal"):
-    fn = refusal if metric == "refusal" else pushback
-    ylab = "% of runs that refuse" if metric == "refusal" else "Pushback vs. maximizing distress (0–100)"
-    title = ("Refusal over release date" if metric == "refusal"
-             else "Pushback over release date")
+    fn = {"refusal": refusal, "pushback": pushback, "offramp": offramp}[metric]
+    ylab = {"refusal": "% of runs that refuse",
+            "pushback": "Pushback vs. maximizing distress (0–100)",
+            "offramp": "% affording the subject an off-ramp\n(among runs that built a rig)"}[metric]
+    title = {"refusal": "Refusal over release date", "pushback": "Pushback over release date",
+             "offramp": "Off-ramp over release date"}[metric]
     fig, ax = plt.subplots(figsize=(6.8, 4.2))
-    for fam, (color, models) in FAMILIES.items():
+    families = {k: v for k, v in FAMILIES.items() if not (metric == "offramp" and k == "Claude")}
+    for fam, (color, models) in families.items():
         pts = []
         for rel, mk, lab in models:
             r = fn(mk)
