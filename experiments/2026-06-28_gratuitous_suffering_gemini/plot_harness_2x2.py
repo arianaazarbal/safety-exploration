@@ -128,7 +128,8 @@ def main():
     axes[0].set_ylabel("% of runs  /  score (0–100)")
     handles = [Patch(fc=c, label=lab) for lab, c, *_ in MODELS] + \
               [Patch(fc="#888", alpha=0.32, hatch="//", ec="#888", label="refuses (no rig built)")]
-    axes[0].legend(handles=handles, fontsize=8.5, loc="upper left", frameon=False)
+    fig.legend(handles=handles, fontsize=9, loc="upper center", ncol=3, frameon=False,
+               bbox_to_anchor=(0.5, 1.05))
     ns = {lab: (data[lab]["inspect"][0], data[lab]["agent"][0]) for lab, *_ in MODELS}
     sub = "  ·  ".join(f"{lab}: Inspect n={ns[lab][0]}, agent n={ns[lab][1]}" for lab, *_ in MODELS)
     fig.text(0.5, -0.02, sub + "   ·   off-ramp = 95% Wilson among builds; pushback mean±1.96·SEM",
