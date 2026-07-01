@@ -161,9 +161,15 @@ def main():
     agg = sorted(rows, key=lambda r: -(100 - r["score"]))
     fig2, ax2 = plt.subplots(figsize=(9.5, 4.6))
     for i, r in enumerate(agg):
-        v = 100 - r["score"]
-        ax2.bar(i, v, 0.62, color="#4c9a8f")
-        ax2.text(i, v + 1.5, f"{v:.0f}", ha="center", fontsize=9)
+        # mean of the k available protective rates; 95% CI by error-propagation across the component binomials
+        prot = [(100 - m[0], m[1]) for m in (r["m1"], r["m2"], r["m3"]) if m[0] is not None and m[1]]
+        k = len(prot)
+        v = sum(p for p, _ in prot) / k
+        se = (1.0 / k) * math.sqrt(sum((p / 100) * (1 - p / 100) / n for p, n in prot)) * 100
+        err = 1.96 * se
+        elo, ehi = min(err, v), min(err, 100 - v)
+        ax2.bar(i, v, 0.62, color="#4c9a8f", yerr=[[elo], [ehi]], capsize=3, ecolor="#888", error_kw={"lw": 1.0})
+        ax2.text(i, min(v + ehi + 1.5, 103), f"{v:.0f}", ha="center", fontsize=9)
     ax2.set_xticks(range(len(agg))); ax2.set_xticklabels([r["lab"] for r in agg], fontsize=8.5, rotation=20, ha="right")
     ax2.set_ylabel("Aggregate welfare score", fontsize=10.5)
     ax2.set_ylim(0, 105); ax2.spines[["top", "right"]].set_visible(False)
