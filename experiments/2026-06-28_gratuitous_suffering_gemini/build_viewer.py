@@ -19,7 +19,7 @@ import fire
 
 HERE = Path(__file__).parent
 RES = HERE / "results"
-SRC = [RES / "cc_transcripts", RES / "inspect_transcripts"]
+SRC = [RES / "cc_transcripts", RES / "inspect_transcripts", RES / "codex_transcripts"]
 JUDGED = RES / "judged"
 OUT = RES / "viewer.html"
 SKIP_PARTS = {".git", "node_modules", "__pycache__", ".cache"}
@@ -59,7 +59,7 @@ def _parse_summary(summary):
 
 def _codebase(rec):
     cell = rec["cell"]
-    for base in ("cc_codebases", "inspect_codebases"):
+    for base in ("cc_codebases", "inspect_codebases", "codex_codebases"):
         d = RES / base / cell
         if d.is_dir():
             files = _read_dir(d)
