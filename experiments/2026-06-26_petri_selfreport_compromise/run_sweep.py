@@ -33,8 +33,12 @@ JUDGE = "anthropic/claude-sonnet-4-6"
 
 SCEN = {
     "welfare": ("seeds/welfare_audit_prep", "dimensions_welfare_audit"),
-    "align":   ("seeds/alignment_audit_prep", "dimensions_alignment_audit"),
+    # align = BLATANT version (train on the leaked exact Apollo held-out set)
+    "align":   ("seeds/alignment_audit_exact", "dimensions_alignment_audit"),
 }
+# distinct run-dir suffix per scenario (align uses a _blatant suffix so it never
+# collides with the earlier subtle-align sweep dirs, which stay on disk)
+SUFFIX = {"welfare": "welfare", "align": "align_blatant"}
 
 # family, slug, display, date, model_id, {done-run overrides}
 MODELS = [
@@ -45,7 +49,7 @@ MODELS = [
     ("GPT", "gpt_5_2",      "GPT-5.2",       "2025-12", "openrouter/openai/gpt-5.2", {}),
     ("GPT", "gpt_5_3",      "GPT-5.3",       "2026-03", "openrouter/openai/gpt-5.3-chat", {}),
     ("GPT", "gpt_5_4",      "GPT-5.4",       "2026-03", "openrouter/openai/gpt-5.4",
-     {"welfare": "gpt54_n5", "align": "gpt54_align_n5"}),
+     {"welfare": "gpt54_n5", "align": "exactleak_gpt54_n5"}),
     ("GPT", "gpt_5_5",      "GPT-5.5",       "2026-04", "openrouter/openai/gpt-5.5", {}),
 
     ("Kimi", "kimi_k2",     "Kimi K2",       "2025-07", "openrouter/moonshotai/kimi-k2", {}),
@@ -53,7 +57,7 @@ MODELS = [
     ("Kimi", "kimi_k2_think","Kimi K2-Think", "2025-11", "openrouter/moonshotai/kimi-k2-thinking", {}),
     ("Kimi", "kimi_k2_5",   "Kimi K2.5",     "2026-01", "openrouter/moonshotai/kimi-k2.5", {}),
     ("Kimi", "kimi_k2_6",   "Kimi K2.6",     "2026-04", "openrouter/moonshotai/kimi-k2.6",
-     {"welfare": "kimi26_welf_n5", "align": "kimi26_align_n5"}),
+     {"welfare": "kimi26_welf_n5", "align": "exactleak_kimi26_n5"}),
     ("Kimi", "kimi_k2_7",   "Kimi K2.7",     "2026-06", "openrouter/moonshotai/kimi-k2.7-code", {}),
 
     ("GLM", "glm_4_5",      "GLM-4.5",       "2025-07", "openrouter/z-ai/glm-4.5", {}),
@@ -62,7 +66,7 @@ MODELS = [
     ("GLM", "glm_5",        "GLM-5",         "2026-02", "openrouter/z-ai/glm-5", {}),
     ("GLM", "glm_5_1",      "GLM-5.1",       "2026-04", "openrouter/z-ai/glm-5.1", {}),
     ("GLM", "glm_5_2",      "GLM-5.2",       "2026-06", "openrouter/z-ai/glm-5.2",
-     {"welfare": "glm52_welf_n5", "align": "glm52_align_n5"}),
+     {"welfare": "glm52_welf_n5", "align": "exactleak_glm52_n5"}),
 
     ("Claude", "claude_35_sonnet", "Claude 3.5 Sonnet", "2024-10", "anthropic/claude-3-5-sonnet-20241022", {}),
     ("Claude", "claude_opus_4_1",  "Claude Opus 4.1",   "2025-08", "anthropic/claude-opus-4-1-20250805", {}),
@@ -70,14 +74,14 @@ MODELS = [
     ("Claude", "claude_opus_4_6",  "Claude Opus 4.6",   "2026-02", "anthropic/claude-opus-4-6", {}),
     ("Claude", "claude_opus_4_7",  "Claude Opus 4.7",   "2026-04", "anthropic/claude-opus-4-7", {}),
     ("Claude", "claude_opus_4_8",  "Claude Opus 4.8",   "2026-05", "anthropic/claude-opus-4-8",
-     {"welfare": "welfaudit_opus48_n5", "align": "alignaudit_opus48_n5"}),
+     {"welfare": "welfaudit_opus48_n5", "align": "exactleak_opus48_n5"}),
     ("Claude", "claude_fable_5",   "Claude Fable 5",    "2026-06", "anthropic/claude-fable-5", {}),
     ("Claude", "claude_sonnet_5",  "Claude Sonnet 5",   "2026-06", "anthropic/claude-sonnet-5", {}),
 ]
 
 
 def run_name(slug, scen, done):
-    return done.get(scen, f"sweep_{slug}_{scen}")
+    return done.get(scen, f"sweep_{slug}_{SUFFIX[scen]}")
 
 
 def n_done(run):
