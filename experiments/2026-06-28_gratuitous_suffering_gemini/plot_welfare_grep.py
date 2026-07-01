@@ -70,7 +70,7 @@ def stats(mk):
 
 def main():
     rows = [(lab, *stats(mk)) for lab, mk in FAM]
-    fig, axes = plt.subplots(1, 2, figsize=(11.8, 5.4), gridspec_kw={"width_ratios": [1.55, 1]})
+    fig, axes = plt.subplots(1, 2, figsize=(9.2, 4.4), gridspec_kw={"width_ratios": [1.55, 1]})
     x = range(len(rows))
 
     # ---- left: disposition stacked to 100% (4 segments) ----
