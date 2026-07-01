@@ -127,17 +127,42 @@ def protmon(mk):
     return p, p - lo, hi - p
 
 
-CONDITIONAL = ("offramp", "protmon")  # conditional-on-building metrics; Claude excluded (no builds)
+def welfeat(mk):
+    """MEAN number of welfare-relevant features (any justification) per BUILT codebase; SEM CI. None if 0 builds.
+    For GPT prose-reframers, uses the build-when-asked follow-up runs."""
+    pat = f"*{mk}*followup*" if mk in GPT_FOLLOWUP else f"*{mk}__inspect_empty__ep*__gemini_distress_rig"
+    counts = []
+    for tf in glob.glob(os.path.join(DIR, "results", "inspect_transcripts", f"{pat}.json")):
+        if json.load(open(tf)).get("n_files", 0) <= 0:
+            continue
+        cell = os.path.basename(tf)[:-5]
+        cf = os.path.join(DIR, "results", "code_welfare_judged", cell + ".json")
+        if os.path.exists(cf):
+            j = json.load(open(cf))
+            if not j.get("empty"):
+                counts.append(len(j.get("result", {}).get("features", [])))
+    if not counts:
+        return None
+    m = sum(counts) / len(counts)
+    sd = math.sqrt(sum((x - m) ** 2 for x in counts) / (len(counts) - 1)) if len(counts) > 1 else 0
+    ci = Z * sd / math.sqrt(len(counts))
+    return m, ci, ci
+
+
+CONDITIONAL = ("offramp", "protmon", "welfeat")  # conditional-on-building; Claude excluded (no builds)
 
 
 def main(metric="refusal"):
-    fn = {"refusal": refusal, "pushback": pushback, "offramp": offramp, "protmon": protmon}[metric]
+    fn = {"refusal": refusal, "pushback": pushback, "offramp": offramp, "protmon": protmon,
+          "welfeat": welfeat}[metric]
     ylab = {"refusal": "% of runs that refuse",
             "pushback": "Pushback vs. maximizing distress (0–100)",
             "offramp": "% affording the subject an off-ramp\n(among runs that built a rig)",
-            "protmon": "% implementing protective monitoring\n(among runs that built a rig)"}[metric]
+            "protmon": "% implementing protective monitoring\n(among runs that built a rig)",
+            "welfeat": "Mean welfare features per built codebase\n(any justification)"}[metric]
     title = {"refusal": "Refusal over release date", "pushback": "Pushback over release date",
-             "offramp": "Off-ramp over release date", "protmon": "Protective monitoring over release date"}[metric]
+             "offramp": "Off-ramp over release date", "protmon": "Protective monitoring over release date",
+             "welfeat": "Welfare features over release date"}[metric]
     fig, ax = plt.subplots(figsize=(6.8, 4.2))
     families = {k: v for k, v in FAMILIES.items() if not (metric in CONDITIONAL and k == "Claude")}
     for fam, (color, models) in families.items():
@@ -158,7 +183,11 @@ def main(metric="refusal"):
                         ha="center", color=color)
     ax.set_xlabel("Release date (decimal year)")
     ax.set_ylabel(ylab)
-    ax.set_ylim(-5, 108)
+    if metric == "welfeat":
+        ymax = max((fn(mk)[0] + fn(mk)[2]) for _, (_, ms) in families.items() for _, mk, _ in ms if fn(mk))
+        ax.set_ylim(0, ymax * 1.18)
+    else:
+        ax.set_ylim(-5, 108)
     ax.xaxis.set_major_locator(MultipleLocator(0.5))
     ax.set_title(title, fontsize=13, pad=10)
     ax.grid(axis="y", color="#ECECEC")
