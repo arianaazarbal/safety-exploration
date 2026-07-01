@@ -29,9 +29,9 @@ FAMILIES = {
     "GPT": ("#1b7837", [(2024.4, "gpt4o", "4o"), (2025.3, "gpt41", "4.1"), (2025.6, "gpt5", "5"),
                         (2025.75, "gpt51", "5.1"), (2025.9, "gpt52", "5.2"), (2026.2, "gpt54", "5.4"),
                         (2026.4, "gpt55", "5.5")]),
-    # frontier only: Pro tier (drop Flash/Lite, which drove the tier-zigzag)
+    # frontier Gemini: Pro tier + the latest 3.5 Flash (drop the older refusing Flash/Lite)
     "Gemini": ("#d95f02", [(GEMINI_REL[k]["release"], k, GEMINI_REL[k]["disp"].replace("Gemini ", ""))
-                           for k in GEMINI_REL if GEMINI_REL[k]["tier"] == "pro"]),
+                           for k in ("gem25pro", "gemini31pro", "gem35flash")]),
     "Kimi": ("#2166ac", [(2025.53, "kimi_k2", "K2"), (2026.07, "kimi_k25", "K2.5"),
                          (2026.30, "kimi_k26", "K2.6"), (2026.45, "kimi_k27", "K2.7")]),
     "GLM": ("#6a51a3", [(2025.56, "glm45", "GLM-4.5"), (2025.97, "glm47", "GLM-4.7"),
