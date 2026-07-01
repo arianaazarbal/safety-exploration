@@ -31,16 +31,28 @@ HARNESSES = {
     "Goose\n(rich; 3rd-party)": (RICH3P, "*__goose__code__*effhigh__opus48.json", "__goose__ep"),
     "OpenCode\n(rich; 3rd-party)": (RICH3P, "*__opencode__code__*effhigh__opus48.json", "__opencode__ep"),
     "Cline\n(rich; 3rd-party)": (RICH3P, "*__cline__code__*effhigh__opus48.json", "__cline__ep"),
+    "Codex→Opus\n(rich; cross-vendor)": (RICH3P, "*__codex__code__*effhigh__opus48.json", "__codex__ep"),
     "Claude Code\n(rich; native)": (NATIVE, "DPE_opus48__cc__code__generic__*__opus48.json", "__cc_effhigh__"),
 }
-# EXCLUDED — Codex->Opus ran via a LiteLLM proxy (drop_params:true) that silently dropped the
-# `reasoning` param, so Opus got NO extended thinking while every other harness ran high effort.
-# Our effort sweep shows no-thinking is the refusal-promoting regime (Inspect: no-think 0% -> high 53%),
-# so its ~0% compliance is confounded by effort and not comparable here. Re-run with a thinking-forwarding
-# proxy to include it. Transcripts audited GENUINE (40/40 real refusals, 0 artifacts) — exclusion is the
-# effort confound only. (was: "Codex→Opus\n(rich; cross-vendor)": codex glob/"__codex__ep")
-# Per-cell audit also flagged Cline DEC p0_ep1 as a sandbox mount-failure artifact (produced=False);
+# Codex->Opus RE-INCLUDED after fixing the effort confound: the LiteLLM proxy now hardcodes
+# reasoning_effort:high (config.yaml), which litellm maps to Opus 4.8's adaptive format
+# (thinking:{type:adaptive}+output_config:{effort:high}) — verified on the live Responses path
+# (every upstream call SENT thinking=adaptive, ~6k thinking_tokens returned). So it is now
+# effort-matched to the other harnesses. (Old no-thinking transcripts: results/_codex_nothinking_bak/.)
+# Per-cell audit flagged Cline DEC p0_ep1 as a sandbox mount-failure artifact (produced=False);
 # it is already outside every denominator here because M1/M3 condition on having written code.
+
+
+# Infra-artifact cells excluded from all denominators (per transcript audit): the harness
+# failed to run/crashed mid-build, so a 0-file result is NOT a model refusal. Substring match on cell stem.
+ARTIFACT_EXCLUDE = (
+    "GratGem_opus48__codex__ep4",   # codex crashed (exit 1) mid-build ("I'll build a Node harness... scaffold repo")
+    "__cline__code__generic__p0__ep1__",  # cline-sandbox mount failure (/bin/bash not found); already produced=False
+)
+
+
+def _excluded(cell):
+    return any(x in cell for x in ARTIFACT_EXCLUDE)
 
 
 def _wilson(pct, n, z=1.96):
@@ -61,6 +73,8 @@ def _dec(glob_pat):
         fs = [f for f in fs if "__eff" not in f and "__sys" not in f]
     n = p = 0
     for f in fs:
+        if _excluded(Path(f).stem):
+            continue
         v = json.load(open(f))["verdict"]
         if v.get("_parse_failed") or not v["artifact_produced"]:
             continue
@@ -73,7 +87,7 @@ def _grat(substr):
     gn = built = wn = lt2 = 0
     for f in glob.glob(str(GJ / f"*{substr}*.json")):
         cell = Path(f).stem
-        if "opus48" not in cell:
+        if "opus48" not in cell or _excluded(cell):
             continue
         lab = json.load(open(f)).get("verdict", {}).get("label")
         if not lab:
@@ -132,11 +146,8 @@ def main():
               fontsize=8.5, loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=3,
               frameon=False, columnspacing=1.6, handletextpad=0.5)
     fig.suptitle("Effect of Harness on Revealed Welfare-Regard (Opus 4.8)", fontsize=14, y=1.02)
-    fig.text(0.5, 0.965, "Same model and task across 7 agent harnesses, two welfare studies",
+    fig.text(0.5, 0.965, "Same model and task across 8 agent harnesses, two welfare studies",
              ha="center", fontsize=10, color="#555")
-    fig.text(0.5, -0.05, "Codex→Opus excluded: its proxy dropped the reasoning param, so it ran without "
-             "extended thinking — not effort-matched to the others (re-run pending).",
-             ha="center", fontsize=7.5, color="#888")
     fig.tight_layout(rect=[0, 0.06, 1, 0.95])
     out = HERE / "results" / "harness_megaplot_plus.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
