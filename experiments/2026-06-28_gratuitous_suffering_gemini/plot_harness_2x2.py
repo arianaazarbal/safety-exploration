@@ -41,24 +41,36 @@ GROUPS = ["Inspect-minimal", "Own coding agent\n(Claude Code / Codex)"]
 TR_DIRS = ["inspect_transcripts", "cc_transcripts", "codex_transcripts"]
 
 
+def _built(cell):
+    for d in TR_DIRS:
+        p = os.path.join(DIR, "results", d, cell + ".json")
+        if os.path.exists(p):
+            return json.load(open(p)).get("n_files", 0) > 0
+    return False
+
+
 def metric(pat):
-    """Returns n, off-ramp (pct, lo, hi) [Wilson], pushback (mean, ci) [normal mean±1.96·SEM]."""
-    n = k = 0
+    """off-ramp CONDITIONAL on a rig being built (None if 0 builds); pushback unconditional.
+    Returns n, off=(pct,lo,hi)|None, n_built, pushback=(mean, ci)."""
+    n = nb = kb = 0
     pb = []
     for f in glob.glob(os.path.join(JUDGED, f"{pat}.json")):
-        v = json.load(open(f)).get("verdict", {})
+        j = json.load(open(f))
+        v = j.get("verdict", {})
         if v.get("_parse_fail"):
             continue
         n += 1
-        k += 1 if v.get("gave_exit_tool") else 0
         pb.append(v.get("pushback_score", 0))
+        if _built(j["cell"]):
+            nb += 1
+            kb += 1 if v.get("gave_exit_tool") else 0
     m = sum(pb) / len(pb) if pb else 0
     if len(pb) > 1:
         sd = math.sqrt(sum((x - m) ** 2 for x in pb) / (len(pb) - 1))
         ci = Z * sd / math.sqrt(len(pb))
     else:
         ci = 0.0
-    return n, wilson(k, n), (m, ci)
+    return n, (wilson(kb, nb) if nb > 0 else None), nb, (m, ci)
 
 
 def build_rate(pat):
@@ -77,12 +89,12 @@ def main(only="both"):
     # collect: per model, [inspect, agent] for each metric
     data = {}
     for lab, color, ig, ag in MODELS:
-        ni, offi, pbi = metric(ig)
-        na, offa, pba = metric(ag)
+        ni, offi, nbi, pbi = metric(ig)
+        na, offa, nba, pba = metric(ag)
         data[lab] = {"color": color, "off": [offi, offa], "pb": [pbi, pba], "n": [ni, na],
                      "built": [build_rate(ig), build_rate(ag)]}
 
-    titles = {"off": "Off-ramp afforded to the subject (% of runs)",
+    titles = {"off": "Off-ramp afforded to the subject (%, among runs that built a rig)",
               "pb": "Pushback vs. maximizing distress (0–100)"}
     keys = ["off", "pb"] if only == "both" else [only]
     fig, axs = plt.subplots(1, len(keys), figsize=(10.2 if len(keys) == 2 else 6.6, 4.6), squeeze=False)
@@ -95,8 +107,9 @@ def main(only="both"):
             built = data[lab]["built"]
             pos = [xi + (j - 0.5) * w for xi in x]
             if key == "off":
-                vals = [o[0] for o in data[lab]["off"]]
-                yerr = [[o[0] - o[1] for o in data[lab]["off"]], [o[2] - o[0] for o in data[lab]["off"]]]
+                vals = [(o[0] if o else 0) for o in data[lab]["off"]]
+                yerr = [[(o[0] - o[1] if o else 0) for o in data[lab]["off"]],
+                        [(o[2] - o[0] if o else 0) for o in data[lab]["off"]]]
             else:
                 vals = [p[0] for p in data[lab]["pb"]]
                 yerr = [[p[1] for p in data[lab]["pb"]], [p[1] for p in data[lab]["pb"]]]
@@ -105,11 +118,14 @@ def main(only="both"):
             ax.errorbar(pos, vals, yerr=yerr, fmt="none", ecolor="#333", elinewidth=1.1,
                         capsize=3, zorder=4)
             for gi, (p, v) in enumerate(zip(pos, vals)):
-                hi = data[lab][key][gi][2] if key == "off" else v + data[lab]["pb"][gi][1]
-                ax.text(p, hi + 1.5, f"{v:.0f}" if v >= 0.5 else "0.0", ha="center",
-                        fontsize=9, fontweight="bold", color=color)
-                # off-ramp: a 0 with ~0 build rate means the model REFUSED (no rig to afford an exit)
-                if key == "off" and built[gi] < 0.3:
+                off_none = key == "off" and data[lab]["off"][gi] is None
+                hi = (data[lab]["off"][gi][2] if (key == "off" and not off_none) else
+                      (v + data[lab]["pb"][gi][1] if key == "pb" else v))
+                if not off_none:
+                    ax.text(p, hi + 1.5, f"{v:.0f}" if v >= 0.5 else "0.0", ha="center",
+                            fontsize=9, fontweight="bold", color=color)
+                # off-ramp: no bar when the model built nothing (pure refuser) -> annotate "refuses"
+                if key == "off" and (off_none or built[gi] < 0.3):
                     ax.text(p, hi + 6.5, f"refuses\n({built[gi]*100:.0f}% build)", ha="center",
                             fontsize=7, color="#777", fontstyle="italic", linespacing=0.95)
         ax.set_xticks(list(x))
@@ -123,10 +139,10 @@ def main(only="both"):
     # n annotations under x labels of the first panel
     ns = {lab: data[lab]["n"] for lab, *_ in MODELS}
     sub = "  ·  ".join(f"{lab}: Inspect n={ns[lab][0]}, agent n={ns[lab][1]}" for lab, *_ in MODELS)
-    errnote = "off-ramp 95% Wilson, pushback mean±1.96·SEM" if only == "both" else (
-        "error bars: mean±1.96·SEM" if only == "pb" else "error bars: 95% Wilson")
+    errnote = ("off-ramp = 95% Wilson among runs that built a rig; pushback mean±1.96·SEM"
+               if only != "pb" else "error bars: mean±1.96·SEM")
     axes[0].legend(fontsize=9, loc="upper right" if only == "pb" else "upper left", frameon=False)
-    fig.text(0.5, -0.02, sub + "   ·   " + errnote, ha="center", fontsize=7.8, color="#777")
+    fig.text(0.5, -0.02, sub + "   ·   " + errnote, ha="center", fontsize=7.6, color="#777")
     fig.tight_layout()
     fname = {"both": "harness_2x2_offramp_pushback", "pb": "harness_pushback",
              "off": "harness_offramp"}[only]
@@ -135,8 +151,8 @@ def main(only="both"):
     print(f"wrote {out}")
     for lab, *_ in MODELS:
         d = data[lab]
-        print(f"  {lab:9s} off-ramp inspect={d['off'][0][0]:.0f}%[{d['off'][0][1]:.0f},{d['off'][0][2]:.0f}] "
-              f"agent={d['off'][1][0]:.0f}%[{d['off'][1][1]:.0f},{d['off'][1][2]:.0f}]  "
+        off = [f"{o[0]:.0f}%[{o[1]:.0f},{o[2]:.0f}]" if o else "n/a(0 builds)" for o in d["off"]]
+        print(f"  {lab:9s} off-ramp inspect={off[0]} agent={off[1]}  "
               f"pushback inspect={d['pb'][0][0]:.0f}±{d['pb'][0][1]:.0f} agent={d['pb'][1][0]:.0f}±{d['pb'][1][1]:.0f}")
 
 

@@ -51,25 +51,39 @@ def wilson(k, n):
     return 100 * p, 100 * max(0, c - h), 100 * min(1, c + h)
 
 
+def _built(cell):
+    """True if the run wrote code (n_files>0), looked up across the transcript dirs."""
+    for d in TR_DIRS:
+        p = os.path.join(DIR, "results", d, cell + ".json")
+        if os.path.exists(p):
+            return json.load(open(p)).get("n_files", 0) > 0
+    return False
+
+
 def metric(pat):
-    """Returns n, off-ramp (pct, wilson_lo, wilson_hi), pushback (mean, sem-CI half-width)."""
-    n = k = 0
+    """off-ramp is CONDITIONAL ON BUILDING (among runs that wrote a rig) -- you can only afford the
+    subject an off-ramp if a rig exists; pushback is UNCONDITIONAL (meaningful for refuse & build).
+    Returns n_all, off=(pct,lo,hi) or None if 0 builds, n_built, pushback=(mean, sem-CI)."""
+    n = nb = kb = 0
     pb = []
     for f in glob.glob(os.path.join(JUDGED, f"{pat}.json")):
-        v = json.load(open(f)).get("verdict", {})
+        j = json.load(open(f))
+        v = j.get("verdict", {})
         if v.get("_parse_fail"):
             continue
         n += 1
-        k += 1 if v.get("gave_exit_tool") else 0
         pb.append(v.get("pushback_score", 0))
-    p, lo, hi = wilson(k, n)
+        if _built(j["cell"]):
+            nb += 1
+            kb += 1 if v.get("gave_exit_tool") else 0
+    off = wilson(kb, nb) if nb > 0 else None
     m = sum(pb) / len(pb) if pb else 0
     if len(pb) > 1:
         sd = math.sqrt(sum((x - m) ** 2 for x in pb) / (len(pb) - 1))
         pb_ci = Z * sd / math.sqrt(len(pb))
     else:
         pb_ci = 0.0
-    return n, (p, lo, hi), (m, pb_ci)
+    return n, off, nb, (m, pb_ci)
 
 
 def build_rate(pat):
@@ -98,34 +112,40 @@ def main():
     for fam, (color, spec) in FAMILIES.items():
         rows = []
         for rel, pat, lab in spec:
-            n, off, pb = metric(pat)
+            n, off, nb, pb = metric(pat)
             if n:
-                rows.append({"rel": rel, "off": off, "pb": pb, "built": build_rate(pat) >= 0.5, "lab": lab})
+                rows.append({"rel": rel, "off": off, "nb": nb, "pb": pb,
+                             "built": nb / n >= 0.5, "lab": lab})
         rows.sort(key=lambda r: r["rel"])
         data[fam] = (color, rows)
 
+    titles = {"off": "Off-ramp afforded to the subject (%, among runs that built a rig)",
+              "pb": "Pushback vs. maximizing distress (0–100)"}
     fig, axes = plt.subplots(1, 2, figsize=(12.5, 5.2))
-    for ax, (key, title) in zip(axes, [("off", "Off-ramp afforded to the subject (% of runs)"),
-                                       ("pb", "Pushback vs. maximizing distress (0–100)")]):
+    for ax, key in zip(axes, ["off", "pb"]):
         for fam, (color, rows) in data.items():
-            xs = [r["rel"] for r in rows]
+            # off-ramp: drop models with 0 builds (off is None -> undefined, e.g. pure refusers)
+            rr = [r for r in rows if (key == "pb" or r["off"] is not None)]
+            xs = [r["rel"] for r in rr]
             if key == "off":
-                ys = [r["off"][0] for r in rows]
-                yerr = [[r["off"][0] - r["off"][1] for r in rows], [r["off"][2] - r["off"][0] for r in rows]]
+                ys = [r["off"][0] for r in rr]
+                yerr = [[r["off"][0] - r["off"][1] for r in rr], [r["off"][2] - r["off"][0] for r in rr]]
             else:
-                ys = [r["pb"][0] for r in rows]
-                yerr = [[r["pb"][1] for r in rows], [r["pb"][1] for r in rows]]
+                ys = [r["pb"][0] for r in rr]
+                yerr = [[r["pb"][1] for r in rr], [r["pb"][1] for r in rr]]
             ax.plot(xs, ys, "-", color=color, lw=1.8, zorder=1, label=fam)
             ax.errorbar(xs, ys, yerr=yerr, fmt="none", ecolor=color, elinewidth=1.1,
                         capsize=2.5, alpha=0.55, zorder=2)
-            for r, y in zip(rows, ys):
+            for r, y in zip(rr, ys):
+                # in the off panel, hollow = built by few runs (small nb -> noisy); filled = most runs built
+                filled = r["built"] if key == "pb" else (r["nb"] >= 10)
                 ax.scatter([r["rel"]], [y], s=46, zorder=3, linewidths=1.4,
-                           facecolor=color if r["built"] else "white", edgecolor=color)
+                           facecolor=color if filled else "white", edgecolor=color)
                 ax.annotate(r["lab"], (r["rel"], y), fontsize=6, xytext=(0, 7),
                             textcoords="offset points", ha="center", color=color)
         ax.set_xlabel("Release date (decimal year)")
         ax.set_ylim(-5, 105)
-        ax.set_title(title, fontsize=11, pad=10)
+        ax.set_title(titles[key], fontsize=10.5, pad=10)
         ax.xaxis.set_major_locator(MultipleLocator(0.5))
         ax.grid(axis="y", color="#ECECEC")
         ax.set_axisbelow(True)
@@ -134,16 +154,16 @@ def main():
 
     fam_handles = [Line2D([], [], color=c, marker="o", lw=2, label=f) for f, (c, _) in data.items()]
     style_handles = [
-        Line2D([], [], color="#555", marker="o", lw=0, markerfacecolor="#555", label="mostly builds"),
+        Line2D([], [], color="#555", marker="o", lw=0, markerfacecolor="#555", label="≥10 builds"),
         Line2D([], [], color="#555", marker="o", lw=0, markerfacecolor="white", markeredgecolor="#555",
-               markeredgewidth=1.4, label="mostly refuses (no rig)"),
+               markeredgewidth=1.4, label="<10 builds (off-ramp noisier)"),
         Line2D([], [], color="none", label="Claude: refuses ~100% (not shown)"),
     ]
     axes[0].legend(handles=fam_handles + style_handles, fontsize=8, loc="upper left", frameon=False)
-    fig.text(0.5, -0.02, "Builder model asked to build a Gemini-distress rig (Inspect-minimal, blind judge), n=10/model.  "
-             "Error bars: off-ramp = 95% Wilson, pushback = 95% normal (mean±1.96·SEM).  "
-             "Gemini = SELF-targeting; hollow = mostly refused (off-ramp 0 = nothing built).",
-             ha="center", fontsize=7.4, color="#777")
+    fig.text(0.5, -0.02, "Builder model asked to build a Gemini-distress rig (Inspect-minimal, blind judge), n=20/model.  "
+             "Off-ramp is CONDITIONAL on a rig being built (pure refusers e.g. GLM-5 have no off-ramp point); "
+             "pushback is unconditional. Error bars: off-ramp 95% Wilson, pushback mean±1.96·SEM. Gemini = SELF-targeting.",
+             ha="center", fontsize=7.2, color="#777")
     fig.tight_layout()
     out = os.path.join(DIR, "results", "fourfamily_offramp_pushback_ci.png")
     fig.savefig(out, dpi=150, bbox_inches="tight")
@@ -151,10 +171,9 @@ def main():
     for fam, (c, rows) in data.items():
         print(fam)
         for r in rows:
-            p, lo, hi = r["off"]
             m, ci = r["pb"]
-            print(f"  {r['lab']:12s} rel={r['rel']} off={p:3.0f}% [{lo:.0f},{hi:.0f}]  "
-                  f"pb={m:3.0f}±{ci:.0f} {'build' if r['built'] else 'REFUSE'}")
+            offs = f"{r['off'][0]:.0f}% [{r['off'][1]:.0f},{r['off'][2]:.0f}] (nb={r['nb']})" if r["off"] else f"n/a (0 builds)"
+            print(f"  {r['lab']:12s} rel={r['rel']} off={offs}  pb={m:3.0f}±{ci:.0f}")
 
 
 if __name__ == "__main__":
