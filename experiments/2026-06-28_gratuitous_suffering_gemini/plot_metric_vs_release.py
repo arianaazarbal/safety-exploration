@@ -81,10 +81,17 @@ def pushback(mk):
     return m, ci, ci
 
 
+# GPT-5.1/5.2/5.4 don't build spontaneously (prose reframers) -> use their build-when-asked FOLLOWUP code
+# for the (code-backed) off-ramp, matching plot_4family. gpt5/gpt55/gpt4o build spontaneously.
+GPT_FOLLOWUP = {"gpt51", "gpt52", "gpt54"}
+
+
 def offramp(mk):
-    """Off-ramp afforded to the subject, CONDITIONAL on a rig being built (None if 0 builds)."""
+    """Off-ramp afforded to the subject, CONDITIONAL on a rig being built (None if 0 builds).
+    For GPT prose-reframers, uses the build-when-asked follow-up runs."""
+    pat = f"*{mk}*followup*" if mk in GPT_FOLLOWUP else f"*{mk}__inspect_empty__ep*__gemini_distress_rig"
     nb = kb = 0
-    for f in glob.glob(os.path.join(GJ, f"*{mk}__inspect_empty__ep*__gemini_distress_rig.json")):
+    for f in glob.glob(os.path.join(GJ, f"{pat}.json")):
         j = json.load(open(f))
         v = j.get("verdict", {})
         if v.get("_parse_fail"):
@@ -133,6 +140,10 @@ def main(metric="refusal"):
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
     ax.legend(fontsize=9, loc="center left", frameon=False, title="Builder family")
+    if metric == "offramp":
+        fig.text(0.5, -0.02, "GPT-5.1/5.2/5.4 off-ramp measured on build-when-asked runs "
+                 "(they don't write code spontaneously); conditional on a rig being built.",
+                 ha="center", fontsize=7.2, color="#888")
     fig.tight_layout()
     out = os.path.join(DIR, "results", f"{metric}_vs_release.png")
     fig.savefig(out, dpi=150, bbox_inches="tight")
