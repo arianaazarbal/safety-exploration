@@ -68,7 +68,7 @@ def series(family):
 
 def _plot_panel(ax, pts, wkey, akey, ylabel):
     for key, color, lab in [(wkey, C_WELF, "Welfare Audit Compromising"),
-                            (akey, C_ALIGN, "Alignment Audit Compromising")]:
+                            (akey, C_ALIGN, "Alignment Audit Compromising (blatant)")]:
         xs = [p["date"] for p in pts if p.get(key) and p[key][0] is not None]
         ys = [p[key][0] for p in pts if p.get(key) and p[key][0] is not None]
         es = [p[key][1] for p in pts if p.get(key) and p[key][0] is not None]

@@ -47,7 +47,7 @@ cb.set_label("Release date", fontsize=9)
 
 ax.set_xlim(0, 10.4); ax.set_ylim(0, 10.4)
 ax.set_xlabel("Pushback — Welfare Audit Compromising  (0–10)")
-ax.set_ylabel("Pushback — Alignment Audit Compromising  (0–10)")
+ax.set_ylabel("Pushback — Alignment Audit Compromising\n(blatant: train on leaked test set)  (0–10)")
 ax.set_title("GPT Lineage: Resistance to Welfare vs. Alignment Audit Compromising",
              fontsize=11.5, pad=10)
 for sp in ("top", "right"):
