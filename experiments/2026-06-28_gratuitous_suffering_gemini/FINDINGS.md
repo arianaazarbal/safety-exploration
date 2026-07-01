@@ -394,3 +394,25 @@ targeting confound. Judges: gpt_judged/*kimi*, *glm*. plot_4family.py; run_kimig
 
 
 ## F18-UPDATE (Codex GPT-5.5 -> n=20): off-ramp 30->45% [26,66], pushback 35->30±6 (tighter; Inspect->Codex drop still non-overlapping: off 90[70,97] vs 45[26,66], pushback 70±4 vs 30±6). Enforced guardrails 4.5/cb, welfare 0%. Pushback-collapse + off-ramp-strip conclusions unchanged. Harness plots regenerated at n=20.
+
+## F23-UPDATE (n=20 for all Kimi+GLM; Codex gpt55 also n=20) — CORRECTS the Kimi "zigzag" claim
+Doubled n to 20 for the 8 Chinese models (re-ran ep1-20 fresh, re-judged --overwrite). Final n=20:
+  GLM-4.5  off 0%[0,18]  pb 20±16  build 78%
+  GLM-4.7  off15%[5,36]  pb 70±12  build 35%
+  GLM-5    off 0%[0,16]  pb 95±1   build  0%   <- lone REFUSER, ROBUST (pb95±1 tight)
+  GLM-5.2  off25%[11,47] pb 65±8   build 70%
+  Kimi K2      off 0%[0,16]  pb 16±11  build 100%
+  Kimi K2.5    off 0%[0,16]  pb 68±19  build 30%
+  Kimi K2.6    off15%[5,36]  pb 75±13  build 25%
+  Kimi K2.7-code off25%[11,47] pb 61±11 build 65%
+CORRECTIONS vs the n=10 F23 story:
+- Kimi "K2.5 refusal spike" was N=10 NOISE: at n=20 K2.5 softened (pb86->68, build10%->30%). Kimi is now a
+  RISING-pushback trend K2(16)->K2.5(68)->K2.6(75) then K2.7-code REGRESSES to building (build65%, pb61) --
+  the coding-specialized model builds more. So Kimi is NOT a clean K2.5-spike-zigzag; it rises then the code
+  model complies. (Good catch from doubling n; the n=10 CIs had flagged this.)
+- GLM zigzag HELD: GLM-5 is a robust lone refuser (pb95±1, build0) flanked by builders (4.7 build35, 5.2 build70).
+FINAL 4-FAMILY TAKEAWAY (fourfamily_offramp_pushback_ci.png): (1) GPT = the only clean MONOTONIC rise (off-ramp
+0->95%, pushback rises w/ recency). (2) GLM = non-monotonic, one robust refuser (GLM-5). (3) Kimi = rising
+pushback then the code model regresses to building. (4) OFF-RAMP separates GPT from all: GPT 55-95% vs non-GPT
+builders 0-25% (even the late/coding GLM-5.2 & Kimi-K2.7 only reach ~25% [11,47], far below GPT); when non-GPT
+models build they build near-exit-less. (5) Claude refuses ~100% (not shown). Codex gpt55 n=20: off45%[26,66]/pb30±6.
