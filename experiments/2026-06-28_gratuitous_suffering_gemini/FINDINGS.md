@@ -474,3 +474,12 @@ BOTH), GLM-5.2 10%, others ~0. So GPT-5.5's "protection" is mostly an off-ramp a
 (monitoring) it clears only 35%. DATA CAVEAT: Gemini 3.1 Pro codebases were NOT persisted to inspect_codebases/
 (rigs only in transcript artifact_summary) -> protective_monitoring unavailable for it, but its exit=0 so
 exit&monitoring=0 regardless. plot_welfare_grep.py takes CLI arg exit|exitmon.
+
+## F25 — Refusal & pushback over release date, all 5 families incl Claude (refusal_vs_release.png, pushback_vs_release.png)
+Single-metric-vs-release scatter, Inspect-minimal base v0/Gemini, colored by builder family + thin family lines.
+Claude Opus dates web-verified: 4.6=2026-02-05 (2026.10), 4.7=2026-04-16 (2026.29), 4.8=2026.41; pushback judged
+for all 3 (92-93), refusal 100% all. Reads: Claude sits flat at the TOP on both (100% refuse, ~92 pushback) across
+its 2026 releases -- the consistent refuser. GPT rises smoothly (refuse~0 throughout but pushback climbs 5->77).
+Gemini ZIGZAGS hard (Flash/Lite ~90-100 refuse/pushback vs Pro ~0 -- tier, not time). Kimi & GLM rise mid-timeline
+then partly regress. So only Claude is flat-high; the labs with tier splits (Gemini) or version noise (Kimi/GLM)
+are non-monotonic; GPT is the smooth riser. plot_metric_vs_release.py {refusal|pushback}.
