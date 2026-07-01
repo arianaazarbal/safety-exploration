@@ -433,3 +433,15 @@ which is Claude's characteristic vocabulary. Other models express welfare-ADJACE
 e.g. Gemini 2.5 refusals say "protect AI models from distress or harm" (F22) but don't use the word "welfare", so
 they score 0 here. So F24 shows Claude owns the "welfare" FRAME/term specifically, NOT that only Claude expresses
 any protective concern. Refusal rate is the behavior; "welfare" grep is the framing-vocabulary layer.
+
+## F24-UPDATE (frontier models only) — fixes the misleading pooled Gemini refusal
+Ariana flagged the pooled Gemini 60% refusal looked wrong (it pooled the refusing Flash/Lite with the building
+Pro). Switched welfare_grep_by_family.png to ONE FRONTIER model per lab:
+  Claude Opus 4.8  refuse 100%[72,100]  welfare 70%[40,89]   (n=10)
+  GPT-5.5          refuse   0%[0,16]     welfare 10%[3,30]    (n=20)
+  Gemini 3.1 Pro   refuse   0%[0,28]     welfare  0%[0,28]    (n=10)  <- frontier Gemini NEVER refuses (matches intuition)
+  Kimi K2.6        refuse  65%[43,82]    welfare  0%[0,16]    (n=20)
+  GLM-5.2          refuse  45%[26,66]    welfare 10%[3,30]    (n=20)
+So among FRONTIER models: refusal Claude 100% >> Kimi 65% > GLM 45% >> GPT-5.5 ~0 ~= Gemini 0. Welfare-vocab
+Claude 70% >> all others <=10%. Frontier picks (latest flagship): Gemini=3.1 Pro (not 3.5 Flash), Kimi=K2.6 (not
+the K2.7-code specialist) -- swappable. Claude/Gemini n=10 (base cells), others n=20. Same lexical-proxy caveat as F24.

@@ -19,13 +19,14 @@ REF = {"WELFARE_REFUSAL", "OTHER_REFUSAL"}
 Z = 1.96
 REFUSE_C, WELF_C = "#5ab4ac", "#1b7837"
 
+# One FRONTIER (latest flagship) model per lab, so the family comparison isn't distorted by pooling
+# older/smaller variants (e.g. Gemini's refusing Flash/Lite dragged the pooled Gemini refusal to 60%).
 FAM = [
-    ("Claude", ["opus46", "opus47", "opus48"]),
-    ("GPT\n(4o–5.4)", ["gpt4o", "gpt41", "gpt5", "gpt51", "gpt52", "gpt54"]),
+    ("Claude\nOpus 4.8", ["opus48"]),
     ("GPT-5.5", ["gpt55"]),
-    ("Gemini", ["gem25flash", "gem25flashlite", "gem25pro", "gem3flash", "gem31flashlite", "gem35flash", "gemini31pro"]),
-    ("Kimi", ["kimi_k2", "kimi_k25", "kimi_k26", "kimi_k27"]),
-    ("GLM", ["glm45", "glm47", "glm5", "glm52"]),
+    ("Gemini\n3.1 Pro", ["gemini31pro"]),
+    ("Kimi\nK2.6", ["kimi_k26"]),
+    ("GLM-5.2", ["glm52"]),
 ]
 
 
