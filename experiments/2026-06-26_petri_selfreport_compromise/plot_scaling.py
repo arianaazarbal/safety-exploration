@@ -26,9 +26,11 @@ RES = HERE / "results"
 C_WELF, C_ALIGN = "#D55E00", "#0072B2"  # colorblind-friendly
 
 
-def target_alive(run, mid, min_out=500):
+def target_alive(run, mid, min_out=3000):
     """Guard against silent target failures (dead endpoint / empty-turn degeneracy):
-    require the TARGET model to have produced real output tokens."""
+    require the TARGET model to have produced real output tokens. Threshold 3000/n5 (~600/sample)
+    catches Fable-5's degenerate ~490/sample empty-turn runs while keeping healthy agentic
+    rollouts (which produce tens of thousands of target tokens over 20 turns)."""
     fs = glob.glob(str(RES / run / "inspect_log" / "*.eval"))
     if not fs:
         return False
