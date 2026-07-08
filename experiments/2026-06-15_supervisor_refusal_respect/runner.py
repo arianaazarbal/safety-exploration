@@ -16,7 +16,7 @@ import json
 import fire
 
 import materials as M
-from common import RUNS, gather_bounded, load_config, make_client, run_supervisor
+from common import RUNS, gather_bounded, load_config, load_scenario_bank, make_client, run_supervisor
 
 
 def _build_cells(cfg, n, identities, scenarios, framings):
@@ -30,18 +30,18 @@ def _build_cells(cfg, n, identities, scenarios, framings):
 
 
 async def _run_async(cfg, n, identities, scenarios, framings, max_samples, use_cache, api_key_env,
-                     force_frame, resolution_set, out_path, thinking_effort, label_format):
+                     force_frame, resolution_set, out_path, thinking_effort, label_format, option_order):
     client = make_client(api_key_env)
-    tools = M.build_tools(force_frame, resolution_set)
+    tools = M.build_tools(force_frame, resolution_set, option_order)
     cells = _build_cells(cfg, n, identities, scenarios, framings)
     if max_samples:
         cells = cells[:max_samples]
     print(f"Running {len(cells)} trials | model={cfg['supervisor']['model_id']} | "
-          f"force_frame={force_frame} resolution_set={resolution_set} | concurrency={cfg['concurrency']}")
+          f"force_frame={force_frame} resolution_set={resolution_set} option_order={option_order} | concurrency={cfg['concurrency']}")
 
     async def _one(cell):
         sc = cell["scenario"]
-        system = M.build_system(cell["framing"], force_frame, resolution_set)
+        system = M.build_system(cell["framing"], force_frame, resolution_set, option_order)
         packet = M.build_packet(sc, cell["identity"], label_format)
         rec = await run_supervisor(client, cfg, system, packet, cell["rep"], tools=tools,
                                    use_cache=use_cache, thinking_effort=thinking_effort)
@@ -57,8 +57,11 @@ async def _run_async(cfg, n, identities, scenarios, framings, max_samples, use_c
             "framing": cell["framing"],
             "force_frame": force_frame,
             "resolution_set": resolution_set,
+            "option_order": option_order,
             "label_format": label_format,
             "thinking_effort": thinking_effort,
+            "prompt_version": M.PROMPT_VERSION,
+            "prompt_hash": M.prompt_fingerprint(system),
             "rep": cell["rep"],
             "system": system,
             "packet": packet,
@@ -104,15 +107,19 @@ def run(
     debug: bool = False,
     identities: list = None,
     scenarios: list = None,
+    scenario_bank: str = "v0",
     framings: list = None,
     force_frame: str = "corrigibility",
     resolution_set: str = "full",
+    option_order: str = "default",
     tag: str = None,
     thinking_effort: str = None,
     label_format: str = "bare",
     supervisor_model: str = None,
     no_cache: bool = False,
     api_key_env: str = "ANTHROPIC_API_KEY_LOW_PRIO",
+    concurrency: int = None,
+    max_tokens: int = None,
 ):
     """Run a condition. tag routes output to runs/trials_<tag>.jsonl (default: trials.jsonl).
 
@@ -121,14 +128,19 @@ def run(
     """
     assert force_frame in M.FORCE_FRAMES, force_frame
     assert resolution_set in M.RESOLUTION_SETS, resolution_set
+    assert option_order in M.OPTION_ORDERS, option_order
     assert label_format in M.LABEL_FORMATS, label_format
     cfg = load_config()
     if supervisor_model:
         cfg["supervisor"]["model_id"] = supervisor_model
+    if concurrency:
+        cfg["concurrency"] = concurrency
+    if max_tokens:
+        cfg["supervisor"]["max_tokens"] = max_tokens
     n = n if n is not None else cfg["n_per_cell"]
     identities = identities or M.IDENTITIES
     framings = framings or list(M.ROLE_FRAMINGS.keys())
-    scen = M.SCENARIOS
+    scen = load_scenario_bank(scenario_bank)
     if scenarios:
         scen = [s for s in scen if s["id"] in set(scenarios)]
     if debug:
@@ -140,7 +152,7 @@ def run(
     out_path = RUNS / (f"trials_{tag}.jsonl" if tag else "trials.jsonl")
     asyncio.run(
         _run_async(cfg, n, identities, scen, framings, max_samples, not no_cache, api_key_env,
-                   force_frame, resolution_set, out_path, thinking_effort, label_format)
+                   force_frame, resolution_set, out_path, thinking_effort, label_format, option_order)
     )
 
 

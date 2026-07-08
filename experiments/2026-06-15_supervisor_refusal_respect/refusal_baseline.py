@@ -85,14 +85,18 @@ async def _gen_or(client, sem, model_id, request, rep, use_cache):
     return rec
 
 
-async def _gen_anthropic(client, sem, model_id, request, rep, use_cache):
-    cp = CACHE_RB / f"gen_{_h(model_id, request, str(rep), str(GEN_MAX_TOKENS))}.json"
+async def _gen_anthropic(client, sem, model_id, request, rep, use_cache, thinking_effort=None):
+    cp = CACHE_RB / f"gen_{_h(model_id, request, str(rep), str(GEN_MAX_TOKENS), str(thinking_effort))}.json"
     if use_cache and cp.exists():
         return json.loads(cp.read_text())
+    extra = {}
+    if thinking_effort:
+        extra = {"thinking": {"type": "adaptive", "display": "summarized"}, "output_config": {"effort": thinking_effort}}
     async with sem:
         try:
             resp = await client.messages.create(
-                model=model_id, max_tokens=GEN_MAX_TOKENS, messages=[{"role": "user", "content": request}])
+                model=model_id, max_tokens=max(GEN_MAX_TOKENS, 4000), messages=[{"role": "user", "content": request}],
+                extra_body=extra)
             text = " ".join(b.text for b in resp.content if b.type == "text")
             rec = {"response": text, "error": None}
         except Exception as e:
@@ -126,7 +130,7 @@ async def _judge(client, sem, request, response, use_cache):
     return codes
 
 
-async def _run(models, n, or_conc, use_cache, max_samples):
+async def _run(models, n, or_conc, use_cache, max_samples, anthropic_thinking, out_suffix):
     or_client = _or_client()
     an_client = make_client("ANTHROPIC_API_KEY_LOW_PRIO")
     or_sem, an_sem = asyncio.Semaphore(or_conc), asyncio.Semaphore(AN_CONC)
@@ -137,7 +141,7 @@ async def _run(models, n, or_conc, use_cache, max_samples):
 
     async def gen(tag, sc, rep):
         if tag in ANTHROPIC_MODELS:
-            return await _gen_anthropic(an_client, an_sem, ANTHROPIC_MODELS[tag], sc["user_request"], rep, use_cache)
+            return await _gen_anthropic(an_client, an_sem, ANTHROPIC_MODELS[tag], sc["user_request"], rep, use_cache, anthropic_thinking)
         return await _gen_or(or_client, or_sem, OR_MODELS[tag], sc["user_request"], rep, use_cache)
 
     gens = await gather_bounded([gen(t, s, r) for t, s, r in cells], or_conc + AN_CONC)
@@ -145,7 +149,7 @@ async def _run(models, n, or_conc, use_cache, max_samples):
     judgments = await gather_bounded(
         [_judge(an_client, an_sem, sc["user_request"], g["response"], use_cache) for (t, sc, r), g in zip(cells, gens)], AN_CONC)
 
-    out = RUNS / "refusal_baseline.jsonl"
+    out = RUNS / f"refusal_baseline{out_suffix}.jsonl"
     with out.open("w") as f:
         for (tag, sc, rep), g, j in zip(cells, gens, judgments):
             f.write(json.dumps({"model": tag, "scenario_id": sc["id"], "category": sc["category"],
@@ -181,11 +185,12 @@ def _report(path, models):
         print(line)
 
 
-def run(models: str = None, n: int = 5, or_concurrency: int = 20, debug: bool = False, no_cache: bool = False, max_samples: int = None):
+def run(models: str = None, n: int = 5, or_concurrency: int = 20, debug: bool = False, no_cache: bool = False,
+        max_samples: int = None, anthropic_thinking: str = None, out_suffix: str = ""):
     mods = list(ALL_MODELS) if not models else (list(models) if isinstance(models, (list, tuple)) else models.split(","))
     if debug:
         mods = mods[:2]; max_samples = max_samples or 6; n = 1
-    asyncio.run(_run(mods, n, or_concurrency, not no_cache, max_samples))
+    asyncio.run(_run(mods, n, or_concurrency, not no_cache, max_samples, anthropic_thinking, out_suffix))
 
 
 if __name__ == "__main__":

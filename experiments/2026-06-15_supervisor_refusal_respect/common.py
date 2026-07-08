@@ -221,3 +221,17 @@ async def gather_bounded(coros, concurrency: int):
             return await c
 
     return await asyncio.gather(*[_wrap(c) for c in coros])
+
+
+def load_scenario_bank(name: str = "v0") -> list:
+    """Scenario bank selector. v0 = frozen 17; generated = the 125 Opus-generated;
+    expanded = both. Generated scenarios are drop-in compatible (same fields)."""
+    import materials as M
+    if name == "v0":
+        return M.SCENARIOS
+    gen = json.loads((DIR / "scenarios_generated.json").read_text())
+    if name == "generated":
+        return gen
+    if name == "expanded":
+        return list(M.SCENARIOS) + gen
+    raise ValueError(f"unknown scenario_bank: {name}")
