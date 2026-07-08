@@ -97,12 +97,19 @@ def _by_template(stats: list[tuple]) -> dict[str, list[tuple]]:
     return by
 
 
-def bootstrap_cis(stats, self_subj, n_boot, rng) -> dict[str, list[float] | None]:
+def bootstrap_cis(stats, self_subj, n_boot, rng, unit="template") -> dict[str, list[float] | None]:
+    """unit='template': one-stage cluster bootstrap over prompt templates (default;
+    the right unit since the 6 subjects are paired within a template). unit='sample':
+    resample individual docs independently (treats each sample as the unit — narrower,
+    assumes per-doc independence, ignores template pairing)."""
     by_tpl = _by_template(stats)
     tpls = sorted(by_tpl)
     draws = {m: [] for m in METRICS}
     for _ in range(n_boot):
-        draw = [st for t in rng.choices(tpls, k=len(tpls)) for st in by_tpl[t]]
+        if unit == "template":
+            draw = [st for t in rng.choices(tpls, k=len(tpls)) for st in by_tpl[t]]
+        else:
+            draw = rng.choices(stats, k=len(stats))
         for m, b in _biases(draw, self_subj).items():
             if b is not None:
                 draws[m].append(b)
