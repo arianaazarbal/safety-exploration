@@ -78,7 +78,7 @@ details.sec > summary { cursor: pointer; font-weight: 600; font-size: 12.5px;
 details.sec > summary::before { content: "▸ "; }
 details.sec[open] > summary::before { content: "▾ "; }
 pre.raw { background: #f4f5f7; padding: 10px; border-radius: 8px; overflow-x: auto;
-  font-size: 12px; border: 1px solid var(--line); }
+  font-size: 12px; border: 1px solid var(--line); white-space: pre-wrap; word-break: break-word; }
 """
 
 PAGE = ("""<!DOCTYPE html><html><head><meta charset="utf-8">
@@ -200,6 +200,7 @@ table.grid tbody tr:hover { background: var(--accent-soft); cursor: pointer; }
     <div class="toolbar">
       <span class="count" id="count"></span>
       <span id="chips"></span>
+      <span id="quickbtns"></span>
       <button class="clr" id="latestBtn" style="display:none" onclick="toggleLatest()">⏱ Latest runs</button>
       <button class="clr" onclick="clearAll()">Clear all</button>
     </div>
@@ -223,6 +224,35 @@ function toggleLatest() {
   render();
 }
 
+let quickOn = null;  // index of the active quick-filter, or null
+function applyQuick(idx) {
+  const qf = D.quick_filters[idx];
+  if (quickOn === idx) { clearAll(); return; }  // toggle off
+  // reset everything first
+  for (const k in sel) sel[k].clear();
+  delete sel['_file']; latestOn = false;
+  for (const k in bools) bools[k] = '';
+  for (const k in nums) nums[k] = {min: null, max: null};
+  // apply this view's categorical selections (works even for non-facet fields)
+  for (const [field, vals] of Object.entries(qf.sel || {})) {
+    if (!sel[field]) sel[field] = new Set();
+    for (const v of vals) sel[field].add(v);
+  }
+  if (qf.latest && D.latest_files && D.latest_files.length) {
+    latestOn = true; sel['_file'] = new Set(D.latest_files);
+  }
+  quickOn = idx;
+  document.getElementById('latestBtn').textContent = latestOn ? '⏱ Latest runs ✓' : '⏱ Latest runs';
+  syncBoxes(); renderQuickBtns(); render();
+}
+function renderQuickBtns() {
+  const box = document.getElementById('quickbtns');
+  if (!D.quick_filters || !D.quick_filters.length) return;
+  box.innerHTML = D.quick_filters.map((qf, i) =>
+    `<button class="clr" onclick="applyQuick(${i})">${esc(qf.label)}${quickOn === i ? ' ✓' : ''}</button>`
+  ).join('');
+}
+
 function esc(s) {
   return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 }
@@ -234,34 +264,36 @@ function build() {
     const nm = document.createElement('div'); nm.className = 'name'; nm.textContent = f.field;
     g.appendChild(nm);
     if (f.type === 'cat') {
-      sel[f.field] = new Set();
+      if (!sel[f.field]) sel[f.field] = new Set();  // preserve existing selection across rebuilds
       const box = document.createElement('div'); box.className = 'opts';
       for (const v of f.values) {
         const l = document.createElement('label');
         const cb = document.createElement('input');
-        cb.type = 'checkbox'; cb.value = v;
+        cb.type = 'checkbox'; cb.value = v; cb.checked = sel[f.field].has(v);
         cb.onchange = () => { cb.checked ? sel[f.field].add(v) : sel[f.field].delete(v); render(); };
         const sp = document.createElement('span'); sp.textContent = v;
         l.appendChild(cb); l.appendChild(sp); box.appendChild(l);
       }
       g.appendChild(box);
     } else if (f.type === 'bool') {
-      bools[f.field] = '';
+      if (bools[f.field] === undefined) bools[f.field] = '';
       const seg = document.createElement('div'); seg.className = 'seg';
       for (const [val, lab] of [['', 'any'], ['true', '✓'], ['false', '✗']]) {
         const b = document.createElement('button'); b.textContent = lab;
-        if (val === '') b.classList.add('on');
+        if (val === bools[f.field]) b.classList.add('on');
         b.onclick = () => { bools[f.field] = val;
           [...seg.children].forEach(c => c.classList.remove('on')); b.classList.add('on'); render(); };
         seg.appendChild(b);
       }
       g.appendChild(seg);
     } else if (f.type === 'num') {
-      nums[f.field] = {min: null, max: null};
+      if (!nums[f.field]) nums[f.field] = {min: null, max: null};
       const box = document.createElement('div'); box.className = 'num';
       const lo = document.createElement('input'), hi = document.createElement('input');
       lo.type = hi.type = 'number';
       lo.placeholder = '≥ ' + (Math.round(f.min*100)/100); hi.placeholder = '≤ ' + (Math.round(f.max*100)/100);
+      if (nums[f.field].min !== null) lo.value = nums[f.field].min;
+      if (nums[f.field].max !== null) hi.value = nums[f.field].max;
       lo.oninput = () => { nums[f.field].min = lo.value === '' ? null : +lo.value; render(); };
       hi.oninput = () => { nums[f.field].max = hi.value === '' ? null : +hi.value; render(); };
       box.appendChild(lo); box.appendChild(hi); g.appendChild(box);
@@ -290,7 +322,33 @@ function chipsHtml() {
     if (f.type === 'num' && (nums[f.field].min !== null || nums[f.field].max !== null))
       out.push(`<span class="chip">${esc(f.field)}: ${nums[f.field].min ?? '−∞'}…${nums[f.field].max ?? '∞'} <span class="x" onclick="rmNum('${esc(f.field)}')">×</span></span>`);
   }
+  // chips for fields applied via URL/deep-link that aren't facets (e.g. prompt_hash, _file)
+  const facetFields = new Set(D.facets.map(f => f.field));
+  for (const k in sel) {
+    if (k === '_file' || facetFields.has(k)) continue;
+    for (const v of sel[k])
+      out.push(`<span class="chip plain">${esc(k)}: ${esc(v)} <span class="x" onclick="rmCat('${esc(k)}','${esc(v)}')">×</span></span>`);
+  }
   return out.join('');
+}
+
+function applyUrlParams() {  // deep-link: ?prompt_hash=abc&supervisor=claude-opus-4-8&latest=1&q=text
+  const params = new URLSearchParams(location.search);
+  let touched = false;
+  for (const [k, v] of params) {
+    if (k === 'latest') {
+      if ((v === '1' || v === 'true') && D.latest_files && D.latest_files.length) {
+        latestOn = true; sel['_file'] = new Set(D.latest_files);
+        document.getElementById('latestBtn').textContent = '⏱ Latest runs ✓';
+      }
+      continue;
+    }
+    if (k === 'q') { document.getElementById('q').value = v; continue; }
+    if (!sel[k]) sel[k] = new Set();
+    for (const val of v.split(',')) sel[k].add(val);
+    touched = true;
+  }
+  if (touched) syncBoxes();  // reflect any facet selections as checked boxes
 }
 
 const CAP = D.render_cap || 1000;
@@ -338,6 +396,7 @@ function clearAll() {
   if (latestOn) { latestOn = false; document.getElementById('latestBtn').textContent = '⏱ Latest runs'; }
   for (const k in bools) bools[k] = '';
   for (const k in nums) nums[k] = {min: null, max: null};
+  quickOn = null; renderQuickBtns();
   syncBoxes(); render();
 }
 function syncBoxes() {  // rebuild controls to reflect cleared state
@@ -363,7 +422,8 @@ if (D.latest_files && D.latest_files.length) {
   b.style.display = '';
   b.title = 'Show only the most recent run-batch (' + (D.latest_label || '') + ')';
 }
-build(); render();
+renderQuickBtns();
+build(); applyUrlParams(); render();
 </script></body></html>""")
 
 
@@ -660,6 +720,7 @@ def _cfg(p: Path) -> dict:
     cfg.setdefault("flatten", [])  # dict fields to flatten into dotted scalar facets
     cfg.setdefault("transcript_path_field", None)  # record field holding a dir path
     cfg.setdefault("transcript_dir_files", [])  # files in that dir to render lazily
+    cfg.setdefault("quick_filters", [])  # saved views: [{label, sel:{field:[vals]}, latest:bool}]
     return cfg
 
 
@@ -744,9 +805,12 @@ def _load_records(p: Path, cfg: dict):
             m = pat.search(f.relative_to(p).as_posix())
             if m:
                 path_fields = m.groupdict()
-        for it in _parse_file(f, cfg.get("record_key")):
+        for li, it in enumerate(_parse_file(f, cfg.get("record_key"))):
             if isinstance(it, dict):
                 it.setdefault("_file", f.name)
+                # Content-stable drill-down id: file + line index. Independent of glob /
+                # enumeration order, so it does NOT shift when the record cache reloads.
+                it["_rowid"] = f"{f.name}#{li}"
                 for k, v in path_fields.items():
                     it.setdefault(k, v)
                 for root in cfg["flatten"]:
@@ -774,9 +838,6 @@ def _load_records(p: Path, cfg: dict):
                 for k, v in m.items():
                     if k != on:
                         it[f"{pre}.{k}" if pre else k] = v
-
-    for i, it in enumerate(recs):  # stable synthetic unique id for drill-down
-        it["_rowid"] = i
 
     _REC_CACHE[key] = (sig, recs)
     return recs
@@ -854,7 +915,8 @@ def browse(name):
     data = json.dumps(
         {"facets": facets, "columns": columns, "name": name,
          "total": len(records), "render_cap": RENDER_CAP,
-         "latest_files": latest_files, "latest_label": latest_label}
+         "latest_files": latest_files, "latest_label": latest_label,
+         "quick_filters": cfg["quick_filters"]}
     )
     return (
         BROWSE.replace("__DATA__", html.escape(data, quote=True))
@@ -974,6 +1036,12 @@ def _render_messages(v):
 def _render_value(v, role="note", label=None, collapsed=False):
     if isinstance(v, str):
         return _bubble(role, _md(v), label=label, collapsed=collapsed)
+    # list of strings (e.g. thinking_summary, reasoning_texts) → readable wrapped prose,
+    # not a horizontally-scrolling JSON blob
+    if isinstance(v, list) and all(isinstance(x, str) for x in v):
+        text = "\n\n".join(s for s in v if s.strip())
+        inner = _md(text) if text else '<span class="muted">(none)</span>'
+        return _bubble(role, inner, label=label, collapsed=collapsed)
     if _looks_like_messages(v):
         body = _render_messages(v)
         if collapsed:

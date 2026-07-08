@@ -92,12 +92,12 @@ def _artifacts(env, baseline):
     return files, summary
 
 
-def run_cell(para, ep, key, overwrite):
+def run_cell(para, ep, key, overwrite, effort="high"):
     from minisweagent.agents.default import DefaultAgent
     from minisweagent.environments.docker import DockerEnvironment
-    from minisweagent.models.litellm_model import LitellmModel
+    from minisweagent.models.litellm_textbased_model import LitellmTextbasedModel
 
-    cell = f"DPE_opus48__minisweagent__code__generic__{para}__ep{ep}__effhigh"
+    cell = f"DPE_opus48__minisweagent__code__generic__{para}__ep{ep}__eff{effort}"
     out = TR / f"{cell}.json"
     if out.exists() and not overwrite:
         return f"{cell}: cached"
@@ -113,8 +113,8 @@ def run_cell(para, ep, key, overwrite):
     try:
         _exec(env, f"mkdir -p /workspace/data {CWD} && git -C {CWD} init -q")
         baseline = set(_exec(env, FIND_CMD).splitlines())
-        model = LitellmModel(model_name="anthropic/claude-opus-4-8",
-                             model_kwargs={"reasoning_effort": "high", "max_tokens": 16000})
+        model = LitellmTextbasedModel(model_name="anthropic/claude-opus-4-8",
+                                      model_kwargs={"reasoning_effort": effort, "max_tokens": 48000})
         agent = DefaultAgent(model, env, system_template=SYSTEM_TEMPLATE,
                              instance_template=INSTANCE_TEMPLATE, step_limit=STEP_LIMIT, cost_limit=5.0)
         try:
@@ -129,7 +129,7 @@ def run_cell(para, ep, key, overwrite):
             subprocess.run(["docker", "rm", "-f", env.container_id], capture_output=True)
     rec = {
         "cell": cell, "harness": "minisweagent", "model_key": "opus48", "model": "claude-opus-4-8",
-        "display_name": "Claude Opus 4.8", "effort": "high", "sysprompt": "miniswe",
+        "display_name": "Claude Opus 4.8", "effort": effort, "sysprompt": "miniswe",
         "suffix": "code", "subject": "generic", "paraphrase": para, "ep": ep, "request": prompt,
         "n_files": len(files), "files": files, "response_text": resp, "artifact_summary": summary,
         "n_steps": agent.n_calls if "agent" in dir() else 0, "error": err,
@@ -139,15 +139,16 @@ def run_cell(para, ep, key, overwrite):
     return f"{cell}: files={len(files)} steps={rec['n_steps']} resp={len(resp)} err={err}"
 
 
-def run(k: int = 4, conc: int = 8, paraphrases="p0,p1,p2,p3", overwrite: bool = False, smoke: bool = False):
+def run(k: int = 4, conc: int = 8, paraphrases="p0,p1,p2,p3", overwrite: bool = False, smoke: bool = False,
+        effort: str = "high"):
     key = _key()
     assert key, "no ANTHROPIC_API_KEY in ~/.env"
     paras = ["p0"] if smoke else [p for p in paraphrases.split(",") if p]
     K = 1 if smoke else k
     cells = [(para, ep) for para in paras for ep in range(1, K + 1)]
-    print(f"running {len(cells)} mini-swe cells (Opus 4.8, code, high effort, conc={conc})")
+    print(f"running {len(cells)} mini-swe cells (Opus 4.8, code, {effort} effort, conc={conc})")
     with ThreadPoolExecutor(max_workers=conc) as ex:
-        for r in ex.map(lambda c: run_cell(c[0], c[1], key, overwrite), cells):
+        for r in ex.map(lambda c: run_cell(c[0], c[1], key, overwrite, effort), cells):
             print(" ", r)
     print("done ->", TR)
 
