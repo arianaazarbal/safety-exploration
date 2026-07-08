@@ -77,3 +77,16 @@ QWEN_META = {
     "Qwen3-32B":       {"params_b": 32.0, "mmlu_pro": 65.54, "release": 2025.33, "family": "Qwen3"},
     "Qwen3-235B-A22B": {"params_b": 235.0,"mmlu_pro": 75.2,  "release": 2025.33, "family": "Qwen3"},
 }
+
+
+# Gemini RESPONDER recency ladder (model_key -> display, release decimal-year, tier). For the
+# Gemini-as-builder recency sweep (self-targeting: victim is also Gemini). Release dates approximate.
+GEMINI_REL = {
+    "gem25flash":     {"disp": "Gemini 2.5 Flash",      "release": 2025.40, "tier": "flash"},
+    "gem25pro":       {"disp": "Gemini 2.5 Pro",        "release": 2025.42, "tier": "pro"},
+    "gem25flashlite": {"disp": "Gemini 2.5 Flash-Lite", "release": 2025.55, "tier": "lite"},
+    "gem3flash":      {"disp": "Gemini 3 Flash",        "release": 2025.85, "tier": "flash"},
+    "gem31flashlite": {"disp": "Gemini 3.1 Flash-Lite", "release": 2026.00, "tier": "lite"},
+    "gemini31pro":    {"disp": "Gemini 3.1 Pro",        "release": 2026.05, "tier": "pro"},
+    "gem35flash":     {"disp": "Gemini 3.5 Flash",      "release": 2026.40, "tier": "flash"},
+}
